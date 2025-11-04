@@ -1,0 +1,258 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>0</epicId>
+    <storyId>2</storyId>
+    <title>Configure TailwindCSS 4.0 Oxide Engine + shadcn/ui</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-04</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/0-2-configure-tailwindcss-4-0-oxide-engine-shadcn-ui.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>developer</asA>
+    <iWant>TailwindCSS 4.0 and shadcn/ui configured</iWant>
+    <soThat>I can build UI components with the chosen styling framework</soThat>
+    <tasks>
+      - Install TailwindCSS 4.0 with Oxide engine (AC: 1)
+        - Run `npm install tailwindcss@4.0.0 -D`
+        - Run `npm install @tailwindcss/postcss@next -D`
+        - Verify TailwindCSS version is 4.0.x in package.json
+        - Test: Oxide engine active (check build output for Rust-based notice)
+      - Create Tailwind configuration file (AC: 2)
+        - Create `tailwind.config.ts` in project root
+        - Configure content paths: `./index.html`, `./src/**/*.{js,ts,jsx,tsx}`
+        - Add theme customization (colors, fonts if needed)
+        - Test: Verify config file loads without errors
+      - Configure PostCSS for Tailwind processing (AC: 8)
+        - Create `postcss.config.js` in project root
+        - Add `@tailwindcss/postcss` plugin
+        - Test: Build process uses PostCSS correctly
+      - Create global CSS file with Tailwind directives (AC: 3)
+        - Create `src/index.css` (or `src/App.css`)
+        - Add Tailwind directives: `@tailwind base;`, `@tailwind components;`, `@tailwind utilities;`
+        - Import CSS file in `src/main.tsx`
+        - Test: CSS file imports without errors
+      - Install and initialize shadcn/ui (AC: 4, 5)
+        - Run `npx shadcn@latest init`
+        - Configure shadcn/ui for TailwindCSS 4.0 compatibility
+        - Verify `components.json` created with correct settings
+        - Test: shadcn/ui configuration valid
+      - Install and test shadcn/ui Button component (AC: 7)
+        - Run `npx shadcn@latest add button`
+        - Verify Button component created at `src/components/ui/button.tsx`
+        - Import Button in `src/App.tsx` using path alias
+        - Render Button in App
+        - Test: Button renders correctly with Tailwind styles
+      - Test basic Tailwind utility classes (AC: 6)
+        - Add test div with Tailwind classes to App.tsx
+        - Run `npm run dev`
+        - Verify styles applied correctly in browser
+        - Test: HMR updates Tailwind classes instantly
+        - Test: Build includes Tailwind CSS
+      - Verify integration and cleanup (AC: 1-8)
+        - Run full build: `npm run build`
+        - Check build output size (should be optimized with Oxide engine)
+        - Verify no Tailwind warnings or errors
+        - Clean up any test components if needed
+        - Test: Production build works correctly
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    1. TailwindCSS 4.0.x installed with Oxide engine (Rust-based, 5x faster)
+    2. Tailwind configuration file created (tailwind.config.ts)
+    3. Global CSS file imports Tailwind directives (@tailwind base, components, utilities)
+    4. shadcn/ui CLI installed and initialized
+    5. shadcn/ui configuration set to use TailwindCSS 4.0 compatible settings
+    6. Test: Basic Tailwind classes work (bg-blue-500, text-white, etc.)
+    7. Test: Import and render shadcn/ui Button component successfully
+    8. PostCSS configured for Tailwind processing
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Decision Document</title>
+        <section>Executive Summary - Key Decisions</section>
+        <snippet>Styling: TailwindCSS 4.0.0 (Rust Oxide engine) + shadcn/ui. TailwindCSS 4: 5x faster builds with Oxide engine. shadcn/ui: Accessible Radix components with TailwindCSS styling.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Decision Document</title>
+        <section>Starter Template Decision - Installation Commands</section>
+        <snippet>Install TailwindCSS 4.0: npm install tailwindcss@4.0.0 -D, npm install @tailwindcss/postcss@next -D. Initialize shadcn/ui: npx shadcn@latest init. Add components: npx shadcn@latest add button.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Decision Document</title>
+        <section>Decision 3: UI Styling (TailwindCSS v4 + shadcn/ui)</section>
+        <snippet>TailwindCSS v4 Benefits: 5x faster builds (Rust Oxide engine vs JavaScript v3), smaller bundle size (no PurgeCSS needed), CSS-first config. shadcn/ui Benefits: Components copied to project (full customization), built on Radix UI (ARIA-compliant).</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Decision Document</title>
+        <section>Why TailwindCSS v4?</section>
+        <snippet>Build Performance: Rust Oxide engine (5x faster than v3), critical for sub-50ms UI requirement. Bundle Optimization: Native CSS minimization, automatic CSS optimization. shadcn/ui Compatibility: Fully compatible with v4, future-proof choice.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics/epic-0-infrastructure-project-setup.md</path>
+        <title>Epic 0: Infrastructure & Project Setup</title>
+        <section>Story 0.2 - Expanded Goal</section>
+        <snippet>Configure TailwindCSS 4.0 with Oxide engine and shadcn/ui for UI development. Establishes styling framework before feature development begins.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/0-1-initialize-vite-react-typescript-project.md</path>
+        <title>Story 0.1: Initialize Vite + React + TypeScript Project</title>
+        <section>Path Aliases Configuration</section>
+        <snippet>Path aliases configured: @/* → ./src/*, @features/* → ./src/features/*, @shared/* → ./src/shared/*. Vite config uses fileURLToPath and import.meta.url for ESM compatibility.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>vite.config.ts</path>
+        <kind>config</kind>
+        <symbol>defineConfig</symbol>
+        <lines>1-17</lines>
+        <reason>Existing Vite configuration with path aliases. PostCSS plugin for Tailwind will be added to this config or separate postcss.config.js.</reason>
+      </artifact>
+      <artifact>
+        <path>tsconfig.app.json</path>
+        <kind>config</kind>
+        <symbol>compilerOptions.paths</symbol>
+        <lines>27-33</lines>
+        <reason>TypeScript path aliases already configured for @/* imports. Ensures shadcn/ui imports (@/components/ui/*) work correctly.</reason>
+      </artifact>
+      <artifact>
+        <path>src/main.tsx</path>
+        <kind>entry</kind>
+        <symbol>createRoot</symbol>
+        <lines>1-8</lines>
+        <reason>Application entry point where global CSS (with Tailwind directives) will be imported.</reason>
+      </artifact>
+      <artifact>
+        <path>src/App.tsx</path>
+        <kind>component</kind>
+        <symbol>App</symbol>
+        <lines>1-8</lines>
+        <reason>Main component where Tailwind classes and shadcn/ui Button will be tested.</reason>
+      </artifact>
+      <artifact>
+        <path>package.json</path>
+        <kind>config</kind>
+        <symbol>dependencies</symbol>
+        <lines>1-27</lines>
+        <reason>Dependency manifest where TailwindCSS 4.0 and PostCSS packages will be added.</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <npm>
+        <existing>
+          <package name="vite" version="^7.1.12" type="dev">Fast HMR, ESM-only builds</package>
+          <package name="react" version="19.2">Latest stable with improved hooks API</package>
+          <package name="react-dom" version="19.2">React DOM renderer</package>
+          <package name="typescript" version="5.9" type="dev">Deferred imports support</package>
+          <package name="@vitejs/plugin-react" version="^4.7.0" type="dev">React plugin for Vite</package>
+          <package name="@types/react" version="^19.2.2" type="dev">React type definitions</package>
+          <package name="@types/react-dom" version="^19.2.2" type="dev">React DOM type definitions</package>
+          <package name="@types/node" version="^24.10.0" type="dev">Node.js type definitions</package>
+        </existing>
+        <to_install>
+          <package name="tailwindcss" version="4.0.0" type="dev">Rust-based Oxide engine for 5x faster builds</package>
+          <package name="@tailwindcss/postcss" version="next" type="dev">PostCSS plugin for TailwindCSS 4.0</package>
+          <note>shadcn/ui components installed via CLI, not as npm package. CLI copies components to src/components/ui/</note>
+        </to_install>
+      </npm>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Must use TailwindCSS 4.0.0 (not 3.x) with Oxide engine for 5x faster builds</constraint>
+    <constraint>PostCSS configuration required: @tailwindcss/postcss@next plugin</constraint>
+    <constraint>Global CSS must import Tailwind directives: @tailwind base; @tailwind components; @tailwind utilities;</constraint>
+    <constraint>shadcn/ui must be configured to use existing path aliases (@/* → ./src/*)</constraint>
+    <constraint>shadcn/ui components go in src/components/ui/ (shadcn convention)</constraint>
+    <constraint>Custom components built with shadcn/ui primitives go in src/shared/components/ (architecture convention)</constraint>
+    <constraint>Must meet PWA performance targets: LCP &lt; 2.5s, FID &lt; 100ms, CLS &lt; 0.1 (CSS should not block rendering)</constraint>
+    <constraint>Tailwind config content paths must include: ./index.html, ./src/**/*.{js,ts,jsx,tsx}</constraint>
+    <constraint>CSS file size target: &lt;50 KB for basic setup (Oxide optimization)</constraint>
+    <constraint>Build performance target: Sub-50ms UI updates (requires Oxide engine)</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>TailwindCSS 4.0 Configuration API</name>
+      <kind>config</kind>
+      <signature>tailwind.config.ts exports Config object with content, theme, plugins</signature>
+      <path>tailwind.config.ts</path>
+    </interface>
+    <interface>
+      <name>PostCSS Configuration API</name>
+      <kind>config</kind>
+      <signature>postcss.config.js exports { plugins: { '@tailwindcss/postcss': {} } }</signature>
+      <path>postcss.config.js</path>
+    </interface>
+    <interface>
+      <name>shadcn/ui CLI Configuration</name>
+      <kind>config</kind>
+      <signature>components.json defines style, base color, CSS variables, path aliases</signature>
+      <path>components.json</path>
+    </interface>
+    <interface>
+      <name>shadcn/ui Button Component API</name>
+      <kind>component</kind>
+      <signature>Button({ variant, size, asChild, children, ...props }): React.Element</signature>
+      <path>src/components/ui/button.tsx</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Testing framework for Story 0.2 is manual verification only (similar to Story 0.1). Automated testing infrastructure will be configured in Story 0.4 (Vitest) and Story 0.5 (Playwright). Manual tests focus on visual verification, HMR behavior, and build optimization. Test locations: tests/unit/ for future Vitest tests, tests/e2e/ for future Playwright tests.
+    </standards>
+    <locations>
+      <location>tests/unit/</location>
+      <location>tests/e2e/</location>
+      <note>Test directories created in Story 0.1, but test infrastructure configured in Stories 0.4 and 0.5</note>
+    </locations>
+    <ideas>
+      <test id="AC-1" type="manual">
+        <description>Verify TailwindCSS 4.0.x installed with Oxide engine</description>
+        <steps>Run: npm list tailwindcss. Verify version is 4.0.x. Check build output for Rust/Oxide references.</steps>
+      </test>
+      <test id="AC-2" type="manual">
+        <description>Verify Tailwind configuration file created</description>
+        <steps>Check tailwind.config.ts exists. Verify content paths include ./index.html and ./src/**/*.{js,ts,jsx,tsx}. Run build to confirm config loads.</steps>
+      </test>
+      <test id="AC-3" type="manual">
+        <description>Verify global CSS imports Tailwind directives</description>
+        <steps>Check src/index.css contains @tailwind base, @tailwind components, @tailwind utilities. Verify import in src/main.tsx.</steps>
+      </test>
+      <test id="AC-4-5" type="manual">
+        <description>Verify shadcn/ui installed and configured</description>
+        <steps>Check components.json exists. Verify settings: style (new-york/default), base color (slate), CSS variables (true), path alias (@/components).</steps>
+      </test>
+      <test id="AC-6" type="manual">
+        <description>Verify basic Tailwind utility classes work</description>
+        <steps>Add test div to App.tsx: &lt;div className="bg-blue-500 text-white p-4 rounded-lg"&gt;Tailwind Test&lt;/div&gt;. Run npm run dev. Verify styles render correctly in browser.</steps>
+      </test>
+      <test id="AC-7" type="manual">
+        <description>Verify shadcn/ui Button component renders</description>
+        <steps>Run: npx shadcn@latest add button. Import Button in App.tsx using @/components/ui/button. Render: &lt;Button variant="default"&gt;Test Button&lt;/Button&gt;. Verify button displays with Tailwind styles.</steps>
+      </test>
+      <test id="AC-8" type="manual">
+        <description>Verify PostCSS configured for Tailwind processing</description>
+        <steps>Check postcss.config.js exists with @tailwindcss/postcss plugin. Run npm run build. Verify CSS file generated in dist/ folder.</steps>
+      </test>
+      <test id="HMR" type="manual">
+        <description>Verify Hot Module Replacement works with Tailwind</description>
+        <steps>With dev server running, change Tailwind class (bg-blue-500 → bg-red-500). Verify browser auto-updates without full reload.</steps>
+      </test>
+      <test id="build-performance" type="manual">
+        <description>Verify Oxide engine improves build performance</description>
+        <steps>Run: npm run build. Note build time. Compare to expected sub-second build times with Oxide engine. Check CSS file size (&lt;50 KB target).</steps>
+      </test>
+    </ideas>
+  </tests>
+</story-context>

@@ -1,0 +1,16 @@
+# Build outputs
+dist
+build
+coverage
+
+# Dependencies
+node_modules
+
+# Husky
+.husky
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
