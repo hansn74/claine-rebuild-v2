@@ -1,6 +1,12 @@
 # Dependencies
 node_modules/
 
+# BMAD directories
+bmad/
+BMAD-METHOD/
+.claude/
+docs/
+
 # Build outputs
 dist/
 build/
