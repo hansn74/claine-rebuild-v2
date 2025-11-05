@@ -3,7 +3,7 @@ import { Button } from '@shared/components/ui/button'
 function App() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-8 p-8">
-      <h1 className="text-4xl font-bold">Claine v2</h1>
+      <h1 className="text-4xl font-bold">Claine v2 - Preview Deployment Test</h1>
 
       {/* AC: 6 - Test basic Tailwind utility classes */}
       <div className="bg-blue-500 text-white p-4 rounded-lg">
