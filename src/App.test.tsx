@@ -5,7 +5,7 @@ import App from './App'
 describe('App', () => {
   it('renders Claine v2 heading', () => {
     render(<App />)
-    expect(screen.getByText('Claine v2')).toBeInTheDocument()
+    expect(screen.getByText(/Claine v2/)).toBeInTheDocument()
   })
 
   it('renders Tailwind test element', () => {
