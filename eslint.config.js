@@ -10,7 +10,18 @@ import globals from 'globals'
 export default [
   // Ignore patterns
   {
-    ignores: ['dist', 'node_modules', '.husky', 'BMAD-METHOD', 'bmad', 'docs'],
+    ignores: [
+      'dist',
+      'node_modules',
+      '.husky',
+      'BMAD-METHOD',
+      'bmad',
+      'docs',
+      'coverage',
+      'test-results',
+      'playwright-report',
+      '.playwright',
+    ],
   },
 
   // Base JavaScript config
@@ -32,11 +43,20 @@ export default [
         ...globals.browser,
         ...globals.es2021,
         ...globals.node,
+        // Vitest globals (enabled by globals: true in vitest.config.ts)
+        describe: 'readonly',
+        it: 'readonly',
+        expect: 'readonly',
+        vi: 'readonly',
+        beforeEach: 'readonly',
+        afterEach: 'readonly',
+        beforeAll: 'readonly',
+        afterAll: 'readonly',
       },
     },
     plugins: {
       '@typescript-eslint': tsPlugin,
-      'react': reactPlugin,
+      react: reactPlugin,
       'react-hooks': reactHooksPlugin,
       'jsx-a11y': jsxA11yPlugin,
     },
