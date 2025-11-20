@@ -1,12 +1,15 @@
 import { test, expect } from '@playwright/test'
+import { waitForDatabaseReady } from './helpers/database'
 
 test.describe('App Component E2E Tests', () => {
   test('should load app and display heading', async ({ page }) => {
     // Navigate to the app
     await page.goto('/')
 
-    // Wait for the page to load
-    await page.waitForLoadState('networkidle')
+    // Wait for database initialization to complete before checking UI
+    // The App component initializes RxDB on mount which takes 1-2 seconds
+    // and only renders UI elements after successful initialization
+    await waitForDatabaseReady(page)
 
     // Assert h1 element contains "Claine v2"
     const heading = page.getByRole('heading', { name: /Claine v2/i, level: 1 })
@@ -18,8 +21,8 @@ test.describe('App Component E2E Tests', () => {
     // Navigate to the app
     await page.goto('/')
 
-    // Wait for the page to load
-    await page.waitForLoadState('networkidle')
+    // Wait for database initialization before checking UI elements
+    await waitForDatabaseReady(page)
 
     // Assert blue background div is visible and has content
     const tailwindTestDiv = page.getByText(
@@ -38,8 +41,8 @@ test.describe('App Component E2E Tests', () => {
     // Navigate to the app
     await page.goto('/')
 
-    // Wait for the page to load
-    await page.waitForLoadState('networkidle')
+    // Wait for database initialization before checking UI elements
+    await waitForDatabaseReady(page)
 
     // Assert at least 3 buttons are visible
     const defaultButton = page.getByRole('button', { name: /Default Button/i })
@@ -60,8 +63,8 @@ test.describe('App Component E2E Tests', () => {
     // Navigate to the app
     await page.goto('/')
 
-    // Wait for the page to load
-    await page.waitForLoadState('networkidle')
+    // Wait for database initialization before checking UI elements
+    await waitForDatabaseReady(page)
 
     // Verify all key elements are present on the page
     const heading = page.getByRole('heading', { name: /Claine v2/i, level: 1 })
