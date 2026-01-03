@@ -1,30 +1,59 @@
-import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { describe, it, expect, vi } from 'vitest'
+import { render, screen, waitFor } from '@testing-library/react'
 import App from './App'
 
+// Mock the logger to reduce noise
+vi.mock('@/services/logger', () => ({
+  logger: {
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  },
+}))
+
 describe('App', () => {
-  it('renders Claine v2 heading', () => {
+  it('renders welcome screen with Claine branding on first launch', async () => {
     render(<App />)
-    expect(screen.getByText(/Claine v2/)).toBeInTheDocument()
+    // Wait for database to initialize and welcome screen to appear
+    await waitFor(() => expect(screen.getByText('Welcome to Claine')).toBeInTheDocument(), {
+      timeout: 10000,
+    })
   })
 
-  it('renders Tailwind test element', () => {
+  it('shows intelligent email client tagline', async () => {
     render(<App />)
-    expect(screen.getByText(/Tailwind Test - Blue background/)).toBeInTheDocument()
+    // Wait for the welcome screen content
+    await waitFor(
+      () =>
+        expect(
+          screen.getByText(/Your intelligent, offline-first email client/)
+        ).toBeInTheDocument(),
+      { timeout: 10000 }
+    )
   })
 
-  it('renders Default Button', () => {
+  it('renders connect email button on welcome screen', async () => {
     render(<App />)
-    expect(screen.getByText('Default Button')).toBeInTheDocument()
+    // Wait for the CTA button
+    await waitFor(() => expect(screen.getByText(/Connect Email/)).toBeInTheDocument(), {
+      timeout: 10000,
+    })
   })
 
-  it('renders Secondary Button', () => {
+  it('shows feature highlights on welcome screen', async () => {
     render(<App />)
-    expect(screen.getByText('Secondary')).toBeInTheDocument()
+    // Wait for feature highlights to appear
+    await waitFor(() => expect(screen.getByText('Offline-first')).toBeInTheDocument(), {
+      timeout: 10000,
+    })
   })
 
-  it('renders Outline Button', () => {
+  it('displays privacy-focused messaging', async () => {
     render(<App />)
-    expect(screen.getByText('Outline')).toBeInTheDocument()
+    // Wait for privacy feature
+    await waitFor(() => expect(screen.getByText('Privacy focused')).toBeInTheDocument(), {
+      timeout: 10000,
+    })
   })
 })
