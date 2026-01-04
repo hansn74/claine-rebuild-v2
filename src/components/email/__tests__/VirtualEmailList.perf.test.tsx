@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 /**
  * Performance tests for VirtualEmailList component
  * Story 2.1: Virtualized Inbox Rendering

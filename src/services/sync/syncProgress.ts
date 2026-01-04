@@ -119,7 +119,8 @@ export class SyncProgressService {
       totalEmails > 0 ? Math.min((emailsSynced / totalEmails) * 100, 100) : 0
 
     // Estimate time remaining based on sync rate (±10% accuracy target)
-    const emailsRemaining = totalEmails - emailsSynced
+    // Ensure emailsRemaining is never negative (can happen if emailsSynced > totalEmails)
+    const emailsRemaining = Math.max(0, totalEmails - emailsSynced)
     const estimatedTimeRemaining =
       averageSyncRate > 0 ? (emailsRemaining / averageSyncRate) * 1000 : 0
 

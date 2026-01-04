@@ -6,6 +6,7 @@ import { RxDBDevModePlugin } from 'rxdb/plugins/dev-mode'
 import { wrappedValidateAjvStorage } from 'rxdb/plugins/validate-ajv'
 import type { AppDatabase } from './types'
 import { metadataSchema } from './schemas/metadata.schema'
+import { logger } from '@/services/logger'
 
 // Add required plugins (must be synchronous)
 addRxPlugin(RxDBUpdatePlugin)
@@ -43,19 +44,19 @@ export async function initDatabase(dbName: string = DATABASE_NAME): Promise<AppD
   try {
     // Return existing instance if already initialized
     if (dbInstance && dbInstance.name === dbName && !dbInstance.destroyed) {
-      console.log('[DB] Returning existing database instance')
+      logger.debug('db', 'Returning existing database instance')
       return dbInstance
     }
 
     // If initialization is in progress, wait for it
     if (initPromise) {
-      console.log('[DB] Waiting for existing initialization...')
+      logger.debug('db', 'Waiting for existing initialization...')
       return await initPromise
     }
 
     // Synchronous lock check (prevents React StrictMode race condition)
     if (isInitializing) {
-      console.log('[DB] Already initializing, waiting...')
+      logger.debug('db', 'Already initializing, waiting...')
       // Wait for initialization to complete
       await new Promise((resolve) => setTimeout(resolve, 100))
       if (dbInstance && !dbInstance.destroyed) {
@@ -69,7 +70,7 @@ export async function initDatabase(dbName: string = DATABASE_NAME): Promise<AppD
     // Set synchronous lock AND promise immediately (before any async work)
     // This prevents React StrictMode race conditions
     isInitializing = true
-    console.log('[DB] Starting database initialization...')
+    logger.info('db', 'Starting database initialization...')
 
     // Create the promise immediately so concurrent calls can wait on it
     initPromise = (async () => {
@@ -89,9 +90,10 @@ export async function initDatabase(dbName: string = DATABASE_NAME): Promise<AppD
       // Create database with Dexie/IndexedDB storage
       // Dev: with AJV validation for schema checking
       // Prod: without AJV (smaller bundle, validated at build time)
-      console.log(
-        `[DB] Creating RxDatabase: ${dbName} (storage: dexie, validation: ${import.meta.env.DEV ? 'ajv' : 'none'})`
-      )
+      logger.info('db', `Creating RxDatabase: ${dbName}`, {
+        storage: 'dexie',
+        validation: import.meta.env.DEV ? 'ajv' : 'none',
+      })
       const db = await createRxDatabase({
         name: dbName,
         storage,
@@ -101,33 +103,33 @@ export async function initDatabase(dbName: string = DATABASE_NAME): Promise<AppD
         // Use closeDuplicates instead to handle StrictMode double-mounting
         closeDuplicates: true,
       })
-      console.log('[DB] RxDatabase created successfully')
+      logger.debug('db', 'RxDatabase created successfully')
 
       // Create metadata collection for version tracking and migrations
       // Check if collection already exists (database might have been reopened)
       const typedDb = db as unknown as AppDatabase
       if (!typedDb.metadata) {
-        console.log('[DB] Creating metadata collection...')
+        logger.debug('db', 'Creating metadata collection...')
         await db.addCollections({
           metadata: { schema: metadataSchema },
         })
-        console.log('[DB] Metadata collection created')
+        logger.debug('db', 'Metadata collection created')
       } else {
-        console.log('[DB] Metadata collection already exists')
+        logger.debug('db', 'Metadata collection already exists')
       }
 
       // Check version and initialize if needed
       const existingVersion = await typedDb.metadata.findOne('db-version').exec()
       if (!existingVersion) {
-        console.log('[DB] Initializing version document...')
+        logger.debug('db', 'Initializing version document...')
         await typedDb.metadata.insert({
           id: 'db-version',
           version: DATABASE_VERSION,
           lastMigration: new Date().toISOString(),
         })
-        console.log(`[DB] Version document created (v${DATABASE_VERSION})`)
+        logger.info('db', 'Version document created', { version: DATABASE_VERSION })
       } else {
-        console.log(`[DB] Existing database version: ${existingVersion.version}`)
+        logger.info('db', 'Existing database version', { version: existingVersion.version })
 
         // Check for version mismatch (database newer than code)
         if (existingVersion.version > DATABASE_VERSION) {
@@ -138,7 +140,7 @@ export async function initDatabase(dbName: string = DATABASE_NAME): Promise<AppD
         }
       }
 
-      console.log('[DB] Database initialization complete!')
+      logger.info('db', 'Database initialization complete!')
       dbInstance = typedDb
       return typedDb
     })()
@@ -213,7 +215,9 @@ export async function closeDatabase(remove: boolean = false): Promise<void> {
               await collection.remove()
             } catch (removeError) {
               // Log but continue - collection might already be closed
-              console.warn(`Error removing collection ${collectionName}:`, removeError)
+              logger.warn('db', `Error removing collection ${collectionName}`, {
+                error: removeError,
+              })
             }
           }
         }
@@ -241,7 +245,7 @@ export async function closeDatabase(remove: boolean = false): Promise<void> {
       dbInstance = null
       initPromise = null
       // Don't throw - allow cleanup to complete
-      console.warn('Error during database close:', error)
+      logger.warn('db', 'Error during database close', { error })
     }
   }
 }

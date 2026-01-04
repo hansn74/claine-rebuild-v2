@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll, vi } from 'vitest'
 import { SyncOrchestratorService } from '../syncOrchestrator'
+import { logger } from '@/services/logger'
 import { initDatabase, closeDatabase, __resetDatabaseForTesting } from '../../database/init'
 import type { AppDatabase } from '../../database/types'
 import { syncStateSchema } from '../../database/schemas/syncState.schema'
@@ -7,6 +8,16 @@ import { syncStateSchema } from '../../database/schemas/syncState.schema'
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore - OPEN_COLLECTIONS is exported from rxdb but not in TypeScript types
 import { OPEN_COLLECTIONS } from 'rxdb'
+
+// Mock the logger
+vi.mock('@/services/logger', () => ({
+  logger: {
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  },
+}))
 
 // Mock the auth services
 vi.mock('../../auth/tokenStorage', () => ({
@@ -162,11 +173,13 @@ describe('SyncOrchestratorService', () => {
       await orchestrator.addAccount(testAccountId1, 'gmail')
       await orchestrator.start()
 
+      // Clear previous logger calls
+      vi.mocked(logger.debug).mockClear()
+
       // Try starting again
-      const consoleSpy = vi.spyOn(console, 'log')
       await orchestrator.start()
 
-      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Already started'))
+      expect(logger.debug).toHaveBeenCalledWith(expect.stringContaining('Already started'))
     })
   })
 
@@ -306,17 +319,16 @@ describe('SyncOrchestratorService', () => {
           new Response(JSON.stringify({ messages: [], resultSizeEstimate: 0 }), { status: 200 })
         )
 
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      // Clear previous logger calls
+      vi.mocked(logger.error).mockClear()
 
       await orchestrator.start()
 
       // First account should fail, but second should succeed
-      expect(consoleSpy).toHaveBeenCalledWith(
+      expect(logger.error).toHaveBeenCalledWith(
         expect.stringContaining('Initial sync failed'),
-        expect.any(Error)
+        expect.objectContaining({ accountId: testAccountId1 })
       )
-
-      consoleSpy.mockRestore()
     })
   })
 })

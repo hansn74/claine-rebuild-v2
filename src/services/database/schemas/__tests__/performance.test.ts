@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
 import { createRxDatabase, addRxPlugin, type RxDatabase } from 'rxdb'
 import { getRxStorageDexie } from 'rxdb/plugins/storage-dexie'
@@ -123,11 +124,8 @@ describe('Schema Performance Tests (AC: 8, 9)', () => {
       }, 0)
       const avgSize = totalSize / sampleEmails.length
 
-      // eslint-disable-next-line no-console
       console.log(`Average email size: ${(avgSize / 1024).toFixed(2)} KB`)
-      // eslint-disable-next-line no-console
       console.log(`Estimated 1K emails: ${((avgSize * 1000) / 1024 / 1024).toFixed(2)} MB`)
-      // eslint-disable-next-line no-console
       console.log(`Estimated 100K emails: ${((avgSize * 100000) / 1024 / 1024).toFixed(2)} MB`)
 
       // Verify estimate is reasonable (updated for smaller email format)
@@ -211,7 +209,6 @@ describe('Schema Performance Tests (AC: 8, 9)', () => {
 
       const duration = performance.now() - start
 
-      // eslint-disable-next-line no-console
       console.log(`Inbox query (1K emails, 50 results): ${duration.toFixed(2)}ms`)
 
       expect(emails.length).toBeGreaterThan(0)
@@ -245,7 +242,6 @@ describe('Schema Performance Tests (AC: 8, 9)', () => {
 
       const duration = performance.now() - start
 
-      // eslint-disable-next-line no-console
       console.log(`Label filter query (1K emails): ${duration.toFixed(2)}ms`)
 
       expect(emails.length).toBeGreaterThan(0)
@@ -265,7 +261,6 @@ describe('Schema Performance Tests (AC: 8, 9)', () => {
 
       const duration = performance.now() - start
 
-      // eslint-disable-next-line no-console
       console.log(`Custom attribute filter (1K emails): ${duration.toFixed(2)}ms`)
 
       expect(emails.length).toBeGreaterThan(0)
@@ -285,7 +280,6 @@ describe('Schema Performance Tests (AC: 8, 9)', () => {
 
       const duration = performance.now() - start
 
-      // eslint-disable-next-line no-console
       console.log(`AI priority filter (1K emails): ${duration.toFixed(2)}ms`)
 
       expect(emails.length).toBeGreaterThan(0)
@@ -334,7 +328,6 @@ describe('Schema Performance Tests (AC: 8, 9)', () => {
 
       const duration = performance.now() - start
 
-      // eslint-disable-next-line no-console
       console.log(`Thread list query (200 threads, 50 results): ${duration.toFixed(2)}ms`)
 
       expect(threads.length).toBeGreaterThan(0)

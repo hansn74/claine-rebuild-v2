@@ -11,6 +11,10 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
+    "bundle:analyze": "vite build && open reports/bundle-analysis.html",
+    "bundle:check": "vite build && npx tsx scripts/bundle-size.ts",
+    "bundle:compare": "npx tsx scripts/bundle-compare.ts",
+    "bundle:history": "npx tsx scripts/bundle-history.ts",
     "prepare": "husky",
     "lint": "eslint . --ext ts,tsx,js,jsx --report-unused-disable-directives --max-warnings 0",
     "lint:fix": "eslint . --ext ts,tsx,js,jsx --fix",
@@ -23,7 +27,8 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:debug": "playwright test --debug",
-    "test:e2e:report": "playwright show-report"
+    "test:e2e:report": "playwright show-report",
+    "test:perf": "vitest run src/utils/performance src/utils/workers src/services/database/__tests__/queryCache src/components/dev --reporter=verbose"
   },
   "devDependencies": {
     "@playwright/test": "^1.56.1",
@@ -32,6 +37,7 @@
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.1",
+    "@types/dompurify": "^3.0.5",
     "@types/node": "^24.10.0",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
@@ -47,13 +53,16 @@
     "eslint-plugin-jsx-a11y": "^6.10.2",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.0.1",
+    "fake-indexeddb": "^6.2.4",
     "globals": "^16.5.0",
+    "gzip-size": "^7.0.0",
     "husky": "^9.1.7",
     "jsdom": "^27.1.0",
     "lint-staged": "^16.2.6",
     "lucide-react": "^0.552.0",
     "playwright": "^1.56.1",
     "prettier": "^3.6.2",
+    "rollup-plugin-visualizer": "^6.0.5",
     "tailwind-merge": "^3.3.1",
     "tailwindcss": "^4.1.16",
     "tailwindcss-animate": "^1.0.7",
@@ -62,8 +71,23 @@
     "vitest": "^4.0.7"
   },
   "dependencies": {
+    "@azure/msal-browser": "^4.26.2",
+    "@microsoft/microsoft-graph-client": "^3.0.7",
+    "@sentry/react": "^10.27.0",
+    "@tanstack/react-virtual": "^3.13.12",
+    "@tiptap/extension-link": "^3.11.1",
+    "@tiptap/extension-placeholder": "^3.11.1",
+    "@tiptap/react": "^3.11.1",
+    "@tiptap/starter-kit": "^3.11.1",
+    "@types/lunr": "^2.3.7",
+    "dompurify": "^3.3.0",
+    "lunr": "^2.3.9",
     "react": "19.2",
-    "react-dom": "19.2"
+    "react-dom": "19.2",
+    "react-hotkeys-hook": "^4.6.2",
+    "rxdb": "^16.20.0",
+    "rxjs": "^7.8.2",
+    "zustand": "^5.0.8"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx}": [

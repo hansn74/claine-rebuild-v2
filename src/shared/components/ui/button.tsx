@@ -4,18 +4,37 @@ import { cva, type VariantProps } from 'class-variance-authority'
 
 import { cn } from '@shared/utils/cn'
 
+/**
+ * Button variants following UX Design System
+ * - Primary: Cyan background, white text
+ * - Secondary: Slate background, dark text
+ * - Tertiary: Text only, hover underline
+ * - Border radius: 6px (medium)
+ */
 const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
+  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
   {
     variants: {
       variant: {
-        default: 'bg-primary text-primary-foreground shadow hover:bg-primary/90',
+        // Primary: Cyan background (UX spec)
+        default: 'bg-primary text-primary-foreground shadow-subtle hover:bg-primary/90',
+        // Destructive: Red (error color)
         destructive: 'bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90',
+        // Outline: Border with background
         outline:
           'border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground',
+        // Secondary: Slate background (UX spec)
         secondary: 'bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80',
+        // Ghost: Transparent with hover
         ghost: 'hover:bg-accent hover:text-accent-foreground',
+        // Tertiary: Text only, hover underline (UX spec)
+        tertiary: 'text-primary hover:underline underline-offset-4',
+        // Link: Similar to tertiary but always with underline behavior
         link: 'text-primary underline-offset-4 hover:underline',
+        // Success variant for confirmation actions
+        success: 'bg-success text-success-foreground shadow-sm hover:bg-success/90',
+        // Warning variant
+        warning: 'bg-warning text-warning-foreground shadow-sm hover:bg-warning/90',
       },
       size: {
         default: 'h-9 px-4 py-2',
