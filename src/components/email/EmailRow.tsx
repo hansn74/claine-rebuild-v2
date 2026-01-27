@@ -14,16 +14,15 @@
  * - Slate color palette
  */
 
-import { memo, useMemo } from 'react'
+import { memo, useMemo, useCallback, MouseEvent } from 'react'
 import { cn } from '@shared/utils/cn'
 import { AttributeTagList } from './attributes'
+import { useSelectionStore } from '@/store/selectionStore'
 import type { EmailDocument } from '@/services/database/schemas/email.schema'
 
 interface EmailRowProps {
   email: EmailDocument
   isSelected?: boolean
-  /** Story 2.11: Whether this row is keyboard-focused (j/k navigation) */
-  isFocused?: boolean
   onClick?: () => void
 }
 
@@ -80,10 +79,26 @@ function getSenderDisplay(email: EmailDocument): string {
 export const EmailRow = memo(function EmailRow({
   email,
   isSelected = false,
-  isFocused = false,
   onClick,
 }: EmailRowProps) {
   const isUnread = !email.read
+
+  // Multi-selection state from selection store
+  // Use threadId for consistency with selectedEmailId in emailStore
+  const selectionId = email.threadId || email.id
+  const selectedIds = useSelectionStore((state) => state.selectedIds)
+  const isChecked = selectedIds.has(selectionId)
+  const selectMode = useSelectionStore((state) => state.selectMode)
+  const toggleSelect = useSelectionStore((state) => state.toggleSelect)
+
+  // Handle checkbox click without triggering row click
+  const handleCheckboxClick = useCallback(
+    (e: MouseEvent) => {
+      e.stopPropagation()
+      toggleSelect(selectionId)
+    },
+    [selectionId, toggleSelect]
+  )
 
   // Build accessible label for screen readers
   const ariaLabel = `${isUnread ? 'Unread: ' : ''}${getSenderDisplay(email)} - ${email.subject || '(No subject)'}`
@@ -97,7 +112,7 @@ export const EmailRow = memo(function EmailRow({
   return (
     <div
       role="button"
-      tabIndex={isFocused ? 0 : -1}
+      tabIndex={isSelected ? 0 : -1}
       onClick={onClick}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -109,48 +124,71 @@ export const EmailRow = memo(function EmailRow({
       aria-pressed={isSelected}
       className={cn(
         // Base: 48px height, compact padding (UX spec)
-        'h-12 flex items-center gap-3 py-2 px-3',
+        'group h-12 flex items-center gap-3 py-2 px-3',
         'border-b border-slate-200 cursor-pointer transition-colors',
+        // Remove browser focus outline
+        'outline-none focus:outline-none',
         // Hover state
         'hover:bg-slate-50',
         // Background based on read state
-        !isUnread && !isSelected && !isFocused && 'bg-slate-50/50',
-        isUnread && !isSelected && !isFocused && 'bg-white',
+        !isUnread && !isSelected && !isChecked && 'bg-slate-50/50',
+        isUnread && !isSelected && !isChecked && 'bg-white',
         // Selection state: cyan border left (UX spec)
         isSelected && 'bg-cyan-50 border-l-4 border-l-cyan-500',
-        // Story 2.11: Focused state for keyboard navigation
-        isFocused && !isSelected && 'ring-2 ring-cyan-400 ring-inset'
+        // Multi-select checked state
+        isChecked && !isSelected && 'bg-cyan-50/50'
       )}
     >
+      {/* Selection checkbox - visible on hover or when in select mode */}
+      <div
+        className={cn(
+          'w-5 flex-shrink-0 flex items-center justify-center',
+          // Show checkbox on hover or when in select mode
+          !selectMode && !isChecked && 'opacity-0 group-hover:opacity-100',
+          (selectMode || isChecked) && 'opacity-100'
+        )}
+      >
+        <input
+          type="checkbox"
+          checked={isChecked}
+          onClick={handleCheckboxClick}
+          onChange={() => {}} // Click handler manages state
+          className="h-4 w-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500 cursor-pointer"
+          aria-label={`Select ${email.subject || 'email'}`}
+        />
+      </div>
+
       {/* Unread indicator dot */}
       <div className="w-2 flex-shrink-0">
         {isUnread && <div className="w-2 h-2 rounded-full bg-cyan-500" title="Unread" />}
       </div>
 
-      {/* Sender - fixed width for alignment */}
+      {/* Sender - wider for readability */}
       <span
         className={cn(
-          'w-32 flex-shrink-0 text-sm truncate',
+          'w-36 flex-shrink-0 text-sm truncate',
           isUnread ? 'font-semibold text-slate-900' : 'text-slate-600'
         )}
+        title={getSenderDisplay(email)}
       >
         {getSenderDisplay(email)}
       </span>
 
-      {/* Subject and snippet - flex grow */}
-      <div className="flex-1 min-w-0 flex items-center gap-2">
-        <span
-          className={cn(
-            'text-sm truncate',
-            isUnread ? 'font-medium text-slate-900' : 'text-slate-700'
-          )}
-        >
-          {email.subject || '(No subject)'}
-        </span>
-        <span className="text-xs text-slate-400 truncate hidden sm:inline">
-          — {email.snippet || ''}
-        </span>
-      </div>
+      {/* Subject - truncates with ellipsis, fixed width */}
+      <span
+        className={cn(
+          'w-48 flex-shrink-0 text-sm truncate',
+          isUnread ? 'font-semibold text-slate-900' : 'text-slate-700'
+        )}
+        title={email.subject || '(No subject)'}
+      >
+        {email.subject || '(No subject)'}
+      </span>
+
+      {/* Snippet - fills remaining space, truncates */}
+      <span className="flex-1 min-w-0 text-sm text-slate-500 truncate" title={email.snippet || ''}>
+        {email.snippet || ''}
+      </span>
 
       {/* Indicators: attributes, attachments, starred */}
       <div className="flex items-center gap-1.5 flex-shrink-0">

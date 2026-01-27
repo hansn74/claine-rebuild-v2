@@ -16,7 +16,7 @@
  * - AC 3: Enter to open selected email
  */
 
-import { useRef, useEffect, useCallback, useState, useMemo } from 'react'
+import { useRef, useEffect, useCallback, useMemo } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useEmails } from '@/hooks/useEmails'
 import { useEmailListStore } from '@/store/emailListStore'
@@ -37,7 +37,8 @@ interface VirtualEmailListProps {
   accountId?: string
   folder?: string // Filter by folder (Task 5.1)
   onEmailSelect?: (email: EmailDocument) => void
-  selectedEmailId?: string | null
+  selectedEmailId?: string | null // Actual email ID for j/k navigation
+  selectedThreadId?: string | null // Thread ID for visual highlight (cyan border)
 }
 
 /**
@@ -71,6 +72,7 @@ export function VirtualEmailList({
   folder,
   onEmailSelect,
   selectedEmailId,
+  selectedThreadId,
 }: VirtualEmailListProps) {
   const parentRef = useRef<HTMLDivElement>(null)
 
@@ -89,8 +91,7 @@ export function VirtualEmailList({
     return hasFilters ? activeFilters : undefined
   }, [activeFilters, hasFilters])
 
-  // Story 2.11: Keyboard navigation state
-  const [focusedIndex, setFocusedIndex] = useState<number>(0)
+  // Story 2.11: Keyboard navigation uses selection directly (no separate focus state)
   const { setActiveScope, vimModeEnabled } = useShortcuts()
 
   // Fetch emails reactively from RxDB
@@ -155,57 +156,70 @@ export function VirtualEmailList({
     }
   }, [scrollOffset, setScrollOffset, hasMore, loadingMore, loadMore, emails.length])
 
-  // Handle email click
+  // Track if selection came from click (internal) vs search/external
+  const selectionFromClickRef = useRef(false)
+
+  // Handle email click - just select the email
   const handleEmailClick = useCallback(
-    (email: EmailDocument, index: number) => {
-      setFocusedIndex(index)
+    (email: EmailDocument) => {
+      selectionFromClickRef.current = true // Mark as click-initiated
       onEmailSelect?.(email)
     },
     [onEmailSelect]
   )
 
-  // Story 2.11: Navigation handlers for j/k shortcuts
+  // Find current selection index for navigation (uses actual email ID, not threadId)
+  const currentIndex = useMemo(() => {
+    if (!selectedEmailId || emails.length === 0) return -1
+    return emails.findIndex((e) => e.id === selectedEmailId)
+  }, [selectedEmailId, emails])
+
+  // Story 2.11: Navigation handlers for j/k shortcuts - directly select next/previous
   const handleMoveDown = useCallback(() => {
     if (emails.length === 0) return
-    const newIndex = Math.min(focusedIndex + 1, emails.length - 1)
-    setFocusedIndex(newIndex)
-    // Scroll the focused item into view
+    // If nothing selected, select first; otherwise select next
+    const newIndex = currentIndex < 0 ? 0 : Math.min(currentIndex + 1, emails.length - 1)
+    const email = emails[newIndex]
+    selectionFromClickRef.current = true // Prevent useEffect from also scrolling
+    onEmailSelect?.(email)
     virtualizer.scrollToIndex(newIndex, { align: 'auto' })
-    logger.debug('shortcuts', 'Navigate down', { newIndex, total: emails.length })
-  }, [focusedIndex, emails.length, virtualizer])
+    logger.debug('shortcuts', 'Navigate down & select', { newIndex, total: emails.length })
+  }, [currentIndex, emails, onEmailSelect, virtualizer])
 
   const handleMoveUp = useCallback(() => {
     if (emails.length === 0) return
-    const newIndex = Math.max(focusedIndex - 1, 0)
-    setFocusedIndex(newIndex)
-    // Scroll the focused item into view
-    virtualizer.scrollToIndex(newIndex, { align: 'auto' })
-    logger.debug('shortcuts', 'Navigate up', { newIndex, total: emails.length })
-  }, [focusedIndex, emails.length, virtualizer])
-
-  const handleSelect = useCallback(() => {
-    if (emails.length === 0 || focusedIndex < 0 || focusedIndex >= emails.length) return
-    const email = emails[focusedIndex]
+    // If nothing selected, select first; otherwise select previous
+    const newIndex = currentIndex < 0 ? 0 : Math.max(currentIndex - 1, 0)
+    const email = emails[newIndex]
+    selectionFromClickRef.current = true // Prevent useEffect from also scrolling
     onEmailSelect?.(email)
-    logger.debug('shortcuts', 'Select email via Enter', { emailId: email.id, index: focusedIndex })
-  }, [emails, focusedIndex, onEmailSelect])
+    virtualizer.scrollToIndex(newIndex, { align: 'auto' })
+    logger.debug('shortcuts', 'Navigate up & select', { newIndex, total: emails.length })
+  }, [currentIndex, emails, onEmailSelect, virtualizer])
 
-  // Vim mode: go to top (gg)
+  // Enter key - no-op since j/k already select (kept for compatibility)
+  const handleSelect = useCallback(() => {
+    // j/k already select, Enter does nothing extra
+  }, [])
+
+  // Vim mode: go to top (gg) - select first email
   const handleGoToTop = useCallback(() => {
     if (emails.length === 0) return
-    setFocusedIndex(0)
+    const email = emails[0]
+    onEmailSelect?.(email)
     virtualizer.scrollToIndex(0, { align: 'start' })
-    logger.debug('shortcuts', 'Navigate to top (gg)')
-  }, [emails.length, virtualizer])
+    logger.debug('shortcuts', 'Navigate to top & select (gg)')
+  }, [emails, onEmailSelect, virtualizer])
 
-  // Vim mode: go to bottom (G)
+  // Vim mode: go to bottom (G) - select last email
   const handleGoToBottom = useCallback(() => {
     if (emails.length === 0) return
     const lastIndex = emails.length - 1
-    setFocusedIndex(lastIndex)
+    const email = emails[lastIndex]
+    onEmailSelect?.(email)
     virtualizer.scrollToIndex(lastIndex, { align: 'end' })
-    logger.debug('shortcuts', 'Navigate to bottom (G)')
-  }, [emails.length, virtualizer])
+    logger.debug('shortcuts', 'Navigate to bottom & select (G)')
+  }, [emails, onEmailSelect, virtualizer])
 
   // Story 2.11: Register navigation shortcuts (only when in inbox scope)
   useNavigationShortcuts({
@@ -223,12 +237,40 @@ export function VirtualEmailList({
     setActiveScope('inbox')
   }, [setActiveScope])
 
-  // Reset focused index when emails change
+  // Track previous selectedEmailId to only scroll when it actually changes
+  const prevSelectedEmailIdRef = useRef<string | null>(null)
+
+  // Scroll to selected email only when selection changes from outside (e.g., from search)
+  // Don't scroll when user clicks an email or when email data changes (e.g., mark read/unread)
   useEffect(() => {
-    if (emails.length > 0 && focusedIndex >= emails.length) {
-      setFocusedIndex(Math.max(0, emails.length - 1))
+    const selectionActuallyChanged = selectedEmailId !== prevSelectedEmailIdRef.current
+    prevSelectedEmailIdRef.current = selectedEmailId
+
+    if (
+      selectedEmailId &&
+      emails.length > 0 &&
+      selectionActuallyChanged &&
+      !selectionFromClickRef.current
+    ) {
+      const index = emails.findIndex((e) => e.id === selectedEmailId)
+      if (index >= 0) {
+        // Use requestAnimationFrame to ensure virtualizer has updated measurements
+        // Use align: 'auto' so it only scrolls if item is outside visible area
+        requestAnimationFrame(() => {
+          virtualizer.scrollToIndex(index, { align: 'auto' })
+        })
+      }
     }
-  }, [emails.length, focusedIndex])
+    // Reset the flag after processing
+    selectionFromClickRef.current = false
+  }, [selectedEmailId, emails, virtualizer])
+
+  // Scroll to top when folder changes (but not when email is selected)
+  useEffect(() => {
+    if (parentRef.current && !selectedEmailId) {
+      parentRef.current.scrollTop = 0
+    }
+  }, [folder, selectedEmailId])
 
   // Loading state - Story 2.12: Task 6
   if (loading) {
@@ -298,7 +340,6 @@ export function VirtualEmailList({
           {/* Render only visible rows + overscan buffer */}
           {virtualRows.map((virtualRow) => {
             const email = emails[virtualRow.index]
-            const isFocused = virtualRow.index === focusedIndex
             return (
               <div
                 key={virtualRow.key}
@@ -314,9 +355,8 @@ export function VirtualEmailList({
               >
                 <EmailRow
                   email={email}
-                  isSelected={email.id === selectedEmailId}
-                  isFocused={isFocused}
-                  onClick={() => handleEmailClick(email, virtualRow.index)}
+                  isSelected={email.threadId === selectedThreadId}
+                  onClick={() => handleEmailClick(email)}
                 />
               </div>
             )

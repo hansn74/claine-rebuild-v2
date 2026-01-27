@@ -132,11 +132,7 @@ export const useEmailStore = create<EmailStoreState>((set, get) => ({
       // Mark as completed (optimistic was already applied in service)
       setActionCompleted(action)
 
-      // Clear selection if archived email was selected
-      const { selectedEmailId } = get()
-      if (selectedEmailId === emailId) {
-        set({ selectedEmailId: null, selectedThreadId: null })
-      }
+      // Note: Selection is handled by useEmailKeyboardShortcuts which auto-advances to next email
 
       logger.info('email-store', 'Email archived', { emailId })
       return action
@@ -165,11 +161,7 @@ export const useEmailStore = create<EmailStoreState>((set, get) => ({
 
       setActionCompleted(action)
 
-      // Clear selection if deleted email was selected
-      const { selectedEmailId } = get()
-      if (selectedEmailId === emailId) {
-        set({ selectedEmailId: null, selectedThreadId: null })
-      }
+      // Note: Selection is handled by useEmailKeyboardShortcuts which auto-advances to next email
 
       logger.info('email-store', 'Email deleted', { emailId })
       return action

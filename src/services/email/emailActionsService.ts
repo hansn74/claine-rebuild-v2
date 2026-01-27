@@ -19,7 +19,39 @@
 import { Subject, Observable } from 'rxjs'
 import { getDatabase } from '@/services/database/init'
 import { logger } from '@/services/logger'
+import { emailActionQueue } from './emailActionQueue'
 import type { EmailDocument } from '@/services/database/schemas/email.schema'
+
+/**
+ * Detect provider type from accountId
+ * Handles both prefixed format (gmail:user@example.com) and plain email format
+ */
+function getProviderType(accountId: string): 'gmail' | 'outlook' {
+  // Check for prefixed format first (gmail:user@example.com)
+  if (accountId.startsWith('gmail:')) {
+    return 'gmail'
+  }
+  if (accountId.startsWith('outlook:') || accountId.startsWith('microsoft:')) {
+    return 'outlook'
+  }
+
+  // Fallback: Use domain heuristics for plain email format
+  const lowerAccountId = accountId.toLowerCase()
+  if (lowerAccountId.includes('@gmail.com') || lowerAccountId.includes('@googlemail.com')) {
+    return 'gmail'
+  }
+  if (
+    lowerAccountId.includes('@outlook.') ||
+    lowerAccountId.includes('@hotmail.') ||
+    lowerAccountId.includes('@live.') ||
+    lowerAccountId.includes('@msn.')
+  ) {
+    return 'outlook'
+  }
+
+  // Default to gmail if unknown
+  return 'gmail'
+}
 
 /**
  * Types of email actions that can be performed
@@ -142,13 +174,24 @@ export class EmailActionsService {
 
       await emailDoc.update({
         $set: {
-          folder: 'ARCHIVE',
+          folder: 'archive',
           labels: newLabels,
         },
       })
 
-      logger.info('email-actions', 'Email archived', { emailId, folder: 'ARCHIVE' })
+      logger.info('email-actions', 'Email archived', { emailId, folder: 'archive' })
       this.events$.next({ type: 'action-completed', action })
+
+      // Queue action for sync to provider (Gmail/Outlook)
+      const providerType = getProviderType(email.accountId)
+      try {
+        await emailActionQueue.queueAction(action, providerType)
+      } catch (queueError) {
+        logger.warn('email-actions', 'Failed to queue archive action for sync', {
+          emailId,
+          error: queueError instanceof Error ? queueError.message : String(queueError),
+        })
+      }
 
       return action
     } catch (error) {
@@ -222,12 +265,23 @@ export class EmailActionsService {
       // Move to Trash
       await emailDoc.update({
         $set: {
-          folder: 'TRASH',
+          folder: 'trash',
         },
       })
 
       logger.info('email-actions', 'Email deleted (moved to trash)', { emailId })
       this.events$.next({ type: 'action-completed', action })
+
+      // Queue action for sync to provider (Gmail/Outlook)
+      const providerType = getProviderType(email.accountId)
+      try {
+        await emailActionQueue.queueAction(action, providerType)
+      } catch (queueError) {
+        logger.warn('email-actions', 'Failed to queue delete action for sync', {
+          emailId,
+          error: queueError instanceof Error ? queueError.message : String(queueError),
+        })
+      }
 
       return action
     } catch (error) {
@@ -325,6 +379,17 @@ export class EmailActionsService {
         read: newReadStatus,
       })
       this.events$.next({ type: 'action-completed', action })
+
+      // Queue action for sync to provider (Gmail/Outlook)
+      const providerType = getProviderType(email.accountId)
+      try {
+        await emailActionQueue.queueAction(action, providerType)
+      } catch (queueError) {
+        logger.warn('email-actions', 'Failed to queue read status action for sync', {
+          emailId,
+          error: queueError instanceof Error ? queueError.message : String(queueError),
+        })
+      }
 
       return action
     } catch (error) {

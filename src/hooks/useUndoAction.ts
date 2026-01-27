@@ -76,16 +76,6 @@ export function useUndoAction(): UseUndoActionReturn {
   }, [addAction])
 
   /**
-   * Add an action to the undo queue manually
-   */
-  const addToUndoQueue = useCallback(
-    (action: EmailAction) => {
-      addAction(action)
-    },
-    [addAction]
-  )
-
-  /**
    * Undo the last action
    * Task 7.5: Handle undo for archive, delete, mark read actions
    */
@@ -105,6 +95,42 @@ export function useUndoAction(): UseUndoActionReturn {
       })
     }
   }, [getLatestAction, undoAction, performUndo])
+
+  /**
+   * Cmd+Z keyboard shortcut for undo
+   */
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Cmd+Z (Mac) or Ctrl+Z (Windows/Linux)
+      if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
+        // Don't intercept in text inputs (let them handle their own undo)
+        const target = e.target as HTMLElement
+        if (
+          target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable
+        ) {
+          return
+        }
+
+        e.preventDefault()
+        undoLastAction()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [undoLastAction])
+
+  /**
+   * Add an action to the undo queue manually
+   */
+  const addToUndoQueue = useCallback(
+    (action: EmailAction) => {
+      addAction(action)
+    },
+    [addAction]
+  )
 
   /**
    * Check if there are pending undoable actions

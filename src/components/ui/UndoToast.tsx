@@ -11,8 +11,8 @@
  */
 
 import { useEffect, useState, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { X, Undo2, Archive, Trash2, Mail, MailOpen } from 'lucide-react'
-import { cn } from '@/utils/cn'
 import { useUndoStore, type UndoableAction } from '@/store/undoStore'
 import { useEmailStore } from '@/store/emailStore'
 import type { EmailActionType } from '@/services/email/emailActionsService'
@@ -28,13 +28,13 @@ interface UndoToastProps {
 function getActionIcon(type: EmailActionType) {
   switch (type) {
     case 'archive':
-      return <Archive className="w-4 h-4" />
+      return <Archive style={{ width: 16, height: 16 }} />
     case 'delete':
-      return <Trash2 className="w-4 h-4" />
+      return <Trash2 style={{ width: 16, height: 16 }} />
     case 'mark-read':
-      return <Mail className="w-4 h-4" />
+      return <Mail style={{ width: 16, height: 16 }} />
     case 'mark-unread':
-      return <MailOpen className="w-4 h-4" />
+      return <MailOpen style={{ width: 16, height: 16 }} />
     default:
       return null
   }
@@ -59,7 +59,7 @@ function getActionText(type: EmailActionType): string {
 }
 
 /**
- * Single undo toast item
+ * Single undo toast item - using inline styles for debugging
  */
 function UndoToastItem({
   undoableAction,
@@ -99,31 +99,48 @@ function UndoToastItem({
 
   return (
     <div
-      className={cn(
-        'flex items-center gap-3 px-4 py-3 bg-slate-900 text-white rounded-lg shadow-lg',
-        'animate-in slide-in-from-bottom-4 fade-in duration-200'
-      )}
+      style={{
+        position: 'relative',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+        padding: '12px 16px',
+        backgroundColor: '#0f172a',
+        color: 'white',
+        borderRadius: '8px',
+        boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+        minHeight: '48px',
+        minWidth: '300px',
+      }}
       role="alert"
       aria-live="polite"
     >
       {/* Icon */}
-      <span className="flex-shrink-0 text-slate-400">{getActionIcon(action.type)}</span>
+      <span style={{ flexShrink: 0, color: '#94a3b8' }}>{getActionIcon(action.type)}</span>
 
       {/* Message */}
-      <span className="flex-1 text-sm">Email {getActionText(action.type)}</span>
+      <span style={{ flex: 1, fontSize: '14px' }}>Email {getActionText(action.type)}</span>
 
       {/* Undo button */}
       <button
         type="button"
         onClick={onUndo}
-        className={cn(
-          'flex items-center gap-1.5 px-3 py-1 rounded text-sm font-medium',
-          'bg-slate-700 hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-white/50',
-          'transition-colors'
-        )}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          padding: '4px 12px',
+          borderRadius: '4px',
+          fontSize: '14px',
+          fontWeight: 500,
+          backgroundColor: '#334155',
+          color: 'white',
+          border: 'none',
+          cursor: 'pointer',
+        }}
         aria-label="Undo action"
       >
-        <Undo2 className="w-3.5 h-3.5" />
+        <Undo2 style={{ width: 14, height: 14 }} />
         Undo
       </button>
 
@@ -131,20 +148,40 @@ function UndoToastItem({
       <button
         type="button"
         onClick={onDismiss}
-        className={cn(
-          'p-1 rounded text-slate-400 hover:text-white',
-          'focus:outline-none focus:ring-2 focus:ring-white/50'
-        )}
+        style={{
+          padding: '4px',
+          borderRadius: '4px',
+          color: '#94a3b8',
+          backgroundColor: 'transparent',
+          border: 'none',
+          cursor: 'pointer',
+        }}
         aria-label="Dismiss notification"
       >
-        <X className="w-4 h-4" />
+        <X style={{ width: 16, height: 16 }} />
       </button>
 
       {/* Progress bar */}
-      <div className="absolute bottom-0 left-0 right-0 h-1 bg-slate-700 rounded-b-lg overflow-hidden">
+      <div
+        style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: '4px',
+          backgroundColor: '#334155',
+          borderBottomLeftRadius: '8px',
+          borderBottomRightRadius: '8px',
+          overflow: 'hidden',
+        }}
+      >
         <div
-          className="h-full bg-cyan-500 transition-all duration-100 ease-linear"
-          style={{ width: `${progress * 100}%` }}
+          style={{
+            height: '100%',
+            backgroundColor: '#06b6d4',
+            width: `${progress * 100}%`,
+            transition: 'width 100ms linear',
+          }}
         />
       </div>
     </div>
@@ -153,20 +190,8 @@ function UndoToastItem({
 
 /**
  * UndoToast - Container for undo notifications
- *
- * Usage:
- * ```tsx
- * function App() {
- *   return (
- *     <>
- *       <MainContent />
- *       <UndoToast />
- *     </>
- *   )
- * }
- * ```
  */
-export function UndoToast({ className }: UndoToastProps) {
+export function UndoToast({ className: _className }: UndoToastProps) {
   const { pendingActions, undoAction, removeAction } = useUndoStore()
   const { undoAction: performUndo } = useEmailStore()
 
@@ -201,9 +226,18 @@ export function UndoToast({ className }: UndoToastProps) {
     return null
   }
 
-  return (
+  const toastContent = (
     <div
-      className={cn('fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm', className)}
+      style={{
+        position: 'fixed',
+        bottom: '24px',
+        right: '24px',
+        zIndex: 99999,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '8px',
+        width: '340px',
+      }}
       role="region"
       aria-label="Undo notifications"
     >
@@ -218,8 +252,13 @@ export function UndoToast({ className }: UndoToastProps) {
 
       {/* Show count if more than 3 */}
       {visibleActions.length > 3 && (
-        <div className="text-xs text-slate-400 text-center">+{visibleActions.length - 3} more</div>
+        <div style={{ fontSize: '12px', color: '#94a3b8', textAlign: 'center' }}>
+          +{visibleActions.length - 3} more
+        </div>
       )}
     </div>
   )
+
+  // Use portal to render at document.body level, avoiding any parent transform/overflow issues
+  return createPortal(toastContent, document.body)
 }

@@ -23,11 +23,12 @@
  * - Integrates with ShortcutContext
  */
 
-import { useCallback, useMemo } from 'react'
+import { useCallback, useEffect, useMemo } from 'react'
 import { useEmailStore } from '@/store/emailStore'
 import { useSelectionStore } from '@/store/selectionStore'
 import { useActionShortcuts } from './useEmailShortcut'
 import { logger } from '@/services/logger'
+import type { EmailDocument } from '@/services/database/schemas/email.schema'
 
 interface UseEmailKeyboardShortcutsOptions {
   /** Whether shortcuts are enabled */
@@ -40,6 +41,10 @@ interface UseEmailKeyboardShortcutsOptions {
   onReply?: (emailId: string) => void
   /** Callback for forward action (provides emailId) */
   onForward?: (emailId: string) => void
+  /** Callback for star/unstar action (provides emailId) */
+  onStar?: (emailId: string) => void
+  /** Email list for auto-advancing to next email after archive/delete */
+  emails?: EmailDocument[]
 }
 
 /**
@@ -80,14 +85,20 @@ export function useEmailKeyboardShortcuts({
   scopes = ['inbox', 'reading'],
   onReply,
   onForward,
+  onStar,
+  emails = [],
 }: UseEmailKeyboardShortcutsOptions = {}) {
   const {
     selectedEmailId,
+    selectedThreadId,
     archiveEmail,
     deleteEmail,
     toggleReadStatus,
     archiveEmails,
     deleteEmails,
+    markAsRead,
+    markAsUnread,
+    setSelectedEmail,
   } = useEmailStore()
 
   // Select values individually to avoid creating new object references
@@ -118,6 +129,7 @@ export function useEmailKeyboardShortcuts({
 
   /**
    * Handle archive shortcut (e key)
+   * Auto-advances to next email after archiving single email
    */
   const handleArchive = useCallback(async () => {
     const targetIds = getTargetIds()
@@ -126,14 +138,25 @@ export function useEmailKeyboardShortcuts({
     logger.info('keyboard', 'Archive shortcut triggered', { count: targetIds.length })
 
     if (targetIds.length === 1) {
-      await archiveEmail(targetIds[0])
+      // Find current index and determine next email before archiving
+      const currentId = targetIds[0]
+      const currentIndex = emails.findIndex((e) => e.id === currentId)
+      const nextEmail = emails[currentIndex + 1] || emails[currentIndex - 1]
+
+      // Set selection to next email BEFORE archive to avoid race conditions
+      if (nextEmail) {
+        setSelectedEmail(nextEmail.id, nextEmail.threadId)
+      }
+
+      await archiveEmail(currentId)
     } else {
       await archiveEmails(targetIds)
     }
-  }, [getTargetIds, archiveEmail, archiveEmails])
+  }, [getTargetIds, archiveEmail, archiveEmails, emails, setSelectedEmail])
 
   /**
    * Handle delete shortcut (# key)
+   * Auto-advances to next email after deleting single email
    */
   const handleDelete = useCallback(async () => {
     const targetIds = getTargetIds()
@@ -142,11 +165,21 @@ export function useEmailKeyboardShortcuts({
     logger.info('keyboard', 'Delete shortcut triggered', { count: targetIds.length })
 
     if (targetIds.length === 1) {
-      await deleteEmail(targetIds[0])
+      // Find current index and determine next email before deleting
+      const currentId = targetIds[0]
+      const currentIndex = emails.findIndex((e) => e.id === currentId)
+      const nextEmail = emails[currentIndex + 1] || emails[currentIndex - 1]
+
+      // Set selection to next email BEFORE delete to avoid race conditions
+      if (nextEmail) {
+        setSelectedEmail(nextEmail.id, nextEmail.threadId)
+      }
+
+      await deleteEmail(currentId)
     } else {
       await deleteEmails(targetIds)
     }
-  }, [getTargetIds, deleteEmail, deleteEmails])
+  }, [getTargetIds, deleteEmail, deleteEmails, emails, setSelectedEmail])
 
   /**
    * Handle toggle read shortcut (u key)
@@ -161,6 +194,28 @@ export function useEmailKeyboardShortcuts({
       await toggleReadStatus(id)
     }
   }, [getTargetIds, toggleReadStatus])
+
+  /**
+   * Handle mark as read shortcut (Shift+I)
+   */
+  const handleMarkRead = useCallback(async () => {
+    const targetIds = getTargetIds()
+    if (targetIds.length === 0) return
+
+    logger.info('keyboard', 'Mark read shortcut triggered', { count: targetIds.length })
+    await markAsRead(targetIds)
+  }, [getTargetIds, markAsRead])
+
+  /**
+   * Handle mark as unread shortcut (Shift+U)
+   */
+  const handleMarkUnread = useCallback(async () => {
+    const targetIds = getTargetIds()
+    if (targetIds.length === 0) return
+
+    logger.info('keyboard', 'Mark unread shortcut triggered', { count: targetIds.length })
+    await markAsUnread(targetIds)
+  }, [getTargetIds, markAsUnread])
 
   /**
    * Handle reply shortcut (r key)
@@ -187,28 +242,89 @@ export function useEmailKeyboardShortcuts({
   }, [getTargetIds, onForward])
 
   /**
-   * Handle select shortcut (x key)
+   * Handle star shortcut (s key)
    */
-  const handleSelect = useCallback(() => {
+  const handleStar = useCallback(() => {
     const targetIds = getTargetIds()
     if (targetIds.length === 0) return
 
-    const { toggleSelection } = useSelectionStore.getState()
-    toggleSelection(targetIds[0])
-    logger.info('keyboard', 'Select shortcut triggered', { emailId: targetIds[0] })
-  }, [getTargetIds])
+    logger.info('keyboard', 'Star shortcut triggered', { emailId: targetIds[0] })
+    onStar?.(targetIds[0])
+  }, [getTargetIds, onStar])
+
+  /**
+   * Handle select shortcut (x key)
+   * Uses threadId for selection to match EmailRow which uses email.threadId || email.id
+   */
+  const handleSelect = useCallback(() => {
+    // For selection, use threadId to match EmailRow's selectionId (email.threadId || email.id)
+    const selectionId = selectedThreadId || selectedEmailId
+    if (!selectionId) return
+
+    const { toggleSelect } = useSelectionStore.getState()
+    toggleSelect(selectionId)
+    logger.info('keyboard', 'Select shortcut triggered', {
+      selectionId,
+      threadId: selectedThreadId,
+      emailId: selectedEmailId,
+    })
+  }, [selectedThreadId, selectedEmailId])
 
   // Register action shortcuts using the new hook system (Story 2.11)
+  // Note: r, f, s are handled via direct event listener below (react-hotkeys-hook workaround)
   useActionShortcuts({
     onArchive: handleArchive,
     onDelete: handleDelete,
-    onReply: onReply ? handleReply : undefined,
-    onForward: onForward ? handleForward : undefined,
-    onMarkRead: handleToggleRead,
+    // onReply, onForward, onStar removed - handled by direct event listener
+    onToggleRead: handleToggleRead,
+    onMarkRead: handleMarkRead,
+    onMarkUnread: handleMarkUnread,
     onSelect: handleSelect,
     enabled,
     scopes,
   })
+
+  // Direct event listener for r, f, s shortcuts (react-hotkeys-hook workaround)
+  useEffect(() => {
+    if (!enabled) return
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger in form fields
+      const target = e.target as HTMLElement
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+        return
+      }
+
+      // Don't trigger with modifier keys
+      if (e.ctrlKey || e.metaKey || e.altKey) return
+
+      const key = e.key.toLowerCase()
+
+      switch (key) {
+        case 'r':
+          if (onReply) {
+            e.preventDefault()
+            handleReply()
+          }
+          break
+        case 'f':
+          if (onForward) {
+            e.preventDefault()
+            handleForward()
+          }
+          break
+        case 's':
+          if (onStar) {
+            e.preventDefault()
+            handleStar()
+          }
+          break
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [enabled, onReply, onForward, onStar, handleReply, handleForward, handleStar])
 
   // Return shortcut info for UI
   return {

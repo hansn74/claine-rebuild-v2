@@ -27,24 +27,31 @@
  * - AC6: Loading state during sync
  */
 
-import { useState, useCallback, useMemo } from 'react'
+import { useCallback, useMemo } from 'react'
 import { VirtualEmailList } from './VirtualEmailList'
 import { ThreadDetailView } from './ThreadDetailView'
 import { BulkActionBar } from './BulkActionBar'
 import { useEmailStore } from '@/store/emailStore'
 import { useSelectionStore } from '@/store/selectionStore'
 import { useFolderStore } from '@/store/folderStore'
+import { useComposeStore } from '@/store/composeStore'
 import { useEmails } from '@/hooks/useEmails'
 import { useEmailKeyboardShortcuts } from '@/hooks/useEmailKeyboardShortcuts'
 import { useUndoAction } from '@/hooks/useUndoAction'
+import { getDatabase } from '@/services/database/init'
+import { logger } from '@/services/logger'
 import type { EmailDocument } from '@/services/database/schemas/email.schema'
+import type { ComposeContext } from '@/components/compose/ComposeDialog'
 
 interface EmailListProps {
   accountId?: string
 }
 
 export function EmailList({ accountId }: EmailListProps) {
-  const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null)
+  // Use store for selected email/thread so it can be set from search
+  const selectedEmailId = useEmailStore((state) => state.selectedEmailId)
+  const selectedThreadId = useEmailStore((state) => state.selectedThreadId)
+  const setSelectedEmail = useEmailStore((state) => state.setSelectedEmail)
 
   // Get selected folder from store (Story 2.9)
   const selectedFolder = useFolderStore((state) => state.selectedFolder)
@@ -56,27 +63,121 @@ export function EmailList({ accountId }: EmailListProps) {
   // Store actions
   const { archiveEmails, deleteEmails, markAsRead, markAsUnread, isActionLoading } = useEmailStore()
 
+  // Compose store for reply/forward
+  const openComposeWithContext = useComposeStore((state) => state.openComposeWithContext)
+
   // Selection state
   const { selectedIds, selectAll, clearSelection } = useSelectionStore()
   const selectedCount = selectedIds.size
   const hasSelection = selectedCount > 0
   const allSelected = selectedCount > 0 && selectedCount === emailIds.length
 
-  // Keyboard shortcuts
-  useEmailKeyboardShortcuts({ enabled: true })
+  // Keyboard shortcut handlers
+  const handleReply = useCallback(
+    async (emailId: string) => {
+      try {
+        const db = getDatabase()
+        const emailDoc = await db.emails.findOne(emailId).exec()
+        if (emailDoc) {
+          const email = emailDoc.toJSON()
+          const context: ComposeContext = {
+            type: 'reply',
+            to: [email.from],
+            cc: [],
+            subject: email.subject.startsWith('Re:') ? email.subject : `Re: ${email.subject}`,
+            quotedContent: `<br><br><div style="border-left: 2px solid #ccc; padding-left: 10px; margin-left: 10px;">On ${new Date(email.timestamp).toLocaleString()}, ${email.from.name || email.from.email} wrote:<br>${email.body?.html || email.body?.text || ''}</div>`,
+            replyToEmailId: email.id,
+            threadId: email.threadId,
+          }
+          openComposeWithContext(context)
+        }
+      } catch (err) {
+        logger.error('keyboard', 'Failed to initiate reply', { error: err })
+      }
+    },
+    [openComposeWithContext]
+  )
+
+  const handleForward = useCallback(
+    async (emailId: string) => {
+      try {
+        const db = getDatabase()
+        const emailDoc = await db.emails.findOne(emailId).exec()
+        if (emailDoc) {
+          const email = emailDoc.toJSON()
+          const context: ComposeContext = {
+            type: 'forward',
+            to: [],
+            cc: [],
+            subject: email.subject.startsWith('Fwd:') ? email.subject : `Fwd: ${email.subject}`,
+            quotedContent: `<br><br><div style="border-left: 2px solid #ccc; padding-left: 10px; margin-left: 10px;">---------- Forwarded message ---------<br>From: ${email.from.name || email.from.email}<br>Date: ${new Date(email.timestamp).toLocaleString()}<br>Subject: ${email.subject}<br><br>${email.body?.html || email.body?.text || ''}</div>`,
+            replyToEmailId: email.id,
+            threadId: email.threadId,
+          }
+          openComposeWithContext(context)
+        }
+      } catch (err) {
+        logger.error('keyboard', 'Failed to initiate forward', { error: err })
+      }
+    },
+    [openComposeWithContext]
+  )
+
+  const handleStar = useCallback(async (emailId: string) => {
+    try {
+      const db = getDatabase()
+      const emailDoc = await db.emails.findOne(emailId).exec()
+      if (emailDoc) {
+        const email = emailDoc.toJSON()
+        const newStarred = !email.starred
+        const newLabels = newStarred
+          ? [...email.labels.filter((l: string) => l !== 'STARRED'), 'STARRED']
+          : email.labels.filter((l: string) => l !== 'STARRED')
+        await emailDoc.patch({
+          starred: newStarred,
+          labels: newLabels,
+        })
+        logger.info('keyboard', `Email ${newStarred ? 'starred' : 'unstarred'}`, { emailId })
+      }
+    } catch (err) {
+      logger.error('keyboard', 'Failed to toggle star', { error: err })
+    }
+  }, [])
+
+  // Keyboard shortcuts - pass emails for auto-advance after archive/delete
+  useEmailKeyboardShortcuts({
+    enabled: true,
+    onReply: handleReply,
+    onForward: handleForward,
+    onStar: handleStar,
+    emails,
+  })
 
   // Undo functionality
   useUndoAction()
 
+  // Get openDraft from compose store
+  const openDraft = useComposeStore((state) => state.openDraft)
+
   // Handle email selection - now selects by threadId for thread view
-  const handleEmailSelect = useCallback((email: EmailDocument) => {
-    setSelectedThreadId(email.threadId)
-  }, [])
+  // Special handling for drafts folder: open compose dialog instead
+  const handleEmailSelect = useCallback(
+    (email: EmailDocument) => {
+      // If viewing drafts folder, open the draft in compose dialog
+      if (selectedFolder === 'drafts' && email.folder === 'drafts') {
+        // Draft emails have draftId stored in email.id - open existing draft
+        openDraft(email.id)
+        return
+      }
+      setSelectedEmail(email.id, email.threadId)
+    },
+    [setSelectedEmail, selectedFolder, openDraft]
+  )
 
   // Handle back action from thread view
   const handleBack = useCallback(() => {
-    setSelectedThreadId(null)
-  }, [])
+    setSelectedEmail(null, null)
+  }, [setSelectedEmail])
 
   // Bulk action handlers
   const handleBulkArchive = useCallback(async () => {
@@ -128,12 +229,13 @@ export function EmailList({ accountId }: EmailListProps) {
 
       <div className="flex flex-1 overflow-hidden min-w-0">
         {/* Virtualized email list sidebar */}
-        <div className="w-96 flex-shrink-0 border-r border-slate-200 flex flex-col">
+        <div className="w-[1040px] flex-shrink-0 border-r border-slate-200 flex flex-col">
           <VirtualEmailList
             accountId={accountId}
             folder={selectedFolder} // Filter by selected folder (Story 2.9)
             onEmailSelect={handleEmailSelect}
-            selectedEmailId={selectedThreadId} // Using threadId for selection highlight
+            selectedEmailId={selectedEmailId} // Actual email ID for j/k navigation
+            selectedThreadId={selectedThreadId} // Thread ID for visual highlight
           />
         </div>
 
