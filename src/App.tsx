@@ -11,6 +11,7 @@ import { EmailList, OutboxView, FolderSidebar } from '@/components/email'
 import { AccountSwitcher, AccountSettings } from '@/components/account'
 import { ReAuthNotificationContainer } from '@/components/notifications'
 import { CircuitBreakerNotification } from '@/components/notifications/CircuitBreakerNotification'
+import { BankruptcyNotification } from '@/components/notifications/BankruptcyNotification'
 import {
   UndoToast,
   OfflineIndicator,
@@ -825,6 +826,9 @@ function App() {
 
             {/* Circuit breaker notifications (fixed position, top-center) - Story 1.19 */}
             <CircuitBreakerNotification />
+
+            {/* Bankruptcy notification (fixed position, below circuit breaker) - Story 1.16 */}
+            <BankruptcyNotification />
 
             {/* Compose Dialog - Lazy loaded (Story 2.10: Task 6) */}
             {composeOpen && (

@@ -17,6 +17,7 @@ import { OutlookSyncService } from './outlookSync'
 import { SyncProgressService } from './syncProgress'
 import { circuitBreaker } from './circuitBreaker'
 import { adaptiveInterval } from './adaptiveInterval'
+import { syncBankruptcy } from './syncBankruptcy'
 import { classifyError } from './errorClassification'
 import { logger } from '@/services/logger'
 
@@ -25,6 +26,7 @@ import { logger } from '@/services/logger'
  * Manages sync scheduling and timing for all email accounts
  */
 export class SyncOrchestratorService {
+  private db: AppDatabase
   private gmailSyncService: GmailSyncService
   private outlookSyncService: OutlookSyncService
   private progressService: SyncProgressService
@@ -34,6 +36,7 @@ export class SyncOrchestratorService {
   private started = false
 
   constructor(db: AppDatabase) {
+    this.db = db
     this.gmailSyncService = new GmailSyncService(db)
     this.outlookSyncService = new OutlookSyncService(db)
     this.progressService = new SyncProgressService(db)
@@ -179,8 +182,24 @@ export class SyncOrchestratorService {
       return
     }
 
+    // Story 1.16: Check sync bankruptcy before attempting delta sync (AC 1-7)
+    if (progress.initialSyncComplete && progress.lastSyncAt) {
+      const decision = syncBankruptcy.shouldDeclareBankruptcy(
+        accountId,
+        provider,
+        progress.lastSyncAt
+      )
+      if (decision.bankrupt) {
+        await syncBankruptcy.performFreshSyncReset(accountId, provider, this.db)
+        // After reset, the existing sync flow will perform initial sync
+        // since initialSyncComplete is now false
+      }
+    }
+
     // Story 1.15: Capture emailsSynced before sync for activity detection (AC 2-4)
-    const beforeCount = progress.emailsSynced
+    // Re-fetch progress after potential bankruptcy reset
+    const currentProgress = await this.progressService.getProgress(accountId)
+    const beforeCount = currentProgress?.emailsSynced ?? progress.emailsSynced
 
     try {
       // Determine provider and delegate to appropriate sync service

@@ -88,7 +88,7 @@ development_status:
   1-20-subsystem-health-tracking: done
   # Correct-Course: Superhuman Analysis (2026-02-02) — Priority 3
   1-15-adaptive-sync-polling-intervals: done
-  1-16-sync-bankruptcy-detection: backlog
+  1-16-sync-bankruptcy-detection: done
   1-17-sync-interval-jitter: backlog
   epic-1-retrospective: optional
 
