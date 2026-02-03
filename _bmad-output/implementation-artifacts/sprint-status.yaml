@@ -1,0 +1,189 @@
+# Sprint Status - Claine v2 Rebuild
+# Generated: 2026-02-02
+# This file tracks all epics and stories across the development lifecycle
+
+# generated: 2026-02-02
+# project: claine-rebuild-v2
+# project_key: claine-rebuild-v2
+# tracking_system: file-system
+# story_location: "{project-root}/_bmad-output/implementation-artifacts/stories"
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - contexted: Epic tech context created (required before drafting stories)
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - drafted: Story file created in stories folder
+#   - ready-for-dev: Draft approved and story context created
+#   - in-progress: Developer actively working on implementation
+#   - review: Under SM review (via code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - completed: Retrospective has been done
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epics should be 'contexted' before stories can be 'drafted'
+# - Stories can be worked in parallel if team capacity allows
+# - SM typically drafts next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', SM reviews, then Dev moves to 'done'
+
+generated: 2026-02-02
+project: claine-rebuild-v2
+project_key: claine-rebuild-v2
+tracking_system: file-system
+story_location: "{project-root}/_bmad-output/implementation-artifacts/stories"
+
+development_status:
+  # Epic 0: Infrastructure & Project Setup ✅
+  epic-0: done
+  0-1-initialize-vite-react-typescript-project: done
+  0-2-configure-tailwindcss-4-0-oxide-engine-shadcn-ui: done
+  0-3-set-up-eslint-prettier-husky-pre-commit-hooks: done
+  0-4-configure-vitest-4-0-unit-testing-infrastructure: done
+  0-5-configure-playwright-1-56-e2e-testing-infrastructure: done
+  0-6-set-up-github-actions-ci-cd-pipeline: done
+  0-7-configure-vercel-deployment-pipeline: done
+  0-8-set-up-environment-variable-management: done
+  0-9-create-project-readme-with-setup-instructions: done
+  0-10-configure-bundle-analysis-and-size-budgets: done
+  epic-0-retrospective: optional
+
+  # Epic 1: Foundation & Core Infrastructure (original scope done, correct-course stories pending)
+  epic-1: in-progress
+  1-1-project-setup-repository-initialization: done  # Completed via Epic 0
+  1-2-electron-application-shell: n/a  # Not applicable - PWA architecture
+  1-3-rxdb-indexeddb-data-layer-setup: done
+  1-3b-design-rxdb-schemas-for-core-entities: done
+  1-3c-implement-schema-migration-strategy: done
+  1-3d-refactor-database-type-safety: done  # Implementation-time split
+  1-3e-integrate-migration-runner-in-init: done  # Implementation-time split
+  1-3f-add-migration-e2e-tests: done  # Implementation-time split
+  1-3g-fix-epic-0-e2e-tests: done  # Implementation-time split
+  1-4-oauth-2-0-pkce-integration-for-gmail: done
+  1-5-oauth-2-0-integration-for-outlook: done
+  1-6-basic-email-sync-engine: split  # Split into 1.6A, 1.6B, 1.6C
+  1-6a-gmail-sync-engine-core: done
+  1-6b-outlook-sync-engine: done
+  1-6c-oauth-e2e-tests-reauth-notification-ui: done
+  1-7-basic-email-list-view-ui: done
+  1-8-multi-account-management: done
+  1-9-implement-sync-conflict-detection-and-resolution: done
+  1-10-handle-partial-sync-failures-with-retry-logic: done
+  1-11-implement-quota-management-indexeddb-gmail-api: done
+  1-12-configure-bundle-analysis-and-size-budgets: done
+  1-13-ci-cd-pipeline-setup: done
+  1-14-logging-error-tracking-infrastructure: done
+  # Correct-Course: Superhuman Analysis (2026-02-02) — Priority 1
+  1-19-circuit-breaker-provider-apis: done
+  # Correct-Course: Superhuman Analysis (2026-02-02) — Priority 2
+  1-18-batched-reactive-query-triggers: backlog
+  1-20-subsystem-health-tracking: backlog
+  # Correct-Course: Superhuman Analysis (2026-02-02) — Priority 3
+  1-15-adaptive-sync-polling-intervals: backlog
+  1-16-sync-bankruptcy-detection: backlog
+  1-17-sync-interval-jitter: backlog
+  epic-1-retrospective: optional
+
+  # Epic 2: Offline-First Email Client with Attributes (original scope done, correct-course stories pending)
+  epic-2: in-progress
+  2-1-virtualized-inbox-rendering: done
+  2-2-thread-detail-view-with-conversation-history: done
+  2-3-compose-reply-interface: done
+  2-4-offline-first-send-queue: done
+  2-5-local-full-text-search: done
+  2-6-email-actions-archive-delete-mark-read-unread: done
+  2-7-offline-mode-indicators-conflict-resolution: done
+  2-8-attachment-handling: done
+  2-9-email-folders-labels: done
+  2-10-performance-optimization-benchmarking: done
+  2-11-keyboard-shortcuts-power-user-features: done
+  2-12-empty-states-onboarding-ux: done
+  2-13-custom-attributes-system-data-model-crud: done
+  2-14-apply-attributes-to-emails-ui-interaction: done
+  2-15-attribute-based-filtering-search: done
+  2-16-implement-lazy-loading-for-email-threads-and-large-lists: done
+  2-17-apply-ux-design-system: done
+  # Correct-Course: Superhuman Analysis (2026-02-02) — Priority 1
+  2-18-persistent-send-queue-background-sync-api: backlog
+  2-20-pre-render-adjacent-email-thread-views: backlog
+  # Correct-Course: Superhuman Analysis (2026-02-02) — Priority 2
+  2-19-parallel-action-queue-processing: backlog
+  2-21-replace-lunr-with-minisearch: backlog
+  2-22-search-operators-structured-queries: backlog
+  # Correct-Course: Superhuman Analysis (2026-02-02) — Priority 3
+  2-23-keyboard-shortcut-discoverability: backlog
+  epic-2-retrospective: optional
+
+  # Epic 3: AI Triage & Attribute Suggestions
+  epic-3: contexted
+  3-1-local-llm-integration-ollama: drafted
+  3-2-email-analysis-engine: backlog
+  3-2b-implement-ai-capability-detection-and-graceful-degradation: backlog
+  3-3-priority-scoring-model: backlog
+  3-4-priority-based-inbox-view: backlog
+  3-5-explainability-ui-why-this-priority: backlog
+  3-6-manual-priority-adjustment-feedback-loop: backlog
+  3-7-smart-notifications-high-priority-only: backlog
+  3-8-batch-triage-for-inbox-backlog: backlog
+  3-9-ai-performance-monitoring-dashboard-dev-tool: backlog
+  3-10-privacy-dashboard-ai-processing-transparency: backlog
+  3-11-ai-attribute-suggestion-engine: backlog
+  3-12-ai-attribute-suggestions-ui-review-apply-workflow: backlog
+  3-13-ai-learning-from-attribute-corrections: backlog
+  epic-3-retrospective: optional
+
+  # Epic 4: AI-Powered Compose & Response
+  epic-4: backlog
+  4-1-conversation-context-analysis: backlog
+  4-2-writing-style-learning-engine: backlog
+  4-3-draft-response-generation: backlog
+  4-4-draft-review-ui-with-one-click-workflow: backlog
+  4-5-inline-draft-editing: backlog
+  4-6-draft-quality-confidence-scoring: backlog
+  4-7-smart-timing-suggestions: backlog
+  4-8-feedback-loop-draft-learning: backlog
+  4-9-multi-response-scenarios-reply-reply-all-forward: backlog
+  4-10-draft-templates-common-responses: backlog
+  epic-4-retrospective: optional
+
+  # Epic 5: Visual Workflow Engine & Hybrid Automation
+  epic-5: backlog
+  5-1-workflow-data-model-engine-core: backlog
+  5-2-visual-workflow-editor-canvas-node-placement: backlog
+  5-3-workflow-trigger-configuration: backlog
+  5-4-workflow-condition-nodes-attribute-based-logic: backlog
+  5-5-workflow-action-nodes-apply-attributes-archive-label: backlog
+  5-6-ai-enhanced-decision-nodes: backlog
+  5-7-workflow-variables-data-passing: backlog
+  5-8-screen-flows-multi-step-user-interaction: backlog
+  5-9-workflow-templates-ai-suggested-workflows: backlog
+  5-10-workflow-execution-engine-trigger-processing-action-queue: backlog
+  5-11-workflow-execution-logs-debugging: backlog
+  5-12-workflow-enable-disable-management: backlog
+  5-13-workflow-performance-optimization: backlog
+  5-14-audit-workflow-editor-for-keyboard-navigation-and-aria-compliance: backlog
+  epic-5-retrospective: optional
+
+  # Epic 6: Autonomous Action Engine & Trust Building
+  epic-6: backlog
+  6-1-permission-system-architecture: backlog
+  6-2-permission-settings-ui: backlog
+  6-3-automation-rule-builder: backlog
+  6-4-autonomous-action-execution-engine: backlog
+  6-5-action-log-history: backlog
+  6-6-undo-capability-for-ai-actions: backlog
+  6-7-trust-meter-visualization-optional-stretch-goal: backlog
+  6-8-ai-confidence-thresholds: backlog
+  6-9-autonomous-action-notifications: backlog
+  6-10-safety-rails-action-limits: backlog
+  6-11-progressive-autonomy-onboarding: backlog
+  6-12-autonomy-analytics-insights: backlog
+  epic-6-retrospective: optional
