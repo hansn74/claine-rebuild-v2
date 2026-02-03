@@ -89,7 +89,7 @@ development_status:
   # Correct-Course: Superhuman Analysis (2026-02-02) — Priority 3
   1-15-adaptive-sync-polling-intervals: done
   1-16-sync-bankruptcy-detection: done
-  1-17-sync-interval-jitter: backlog
+  1-17-sync-interval-jitter: done
   epic-1-retrospective: optional
 
   # Epic 2: Offline-First Email Client with Attributes (original scope done, correct-course stories pending)

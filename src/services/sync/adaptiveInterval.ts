@@ -39,8 +39,11 @@ export class AdaptiveIntervalService {
   private minInterval: number
   private maxInterval: number
   private enabledCache: boolean | null = null
+  private randomFn: () => number
+  private jitterEnabled: boolean
 
-  constructor() {
+  constructor(randomFn?: () => number) {
+    this.randomFn = randomFn ?? Math.random
     const parsedMin = parseInt(
       import.meta.env.VITE_ADAPTIVE_MIN_INTERVAL_MS || String(ACTIVE_INTERVAL),
       10
@@ -52,20 +55,27 @@ export class AdaptiveIntervalService {
     // H3 fix: Guard against NaN from invalid env var values
     this.minInterval = Number.isFinite(parsedMin) ? parsedMin : ACTIVE_INTERVAL
     this.maxInterval = Number.isFinite(parsedMax) ? parsedMax : IDLE_10_INTERVAL
+
+    const jitterEnv = import.meta.env.VITE_SYNC_JITTER_ENABLED
+    this.jitterEnabled = jitterEnv !== 'false'
+
     this.load()
   }
 
   /**
    * Get the adaptive interval for an account (AC 1-4)
+   * Story 1.17: Applies jitter after tier selection, before clamping
    */
   getInterval(accountId: string): number {
     if (!this.isEnabled()) {
-      return DEFAULT_INTERVAL
+      return this.jitterEnabled
+        ? this.clamp(this.applyJitter(DEFAULT_INTERVAL))
+        : this.clamp(DEFAULT_INTERVAL)
     }
 
     const state = this.accountStates.get(accountId)
     if (!state) {
-      return this.clamp(DEFAULT_INTERVAL)
+      return this.clamp(this.applyJitter(DEFAULT_INTERVAL))
     }
 
     let interval: number
@@ -80,7 +90,18 @@ export class AdaptiveIntervalService {
       interval = DEFAULT_INTERVAL // AC 1
     }
 
-    return this.clamp(interval)
+    return this.clamp(this.applyJitter(interval))
+  }
+
+  /**
+   * Apply +/-15% random jitter to an interval (Story 1.17 AC 1, 3)
+   * When jitter is disabled, returns the interval unchanged (AC 5)
+   */
+  private applyJitter(interval: number): number {
+    if (!this.jitterEnabled) {
+      return interval
+    }
+    return interval * (1 + (this.randomFn() * 0.3 - 0.15))
   }
 
   /**

@@ -5,7 +5,7 @@
  * Task 7: Unit tests (AC 1-14)
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { AdaptiveIntervalService } from '../adaptiveInterval'
 
 // Mock logger
@@ -34,7 +34,7 @@ describe('AdaptiveIntervalService', () => {
       removeItem: vi.fn((key: string) => mockStorage.delete(key)),
     })
 
-    service = new AdaptiveIntervalService()
+    service = new AdaptiveIntervalService(() => 0.5)
   })
 
   describe('getInterval()', () => {
@@ -199,7 +199,7 @@ describe('AdaptiveIntervalService', () => {
       import.meta.env.VITE_ADAPTIVE_MIN_INTERVAL_MS = '120000'
       import.meta.env.VITE_ADAPTIVE_MAX_INTERVAL_MS = '300000'
 
-      const customService = new AdaptiveIntervalService()
+      const customService = new AdaptiveIntervalService(() => 0.5)
 
       // Active interval (60_000) should be clamped up to min (120_000)
       customService.recordSyncResult('account-1', true)
@@ -220,7 +220,7 @@ describe('AdaptiveIntervalService', () => {
       import.meta.env.VITE_ADAPTIVE_MIN_INTERVAL_MS = 'not-a-number'
       import.meta.env.VITE_ADAPTIVE_MAX_INTERVAL_MS = 'invalid'
 
-      const customService = new AdaptiveIntervalService()
+      const customService = new AdaptiveIntervalService(() => 0.5)
 
       // Should use default min (60_000) and max (600_000)
       customService.recordSyncResult('account-1', true)
@@ -293,7 +293,7 @@ describe('AdaptiveIntervalService', () => {
       }
       mockStorage.set('claine:adaptive-polling-state', JSON.stringify(data))
 
-      const newService = new AdaptiveIntervalService()
+      const newService = new AdaptiveIntervalService(() => 0.5)
       expect(newService.getInterval('account-1')).toBe(300_000)
     })
   })
@@ -341,7 +341,7 @@ describe('AdaptiveIntervalService', () => {
       })
 
       // Should not throw — falls back to in-memory
-      const newService = new AdaptiveIntervalService()
+      const newService = new AdaptiveIntervalService(() => 0.5)
       expect(newService.getInterval('account-1')).toBe(180_000)
     })
 
@@ -359,7 +359,7 @@ describe('AdaptiveIntervalService', () => {
       mockStorage.set('claine:adaptive-polling-state', 'not-json')
 
       // Should not throw — starts fresh
-      const newService = new AdaptiveIntervalService()
+      const newService = new AdaptiveIntervalService(() => 0.5)
       expect(newService.getInterval('account-1')).toBe(180_000)
     })
 
@@ -370,5 +370,83 @@ describe('AdaptiveIntervalService', () => {
       // Should default to true
       expect(service.isEnabled()).toBe(true)
     })
+  })
+
+  // Story 1.17: Jitter tests (AC 10-12)
+  describe('jitter', () => {
+    // Subtask 2.1 (AC 10): randomFn=0.5 → midpoint → no jitter effect
+    it('should return exact base interval when randomFn returns 0.5 (midpoint)', () => {
+      const svc = new AdaptiveIntervalService(() => 0.5)
+      // Default tier for unknown account
+      expect(svc.getInterval('account-1')).toBe(180_000)
+    })
+
+    // Subtask 2.2 (AC 10): randomFn=0 → base * 0.85 (-15%)
+    it('should return base * 0.85 when randomFn returns 0', () => {
+      const svc = new AdaptiveIntervalService(() => 0)
+      // Default tier 180_000 * 0.85 = 153_000
+      expect(svc.getInterval('account-1')).toBe(153_000)
+    })
+
+    // Subtask 2.3 (AC 10): randomFn=1 → base * 1.15 (+15%)
+    it('should return base * 1.15 when randomFn returns 1', () => {
+      const svc = new AdaptiveIntervalService(() => 1)
+      // Default tier 180_000 * 1.15 = 207_000 (toBeCloseTo handles floating-point)
+      expect(svc.getInterval('account-1')).toBeCloseTo(207_000, 0)
+    })
+
+    // Subtask 2.4 (AC 7): Jittered interval is clamped to [min, max]
+    it('should clamp jittered interval to min/max bounds', () => {
+      // Use randomFn=0 (-15%) with active interval (60_000 * 0.85 = 51_000)
+      // Default min is 60_000, so 51_000 should be clamped to 60_000
+      const svc = new AdaptiveIntervalService(() => 0)
+      svc.recordSyncResult('account-1', true) // Set to active tier (60_000)
+      expect(svc.getInterval('account-1')).toBe(60_000) // Clamped to min
+    })
+
+    // Subtask 2.5 (AC 11): Different random values produce different intervals
+    it('should produce different intervals with different randomFn values', () => {
+      const svc1 = new AdaptiveIntervalService(() => 0.2)
+      const svc2 = new AdaptiveIntervalService(() => 0.8)
+      expect(svc1.getInterval('account-1')).not.toBe(svc2.getInterval('account-1'))
+    })
+
+    // Subtask 2.6 (AC 12): Jitter disabled via env var returns exact tier value
+    describe('with VITE_SYNC_JITTER_ENABLED=false', () => {
+      afterEach(() => {
+        delete import.meta.env.VITE_SYNC_JITTER_ENABLED
+      })
+
+      it('should return exact tier value when jitter is disabled via env var', () => {
+        import.meta.env.VITE_SYNC_JITTER_ENABLED = 'false'
+
+        const svc = new AdaptiveIntervalService(() => 0) // Would apply -15% if jitter enabled
+        expect(svc.getInterval('account-1')).toBe(180_000) // Exact, no jitter
+
+        svc.recordSyncResult('account-1', true)
+        expect(svc.getInterval('account-1')).toBe(60_000) // Exact active tier
+      })
+
+      // Subtask 2.7 complement: Adaptive disabled + jitter disabled → exact default
+      it('should return exact default when both adaptive and jitter are disabled', () => {
+        import.meta.env.VITE_SYNC_JITTER_ENABLED = 'false'
+
+        const svc = new AdaptiveIntervalService(() => 0)
+        svc.setEnabled(false)
+
+        expect(svc.getInterval('account-1')).toBe(180_000) // Exact default
+      })
+    })
+
+    // Subtask 2.7 (AC 6): Adaptive disabled + jitter enabled → default interval still jittered
+    it('should jitter default interval when adaptive is disabled but jitter is enabled', () => {
+      const svc = new AdaptiveIntervalService(() => 0) // -15%
+      svc.setEnabled(false) // Disable adaptive polling
+
+      // Should return DEFAULT_INTERVAL * 0.85 = 153_000 (jitter applied)
+      expect(svc.getInterval('account-1')).toBe(153_000)
+    })
+
+    // Subtask 2.8: Verify existing tests still pass (covered by running the full suite)
   })
 })

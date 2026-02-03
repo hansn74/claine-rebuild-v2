@@ -267,4 +267,50 @@ describe('SyncOrchestrator Adaptive Interval Integration', () => {
       expect(mockAdaptiveInterval.getInterval).toHaveBeenCalledWith('outlook:other@example.com')
     })
   })
+
+  // Story 1.17: Jitter integration tests (AC 8-9)
+  describe('jitter integration', () => {
+    // Subtask 3.1 (AC 8): Manual sync bypasses jitter — executes immediately
+    it('should execute manual sync immediately without timer-based scheduling', async () => {
+      await orchestrator.start()
+      vi.clearAllMocks()
+
+      // triggerSync calls syncAccount directly — no setTimeout/getInterval for timing
+      await orchestrator.triggerSync('gmail:test@example.com')
+
+      // Sync completed immediately — no vi.advanceTimersByTime() was needed
+      // This proves the sync bypassed the timer-based scheduling path (and jitter)
+      expect(mockAdaptiveInterval.recordSyncResult).toHaveBeenCalledWith(
+        'gmail:test@example.com',
+        expect.any(Boolean)
+      )
+
+      // Verify ordering: recordSyncResult (sync happened) before any getInterval
+      // call (rescheduling). getInterval MAY be called 0-1 times for rescheduling
+      // the NEXT automatic sync, but the manual trigger itself was immediate.
+      const syncCallOrder = mockAdaptiveInterval.recordSyncResult.mock.invocationCallOrder[0]
+      if (mockAdaptiveInterval.getInterval.mock.calls.length > 0) {
+        const getIntervalCallOrder = mockAdaptiveInterval.getInterval.mock.invocationCallOrder[0]
+        expect(syncCallOrder).toBeLessThan(getIntervalCallOrder)
+      }
+    })
+
+    // Subtask 3.2 (AC 9): Two accounts with same tier get different jittered intervals
+    it('should return different intervals for two accounts with same tier using real random', async () => {
+      // Use vi.importActual to get the real (unmocked) AdaptiveIntervalService
+      const { AdaptiveIntervalService } =
+        await vi.importActual<typeof import('../adaptiveInterval')>('../adaptiveInterval')
+      const realService = new AdaptiveIntervalService() // Uses real Math.random
+
+      // Get intervals for multiple accounts (all default tier — no state recorded)
+      const results = new Set<number>()
+      for (let i = 0; i < 20; i++) {
+        results.add(realService.getInterval(`account-${i}`))
+      }
+
+      // With real randomness and 20 calls, we should get more than 1 unique value
+      // (probability of all 20 being identical is astronomically low)
+      expect(results.size).toBeGreaterThan(1)
+    })
+  })
 })
