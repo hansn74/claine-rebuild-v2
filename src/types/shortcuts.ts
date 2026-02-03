@@ -262,6 +262,14 @@ export const DEFAULT_SHORTCUTS: ShortcutDefinition[] = [
     category: 'actions',
   },
   {
+    id: 'action-move',
+    description: 'Move to folder',
+    keys: 'v',
+    displayKeys: 'v',
+    scopes: ['inbox', 'reading'],
+    category: 'actions',
+  },
+  {
     id: 'action-star',
     description: 'Star / Unstar',
     keys: 's',

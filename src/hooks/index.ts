@@ -48,3 +48,20 @@ export type {
 // Story 2.13: Custom Attributes
 export { useAttributes } from './useAttributes'
 export type { UseAttributesReturn } from './useAttributes'
+
+// Epic 3: Offline-First Modifier Architecture
+export {
+  useDerivedEmailState,
+  useDerivedEmailStates,
+  useHasPendingModifiers,
+} from './useDerivedEmailState'
+
+export {
+  useDerivedDraftState,
+  useDerivedDraftStates,
+  useHasPendingDraftModifiers,
+  useIsDraftSyncing,
+} from './useDerivedDraftState'
+
+export { useModifierActions, useBulkModifierActions } from './useModifierActions'
+export type { ActionResult } from './useModifierActions'

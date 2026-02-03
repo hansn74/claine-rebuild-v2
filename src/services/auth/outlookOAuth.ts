@@ -13,14 +13,7 @@
  */
 
 import { generatePKCEPair } from './pkce'
-import type {
-  OAuthConfig,
-  OAuthTokens,
-  OAuthError,
-  PKCEPair,
-  AuthorizationParams,
-  TokenExchangeParams,
-} from './types'
+import type { OAuthConfig, OAuthTokens, OAuthError, PKCEPair, TokenExchangeParams } from './types'
 
 /**
  * Microsoft OAuth 2.0 endpoints
@@ -112,7 +105,7 @@ export class OutlookOAuthService {
    * @returns Complete authorization URL
    */
   private buildAuthorizationUrl(pkcePair: PKCEPair, state: string): string {
-    const params: AuthorizationParams = {
+    const params = {
       client_id: this.config.clientId,
       redirect_uri: this.config.redirectUri,
       response_type: 'code',
@@ -125,7 +118,7 @@ export class OutlookOAuthService {
       prompt: 'consent', // Force consent screen to ensure refresh token
     }
 
-    const searchParams = new URLSearchParams(params as Record<string, string>)
+    const searchParams = new URLSearchParams(params as unknown as Record<string, string>)
     return `${this.config.authorizationEndpoint}?${searchParams.toString()}`
   }
 
@@ -236,9 +229,10 @@ export class OutlookOAuthService {
    * @throws Error if token exchange fails
    */
   private async exchangeCode(code: string, codeVerifier: string): Promise<OAuthTokens> {
-    const params: TokenExchangeParams = {
+    // Note: For SPAs (public clients) using PKCE, Microsoft does NOT accept client_secret
+    // The PKCE code_verifier provides the security instead
+    const params: Omit<TokenExchangeParams, 'client_secret'> = {
       client_id: this.config.clientId,
-      client_secret: this.config.clientSecret,
       code,
       code_verifier: codeVerifier,
       redirect_uri: this.config.redirectUri,
@@ -251,7 +245,7 @@ export class OutlookOAuthService {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: new URLSearchParams(params as Record<string, string>).toString(),
+        body: new URLSearchParams(params as unknown as Record<string, string>).toString(),
       })
 
       if (!response.ok) {
@@ -297,9 +291,9 @@ export class OutlookOAuthService {
    * ```
    */
   async refreshAccessToken(refreshToken: string): Promise<OAuthTokens> {
+    // Note: For SPAs (public clients), Microsoft does NOT accept client_secret
     const params = {
       client_id: this.config.clientId,
-      client_secret: this.config.clientSecret,
       refresh_token: refreshToken,
       grant_type: 'refresh_token',
     }

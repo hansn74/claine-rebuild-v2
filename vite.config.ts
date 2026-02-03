@@ -161,7 +161,8 @@ export default defineConfig({
           open: false, // Don't auto-open on build, only on 'npm run bundle:analyze'
           gzipSize: true,
           brotliSize: true,
-        }) as unknown, // Type assertion needed for Vite plugin compatibility
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        }) as any, // Type assertion needed for Vite plugin compatibility
       ],
     },
   },

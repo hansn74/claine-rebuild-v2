@@ -42,7 +42,7 @@ function ReAuthNotificationItem({
 
   return (
     <div
-      className="bg-amber-50 border border-amber-200 rounded-lg p-4 shadow-lg max-w-md"
+      className="bg-amber-50 border border-amber-200 rounded-lg p-4 shadow-lg w-[380px]"
       role="alert"
       aria-live="polite"
       data-testid={`reauth-notification-${accountId}`}

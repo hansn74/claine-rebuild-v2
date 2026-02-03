@@ -56,6 +56,7 @@ export const EMAIL_SHORTCUTS = {
   toggleRead: { key: 'u', description: 'Toggle read/unread', action: 'toggleRead' },
   reply: { key: 'r', description: 'Reply to email', action: 'reply' },
   forward: { key: 'f', description: 'Forward email', action: 'forward' },
+  move: { key: 'v', description: 'Move to folder', action: 'move' },
   help: { key: '?', description: 'Show keyboard shortcuts', action: 'help' },
 } as const
 
@@ -341,6 +342,7 @@ export function getEmailShortcutsForHelp() {
     { key: 'e', description: 'Archive email' },
     { key: '#', description: 'Delete email' },
     { key: 'u', description: 'Toggle read/unread' },
+    { key: 'v', description: 'Move to folder' },
     { key: '?', description: 'Show keyboard shortcuts' },
     { key: '/', description: 'Open search' },
     { key: 'c', description: 'Compose new email' },

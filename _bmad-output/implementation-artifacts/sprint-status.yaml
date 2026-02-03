@@ -84,10 +84,10 @@ development_status:
   # Correct-Course: Superhuman Analysis (2026-02-02) — Priority 1
   1-19-circuit-breaker-provider-apis: done
   # Correct-Course: Superhuman Analysis (2026-02-02) — Priority 2
-  1-18-batched-reactive-query-triggers: backlog
-  1-20-subsystem-health-tracking: backlog
+  1-18-batched-reactive-query-triggers: done
+  1-20-subsystem-health-tracking: done
   # Correct-Course: Superhuman Analysis (2026-02-02) — Priority 3
-  1-15-adaptive-sync-polling-intervals: backlog
+  1-15-adaptive-sync-polling-intervals: done
   1-16-sync-bankruptcy-detection: backlog
   1-17-sync-interval-jitter: backlog
   epic-1-retrospective: optional

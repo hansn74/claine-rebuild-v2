@@ -179,7 +179,9 @@ export interface CommandPaletteProps {
   open: boolean
   /** Called when palette should close */
   onClose: () => void
-  /** Called when an email is selected */
+  /** Mode: 'search' for email search, 'actions' for quick commands */
+  mode?: 'search' | 'actions'
+  /** Called when an email is selected (search mode) */
   onSelectEmail?: (emailId: string) => void
   /** Story 2.11: Task 5 - Action handlers for commands */
   onCompose?: () => void
@@ -234,6 +236,7 @@ function addRecentSearch(query: string): void {
 export const CommandPalette = memo(function CommandPalette({
   open,
   onClose,
+  mode = 'search',
   onSelectEmail,
   onCompose,
   onNavigate,
@@ -252,6 +255,7 @@ export const CommandPalette = memo(function CommandPalette({
   )
   const inputRef = useRef<HTMLInputElement>(null)
   const modalRef = useRef<HTMLDivElement>(null)
+  const actionsContainerRef = useRef<HTMLDivElement>(null)
   const prevOpenRef = useRef(open)
   const prevResultsLengthRef = useRef(results.length)
 
@@ -265,15 +269,15 @@ export const CommandPalette = memo(function CommandPalette({
         onClose()
       },
       'goto-inbox': () => {
-        onNavigate?.('INBOX')
+        onNavigate?.('inbox')
         onClose()
       },
       'goto-sent': () => {
-        onNavigate?.('SENT')
+        onNavigate?.('sent')
         onClose()
       },
       'goto-drafts': () => {
-        onNavigate?.('DRAFTS')
+        onNavigate?.('drafts')
         onClose()
       },
       archive: () => {
@@ -316,14 +320,17 @@ export const CommandPalette = memo(function CommandPalette({
 
   /**
    * Story 2.11: Task 5.4 - Filtered commands based on query
+   * In search mode: no commands shown
+   * In actions mode: filter commands by query
    */
   const filteredCommands = useMemo(() => {
-    // Start typing > triggers email search mode
-    if (query.startsWith('>') || results.length > 0) {
+    // Search mode: no quick actions
+    if (mode === 'search') {
       return []
     }
+    // Actions mode: filter commands by query
     return filterCommands(QUICK_COMMANDS, query)
-  }, [query, results.length])
+  }, [mode, query])
 
   // Track open state changes and perform side effects
   if (open && !prevOpenRef.current) {
@@ -360,6 +367,18 @@ export const CommandPalette = memo(function CommandPalette({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
+  // Scroll selected action into view when navigating with keyboard
+  useEffect(() => {
+    if (mode === 'actions' && actionsContainerRef.current) {
+      const selectedButton = actionsContainerRef.current.querySelector(
+        `[data-index="${selectedIndex}"]`
+      ) as HTMLElement | null
+      if (selectedButton) {
+        selectedButton.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+      }
+    }
+  }, [mode, selectedIndex])
+
   // Handle selecting an email
   const handleSelectEmail = useCallback(
     (emailId: string) => {
@@ -383,15 +402,16 @@ export const CommandPalette = memo(function CommandPalette({
     [setQuery]
   )
 
-  // Keyboard navigation
+  // Keyboard navigation - handles both search and actions modes
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      const maxIndex = results.length - 1
+      // Get the correct max index based on mode
+      const maxIndex = mode === 'search' ? results.length - 1 : filteredCommands.length - 1
 
       switch (e.key) {
         case 'ArrowDown':
           e.preventDefault()
-          setSelectedIndex((prev) => Math.min(prev + 1, maxIndex))
+          setSelectedIndex((prev) => Math.min(prev + 1, Math.max(0, maxIndex)))
           break
         case 'ArrowUp':
           e.preventDefault()
@@ -399,8 +419,17 @@ export const CommandPalette = memo(function CommandPalette({
           break
         case 'Enter':
           e.preventDefault()
-          if (results[selectedIndex]) {
-            handleSelectEmail(results[selectedIndex].email.id)
+          if (mode === 'search') {
+            // Search mode: select email
+            if (results[selectedIndex]) {
+              handleSelectEmail(results[selectedIndex].email.id)
+            }
+          } else {
+            // Actions mode: execute command
+            const command = filteredCommands[selectedIndex]
+            if (command) {
+              commandHandlers[command.id as keyof typeof commandHandlers]?.()
+            }
           }
           break
         case 'Escape':
@@ -413,7 +442,17 @@ export const CommandPalette = memo(function CommandPalette({
           break
       }
     },
-    [results, selectedIndex, query, clear, onClose, handleSelectEmail]
+    [
+      mode,
+      results,
+      filteredCommands,
+      selectedIndex,
+      query,
+      clear,
+      onClose,
+      handleSelectEmail,
+      commandHandlers,
+    ]
   )
 
   // Close on backdrop click
@@ -446,13 +485,14 @@ export const CommandPalette = memo(function CommandPalette({
       <div
         ref={modalRef}
         className={cn(
-          'w-full max-w-2xl bg-white rounded-lg shadow-2xl',
+          'bg-white rounded-lg shadow-2xl',
           'flex flex-col overflow-hidden',
           'animate-in fade-in zoom-in-95 duration-150'
         )}
+        style={{ width: '600px', minWidth: '600px' }}
         role="dialog"
         aria-modal="true"
-        aria-label="Search emails"
+        aria-label={mode === 'search' ? 'Search emails' : 'Quick actions'}
         onKeyDown={handleKeyDown}
       >
         {/* Header */}
@@ -464,7 +504,7 @@ export const CommandPalette = memo(function CommandPalette({
             isSearching={isSearching}
             onClear={clear}
             onEscape={onClose}
-            placeholder="Search emails..."
+            placeholder={mode === 'search' ? 'Search emails...' : 'Type to filter actions...'}
             className="flex-1"
             size="md"
             showClear
@@ -481,105 +521,129 @@ export const CommandPalette = memo(function CommandPalette({
 
         {/* Content */}
         <div className="flex-1 overflow-hidden">
-          {/* Search results */}
-          {query && (
+          {/* SEARCH MODE CONTENT */}
+          {mode === 'search' && (
             <>
-              <SearchResults
-                results={results}
-                selectedIndex={selectedIndex}
-                onSelect={setSelectedIndex}
-                onClick={handleSelectEmail}
-                maxHeight={384}
-                searchQuery={query}
-                isSearching={isSearching}
-                emptyMessage="Searching..."
-              />
+              {/* Search results */}
+              {query && (
+                <>
+                  <SearchResults
+                    results={results}
+                    selectedIndex={selectedIndex}
+                    onSelect={setSelectedIndex}
+                    onClick={handleSelectEmail}
+                    maxHeight={384}
+                    searchQuery={query}
+                    isSearching={isSearching}
+                    emptyMessage="Searching..."
+                  />
 
-              {/* Search time indicator */}
-              {searchTime !== null && results.length > 0 && (
-                <div className="border-t border-slate-200 px-3 py-2 text-xs text-slate-500">
-                  {results.length} result{results.length !== 1 ? 's' : ''} in{' '}
-                  {searchTime.toFixed(0)}ms
+                  {/* Search time indicator */}
+                  {searchTime !== null && results.length > 0 && (
+                    <div className="border-t border-slate-200 px-3 py-2 text-xs text-slate-500">
+                      {results.length} result{results.length !== 1 ? 's' : ''} in{' '}
+                      {searchTime.toFixed(0)}ms
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Recent searches (when no query) */}
+              {!query && recentSearches.length > 0 && (
+                <div className="p-3">
+                  <div className="flex items-center gap-2 text-xs text-slate-500 mb-2">
+                    <Clock className="w-3 h-3" />
+                    <span>Recent searches</span>
+                  </div>
+                  <div className="space-y-1">
+                    {recentSearches.map((search, index) => (
+                      <button
+                        key={index}
+                        type="button"
+                        onClick={() => handleRecentSearchClick(search)}
+                        className={cn(
+                          'w-full text-left px-3 py-2 text-sm rounded-md',
+                          'hover:bg-slate-100 transition-colors',
+                          'flex items-center gap-2'
+                        )}
+                      >
+                        <SearchIcon className="w-4 h-4 text-slate-400" />
+                        <span>{search}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Empty state for search mode */}
+              {!query && recentSearches.length === 0 && (
+                <div className="p-8 text-center text-slate-500 text-sm">
+                  <SearchIcon className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                  <p>Type to search emails</p>
+                  <p className="text-xs mt-1">
+                    Use quotes for exact phrases: &quot;budget meeting&quot;
+                  </p>
                 </div>
               )}
             </>
           )}
 
-          {/* Recent searches (when no query) */}
-          {!query && recentSearches.length > 0 && (
-            <div className="p-3">
-              <div className="flex items-center gap-2 text-xs text-slate-500 mb-2">
-                <Clock className="w-3 h-3" />
-                <span>Recent searches</span>
-              </div>
-              <div className="space-y-1">
-                {recentSearches.map((search, index) => (
-                  <button
-                    key={index}
-                    type="button"
-                    onClick={() => handleRecentSearchClick(search)}
-                    className={cn(
-                      'w-full text-left px-3 py-2 text-sm rounded-md',
-                      'hover:bg-slate-100 transition-colors',
-                      'flex items-center gap-2'
-                    )}
-                  >
-                    <SearchIcon className="w-4 h-4 text-slate-400" />
-                    <span>{search}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+          {/* ACTIONS MODE CONTENT */}
+          {mode === 'actions' && (
+            <>
+              {/* Quick Actions with shortcut hints */}
+              {filteredCommands.length > 0 && (
+                <div ref={actionsContainerRef} className="p-3 max-h-96 overflow-y-auto">
+                  <div className="flex items-center gap-2 text-xs text-slate-500 mb-2">
+                    <Keyboard className="w-3 h-3" />
+                    <span>Quick Actions</span>
+                  </div>
+                  <div className="space-y-1">
+                    {filteredCommands.map((command, index) => (
+                      <button
+                        key={command.id}
+                        type="button"
+                        data-index={index}
+                        onClick={() =>
+                          commandHandlers[command.id as keyof typeof commandHandlers]?.()
+                        }
+                        className={cn(
+                          'w-full text-left px-3 py-2.5 text-sm rounded-md',
+                          'hover:bg-slate-100 transition-colors',
+                          'flex items-center gap-3 group',
+                          selectedIndex === index && 'bg-cyan-50 hover:bg-cyan-50'
+                        )}
+                      >
+                        <span className="text-slate-400 group-hover:text-slate-600">
+                          {command.icon}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-slate-700">{command.name}</div>
+                          <div className="text-xs text-slate-500 truncate">
+                            {command.description}
+                          </div>
+                        </div>
+                        {/* Shortcut hint display */}
+                        {command.shortcut && (
+                          <kbd className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded text-[10px] text-slate-500 font-mono whitespace-nowrap">
+                            {command.shortcut}
+                          </kbd>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
-          {/* Story 2.11: Task 5.3/5.6 - Quick Actions with shortcut hints */}
-          {filteredCommands.length > 0 && !results.length && (
-            <div className="p-3 max-h-96 overflow-y-auto">
-              <div className="flex items-center gap-2 text-xs text-slate-500 mb-2">
-                <Keyboard className="w-3 h-3" />
-                <span>Quick Actions</span>
-              </div>
-              <div className="space-y-1">
-                {filteredCommands.map((command, index) => (
-                  <button
-                    key={command.id}
-                    type="button"
-                    onClick={() => commandHandlers[command.id as keyof typeof commandHandlers]?.()}
-                    className={cn(
-                      'w-full text-left px-3 py-2.5 text-sm rounded-md',
-                      'hover:bg-slate-100 transition-colors',
-                      'flex items-center gap-3 group',
-                      selectedIndex === index && 'bg-cyan-50 hover:bg-cyan-50'
-                    )}
-                  >
-                    <span className="text-slate-400 group-hover:text-slate-600">
-                      {command.icon}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium text-slate-700">{command.name}</div>
-                      <div className="text-xs text-slate-500 truncate">{command.description}</div>
-                    </div>
-                    {/* Story 2.11: Task 5.6 - Shortcut hint display */}
-                    {command.shortcut && (
-                      <kbd className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded text-[10px] text-slate-500 font-mono whitespace-nowrap">
-                        {command.shortcut}
-                      </kbd>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Empty state (no query and no commands match filter) */}
-          {!query && filteredCommands.length === 0 && recentSearches.length === 0 && (
-            <div className="p-8 text-center text-slate-500 text-sm">
-              <SearchIcon className="w-8 h-8 mx-auto mb-2 text-slate-300" />
-              <p>Type to search emails</p>
-              <p className="text-xs mt-1">
-                Use quotes for exact phrases: &quot;budget meeting&quot;
-              </p>
-            </div>
+              {/* Empty state for actions mode (no matching commands) */}
+              {filteredCommands.length === 0 && (
+                <div className="p-8 text-center text-slate-500 text-sm">
+                  <Keyboard className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                  <p>No matching actions</p>
+                  <p className="text-xs mt-1">Try a different search term</p>
+                </div>
+              )}
+            </>
           )}
         </div>
 

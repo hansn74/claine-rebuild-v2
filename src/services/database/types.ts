@@ -15,6 +15,7 @@ import type {
   ActionQueueDocument,
   AttributeDocument,
   MetadataDocument,
+  ModifierDocument,
 } from './schemas'
 
 // Re-export MetadataDocument for convenience
@@ -40,9 +41,9 @@ export interface DatabaseCollections {
 
   // Optional user data collections (may not exist until user adds accounts)
   emails?: RxCollection<EmailDocument>
-  _threads?: RxCollection<ThreadDocument>
-  _workflows?: RxCollection<WorkflowDocument>
-  _aiMetadata?: RxCollection<AIMetadataDocument>
+  threads?: RxCollection<ThreadDocument>
+  workflows?: RxCollection<WorkflowDocument>
+  aiMetadata?: RxCollection<AIMetadataDocument>
   authTokens?: RxCollection<AuthTokenDocument>
   syncState?: RxCollection<SyncStateDocument>
   conflictAudit?: RxCollection<ConflictAuditDocument>
@@ -53,6 +54,7 @@ export interface DatabaseCollections {
   searchIndex?: RxCollection<SearchIndexDocument>
   actionQueue?: RxCollection<ActionQueueDocument>
   attributes?: RxCollection<AttributeDocument>
+  modifiers?: RxCollection<ModifierDocument>
 }
 
 /**
@@ -69,4 +71,7 @@ export interface DatabaseCollections {
  * }
  * ```
  */
-export type AppDatabase = RxDatabase<DatabaseCollections>
+export type AppDatabase = RxDatabase<DatabaseCollections> & {
+  destroyed: boolean
+  destroy: () => Promise<boolean>
+}

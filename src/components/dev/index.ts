@@ -6,3 +6,4 @@
  */
 
 export { PerformanceMonitor } from './PerformanceMonitor'
+export { HealthDebugPanel } from './HealthDebugPanel'

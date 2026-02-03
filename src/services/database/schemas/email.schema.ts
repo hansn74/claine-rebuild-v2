@@ -232,7 +232,7 @@ export const emailSchema: RxJsonSchema<EmailDocument> = {
         properties: {
           id: {
             type: 'string',
-            maxLength: 200,
+            maxLength: 500, // Gmail attachment IDs can be 300+ chars
           },
           filename: {
             type: 'string',

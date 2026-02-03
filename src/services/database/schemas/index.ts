@@ -100,3 +100,6 @@ export type { AttributeDocument, AttributeEnumValueDoc } from './attribute.schem
 
 export { metadataSchema } from './metadata.schema'
 export type { MetadataDocument } from './metadata.schema'
+
+export { modifierSchema } from './modifier.schema'
+export type { ModifierDocument } from '@/services/modifiers/types'

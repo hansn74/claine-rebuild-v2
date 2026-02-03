@@ -14,8 +14,18 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { getDatabase, isDatabaseInitialized } from '@/services/database/init'
 import { logger } from '@/services/logger'
+import { gmailDraftSyncService } from '@/services/email/gmailDraftSync'
+import { outlookDraftSyncService } from '@/services/email/outlookDraftSync'
+import { useAccountStore } from '@/store/accountStore'
 import type { DraftDocument, DraftType } from '@/services/database/schemas/draft.schema'
 import type { EmailAddress, EmailBody } from '@/services/database/schemas/email.schema'
+
+/**
+ * Get the appropriate draft sync service based on account provider
+ */
+function getDraftSyncService(provider: 'gmail' | 'outlook') {
+  return provider === 'outlook' ? outlookDraftSyncService : gmailDraftSyncService
+}
 
 const AUTO_SAVE_INTERVAL = 30000 // 30 seconds
 const DEBOUNCE_DELAY = 1000 // 1 second debounce for immediate changes
@@ -136,6 +146,67 @@ export function useDraft(draftId: string | null = null): UseDraftResult {
     loadDraft()
   }, [draftId])
 
+  // Get accounts from store to determine provider
+  const accounts = useAccountStore((state) => state.accounts)
+
+  // Save draft to database and sync to server
+  const saveDraftToDb = useCallback(async () => {
+    if (!draft || !isDatabaseInitialized()) return
+
+    setIsSaving(true)
+
+    try {
+      const db = getDatabase()
+      if (!db.drafts) {
+        throw new Error('Drafts collection not available')
+      }
+
+      const now = Date.now()
+      let updatedDraft: DraftDocument = {
+        ...draft,
+        ...pendingChangesRef.current,
+        lastSaved: now,
+      }
+
+      // Save locally first
+      await db.drafts.upsert(updatedDraft)
+
+      // Sync to server - determine which service based on account provider
+      const account = accounts.find((a) => a.id === draft.accountId)
+      const provider = account?.provider || 'gmail'
+      const syncService = getDraftSyncService(provider)
+      const remoteDraftId = await syncService.syncDraft(draft.accountId, updatedDraft)
+
+      // If we got a new remote ID, update the local draft
+      if (remoteDraftId && remoteDraftId !== draft.remoteDraftId) {
+        updatedDraft = {
+          ...updatedDraft,
+          remoteDraftId,
+          syncedAt: now,
+        }
+        await db.drafts.upsert(updatedDraft)
+        logger.debug('compose', 'Draft synced to server', {
+          draftId: draft.id,
+          remoteDraftId,
+          provider,
+        })
+      }
+
+      setDraft(updatedDraft)
+      setLastSaved(new Date(now))
+      pendingChangesRef.current = null
+      setError(null)
+
+      logger.debug('compose', 'Draft saved', { draftId: draft.id })
+    } catch (err) {
+      const errorObj = err instanceof Error ? err : new Error('Failed to save draft')
+      setError(errorObj)
+      logger.error('compose', 'Failed to save draft', { error: errorObj.message })
+    } finally {
+      setIsSaving(false)
+    }
+  }, [draft, accounts])
+
   // Set up auto-save interval
   useEffect(() => {
     if (!draft) return
@@ -152,42 +223,6 @@ export function useDraft(draftId: string | null = null): UseDraftResult {
       }
     }
   }, [draft, saveDraftToDb])
-
-  // Save draft to database
-  const saveDraftToDb = useCallback(async () => {
-    if (!draft || !isDatabaseInitialized()) return
-
-    setIsSaving(true)
-
-    try {
-      const db = getDatabase()
-      if (!db.drafts) {
-        throw new Error('Drafts collection not available')
-      }
-
-      const now = Date.now()
-      const updatedDraft: DraftDocument = {
-        ...draft,
-        ...pendingChangesRef.current,
-        lastSaved: now,
-      }
-
-      await db.drafts.upsert(updatedDraft)
-
-      setDraft(updatedDraft)
-      setLastSaved(new Date(now))
-      pendingChangesRef.current = null
-      setError(null)
-
-      logger.debug('compose', 'Draft saved', { draftId: draft.id })
-    } catch (err) {
-      const errorObj = err instanceof Error ? err : new Error('Failed to save draft')
-      setError(errorObj)
-      logger.error('compose', 'Failed to save draft', { error: errorObj.message })
-    } finally {
-      setIsSaving(false)
-    }
-  }, [draft])
 
   // Create a new draft
   const createDraft = useCallback(async (accountId: string, data: DraftData): Promise<string> => {
@@ -273,7 +308,7 @@ export function useDraft(draftId: string | null = null): UseDraftResult {
     }
   }, [draft, saveDraftToDb])
 
-  // Delete draft
+  // Delete draft (local and server)
   const deleteDraft = useCallback(async () => {
     if (!draft || !isDatabaseInitialized()) return
 
@@ -283,6 +318,15 @@ export function useDraft(draftId: string | null = null): UseDraftResult {
         throw new Error('Drafts collection not available')
       }
 
+      // Delete from server if synced
+      if (draft.remoteDraftId) {
+        const account = accounts.find((a) => a.id === draft.accountId)
+        const provider = account?.provider || 'gmail'
+        const syncService = getDraftSyncService(provider)
+        await syncService.deleteDraft(draft.accountId, draft.remoteDraftId)
+      }
+
+      // Delete locally
       const doc = await db.drafts.findOne(draft.id).exec()
       if (doc) {
         await doc.remove()
@@ -301,13 +345,16 @@ export function useDraft(draftId: string | null = null): UseDraftResult {
       setLastSaved(null)
       pendingChangesRef.current = null
 
-      logger.info('compose', 'Draft deleted', { draftId: draft.id })
+      logger.info('compose', 'Draft deleted', {
+        draftId: draft.id,
+        remoteDraftId: draft.remoteDraftId,
+      })
     } catch (err) {
       const errorObj = err instanceof Error ? err : new Error('Failed to delete draft')
       setError(errorObj)
       logger.error('compose', 'Failed to delete draft', { error: errorObj.message })
     }
-  }, [draft])
+  }, [draft, accounts])
 
   // Cleanup on unmount
   useEffect(() => {

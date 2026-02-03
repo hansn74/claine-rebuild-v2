@@ -6,10 +6,37 @@
  */
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import type { RxDocument } from 'rxdb'
+import type { RxDocument, MangoQuerySelector } from 'rxdb'
 import { getDatabase } from '@/services/database/init'
+import { createBatchedObservable } from '@/services/database/reactive'
 import type { EmailDocument } from '@/services/database/schemas/email.schema'
+import type { DraftDocument } from '@/services/database/schemas/draft.schema'
 import type { FilterValue } from '@/store/attributeFilterStore'
+
+/**
+ * Convert a DraftDocument to EmailDocument-like format for display in email list
+ */
+function draftToEmailFormat(draft: DraftDocument): EmailDocument {
+  return {
+    id: draft.id,
+    threadId: draft.threadId || draft.id, // Use draft id as threadId if no thread
+    from: { name: 'Draft', email: '' }, // Drafts don't have a "from"
+    to: draft.to.length > 0 ? draft.to : [{ name: '', email: '' }],
+    cc: draft.cc,
+    subject: draft.subject || '(No subject)',
+    body: draft.body,
+    timestamp: draft.lastSaved, // Use lastSaved as timestamp for sorting
+    accountId: draft.accountId,
+    attachments: [],
+    snippet: draft.body?.text?.slice(0, 200) || draft.body?.html?.slice(0, 200) || '',
+    labels: ['draft'],
+    folder: 'drafts',
+    read: true, // Drafts are always "read"
+    starred: false,
+    importance: 'normal',
+    attributes: {},
+  }
+}
 
 export interface UseEmailsOptions {
   accountId?: string // Filter by account (optional)
@@ -185,6 +212,49 @@ export function useEmails(options: UseEmailsOptions = {}): UseEmailsResult {
         }
         const db = getDatabase()
 
+        // Special handling for drafts folder - query drafts collection instead
+        if (folder === 'drafts') {
+          if (!db.drafts) {
+            setEmails([])
+            setLoading(false)
+            setLoadingMore(false)
+            return
+          }
+
+          // Build drafts query selector
+          const draftSelector: Record<string, unknown> = {}
+          if (accountId) {
+            draftSelector.accountId = accountId
+          }
+
+          // Query drafts collection sorted by lastSaved
+          const draftQuery = db.drafts.find({
+            selector: draftSelector,
+            sort: [{ lastSaved: sortOrder }],
+            limit: enablePagination ? currentLimit : limit,
+          })
+
+          // Subscribe to drafts changes (Story 1.18: batched during bulk ops)
+          subscription = createBatchedObservable(draftQuery.$).subscribe({
+            next: (results: RxDocument<DraftDocument>[]) => {
+              // Convert drafts to email format for display
+              const draftDocs = results.map((doc) =>
+                draftToEmailFormat(doc.toJSON() as DraftDocument)
+              )
+              setEmails(draftDocs)
+              setHasMore(draftDocs.length === currentLimit)
+              setLoading(false)
+              setLoadingMore(false)
+            },
+            error: (err: Error) => {
+              setError(err)
+              setLoading(false)
+              setLoadingMore(false)
+            },
+          })
+          return
+        }
+
         // Check if emails collection exists
         if (!db.emails) {
           setEmails([])
@@ -204,16 +274,17 @@ export function useEmails(options: UseEmailsOptions = {}): UseEmailsResult {
 
         // Add attribute filter conditions (Story 2.15)
         const attributeSelector = buildAttributeSelector(attributeFilters ?? new Map())
-        let finalSelector = selector
+        let finalSelector: MangoQuerySelector<EmailDocument> =
+          selector as MangoQuerySelector<EmailDocument>
 
         if (attributeSelector) {
           // Merge base selector with attribute conditions
           if (Object.keys(selector).length > 0) {
             finalSelector = {
               $and: [selector, attributeSelector],
-            }
+            } as MangoQuerySelector<EmailDocument>
           } else {
-            finalSelector = attributeSelector
+            finalSelector = attributeSelector as MangoQuerySelector<EmailDocument>
           }
         }
 
@@ -225,8 +296,8 @@ export function useEmails(options: UseEmailsOptions = {}): UseEmailsResult {
           limit: enablePagination ? currentLimit : limit,
         })
 
-        // Subscribe to changes
-        subscription = query.$.subscribe({
+        // Subscribe to changes (Story 1.18: batched during bulk ops)
+        subscription = createBatchedObservable(query.$).subscribe({
           next: (results: RxDocument<EmailDocument>[]) => {
             const emailDocs = results.map((doc) => doc.toJSON() as EmailDocument)
             setEmails(emailDocs)
@@ -317,7 +388,8 @@ export function useEmail(emailId: string | null): {
         // Create reactive query for single document
         const query = db.emails.findOne(emailId)
 
-        subscription = query.$.subscribe({
+        // Story 1.18: Use lower debounce for single doc subscriptions
+        subscription = createBatchedObservable(query.$, { debounceMs: 50 }).subscribe({
           next: (doc: RxDocument<EmailDocument> | null) => {
             setEmail(doc ? (doc.toJSON() as EmailDocument) : null)
             setLoading(false)

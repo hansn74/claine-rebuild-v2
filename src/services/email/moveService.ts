@@ -10,12 +10,18 @@
  * - Outlook: Move to folder (Task 4.4)
  * - Optimistic UI updates (Task 4.6)
  * - Offline queue support (Task 4.7)
+ * - Sync coordination to prevent overwrite (AC 4 fix)
  *
  * Gmail API Reference:
  * - messages.modify: Add/remove labels
  *
  * Microsoft Graph API Reference:
  * - POST /messages/{id}/move: Move message to folder
+ *
+ * MIGRATION NOTE (Epic 3):
+ * This service is being migrated to the modifier-based architecture.
+ * New code should use useModifierActions() hook or modifierQueue directly.
+ * This service now uses MoveModifier internally for offline-first behavior.
  */
 
 import { logger } from '@/services/logger'
@@ -23,6 +29,56 @@ import { tokenStorageService } from '@/services/auth/tokenStorage'
 import { gmailOAuthService } from '@/services/auth/gmailOAuth'
 import { outlookOAuthService } from '@/services/auth/outlookOAuth'
 import { getDatabase, isDatabaseInitialized } from '@/services/database/init'
+import { modifierQueue } from '@/services/modifiers'
+import { MoveModifier } from '@/services/modifiers/email'
+import type { EmailDocument } from '@/services/database/schemas/email.schema'
+
+/**
+ * Pending moves tracker - prevents sync from overwriting local changes
+ * Maps emailId to { targetFolder, timestamp }
+ */
+const pendingMoves = new Map<string, { targetFolder: string; timestamp: number }>()
+
+/**
+ * How long to protect a pending move from sync (30 seconds)
+ */
+const PENDING_MOVE_TTL = 30000
+
+/**
+ * Check if an email has a pending move that should be protected from sync
+ */
+export function hasPendingMove(emailId: string): boolean {
+  const pending = pendingMoves.get(emailId)
+  if (!pending) return false
+
+  // Check if still within TTL
+  if (Date.now() - pending.timestamp > PENDING_MOVE_TTL) {
+    pendingMoves.delete(emailId)
+    return false
+  }
+  return true
+}
+
+/**
+ * Get the pending move target folder for an email
+ */
+export function getPendingMoveFolder(emailId: string): string | undefined {
+  const pending = pendingMoves.get(emailId)
+  if (!pending) return undefined
+
+  if (Date.now() - pending.timestamp > PENDING_MOVE_TTL) {
+    pendingMoves.delete(emailId)
+    return undefined
+  }
+  return pending.targetFolder
+}
+
+/**
+ * Clear a pending move (called after sync confirms the move)
+ */
+export function clearPendingMove(emailId: string): void {
+  pendingMoves.delete(emailId)
+}
 
 /**
  * Gmail API base URL
@@ -110,6 +166,8 @@ export class MoveService {
    * Task 4.5: Update local RxDB email records with new folder/label
    * Task 4.6: Show optimistic UI update while API call in progress
    *
+   * Uses modifier-based architecture for offline-first behavior (Epic 3).
+   *
    * @param emailId - Email ID to move
    * @param targetFolder - Target folder ID (standard folder or custom label/folder ID)
    * @param accountId - Account identifier
@@ -122,7 +180,7 @@ export class MoveService {
     accountId: string,
     provider: 'gmail' | 'outlook'
   ): Promise<MoveResult> {
-    logger.debug('move-service', 'Moving email', {
+    logger.debug('move-service', 'Moving email via modifier', {
       emailId,
       targetFolder,
       accountId,
@@ -130,32 +188,62 @@ export class MoveService {
     })
 
     // Get current email state from database
+    let email: EmailDocument | null = null
     let previousFolder = 'inbox'
+    let currentLabels: string[] = []
+
     if (isDatabaseInitialized()) {
       const db = getDatabase()
       if (db.emails) {
-        const email = await db.emails.findOne(emailId).exec()
-        if (email) {
+        const emailDoc = await db.emails.findOne(emailId).exec()
+        if (emailDoc) {
+          email = emailDoc.toJSON() as EmailDocument
           previousFolder = email.folder || 'inbox'
+          currentLabels = [...email.labels]
         }
       }
     }
 
-    // Apply optimistic update (Task 4.6)
-    await this.applyOptimisticUpdate(emailId, targetFolder)
+    if (!email) {
+      return {
+        success: false,
+        emailId,
+        previousFolder,
+        newFolder: targetFolder,
+        error: 'Email not found',
+      }
+    }
+
+    // Register pending move to prevent sync from overwriting (AC 4 sync coordination)
+    pendingMoves.set(emailId, { targetFolder, timestamp: Date.now() })
 
     try {
-      // Sync with API
-      if (provider === 'gmail') {
-        await this.moveGmailEmail(emailId, targetFolder, previousFolder, accountId)
-      } else {
-        await this.moveOutlookEmail(emailId, targetFolder, accountId)
-      }
+      // Create and queue modifier (Epic 3 - Modifier Architecture)
+      const modifier = new MoveModifier({
+        entityId: emailId,
+        accountId,
+        provider,
+        targetFolder,
+        sourceFolder: previousFolder,
+        currentLabels,
+      })
 
-      logger.info('move-service', 'Email moved successfully', {
+      // Apply modifier locally for immediate UI update
+      const modifiedEmail = modifier.modify(email)
+      await this.applyOptimisticUpdate(emailId, modifiedEmail.folder, modifiedEmail.labels)
+
+      // Queue modifier for async sync
+      const modDoc = await modifierQueue.add(modifier)
+
+      // Clear pending move after modifier is queued
+      // The modifier system handles sync and retries
+      setTimeout(() => clearPendingMove(emailId), 5000)
+
+      logger.info('move-service', 'Email move queued via modifier', {
         emailId,
         from: previousFolder,
         to: targetFolder,
+        modifierId: modDoc.id,
       })
 
       return {
@@ -165,11 +253,12 @@ export class MoveService {
         newFolder: targetFolder,
       }
     } catch (error) {
-      // Rollback optimistic update on error
-      await this.applyOptimisticUpdate(emailId, previousFolder)
+      // Clear pending move and rollback optimistic update on error
+      clearPendingMove(emailId)
+      await this.applyOptimisticUpdate(emailId, previousFolder, currentLabels)
 
       const errorMessage = error instanceof Error ? error.message : String(error)
-      logger.error('move-service', 'Failed to move email', {
+      logger.error('move-service', 'Failed to queue move', {
         emailId,
         error: errorMessage,
       })
@@ -253,6 +342,9 @@ export class MoveService {
     if (!response.ok) {
       // Handle token expiration
       if (response.status === 401) {
+        if (!tokens.refresh_token) {
+          throw new Error('No refresh token available for re-authentication')
+        }
         const refreshed = await gmailOAuthService.refreshAccessToken(tokens.refresh_token)
         await tokenStorageService.storeTokens(accountId, refreshed)
         accessToken = refreshed.access_token
@@ -314,6 +406,9 @@ export class MoveService {
     if (!response.ok) {
       // Handle token expiration
       if (response.status === 401) {
+        if (!tokens.refresh_token) {
+          throw new Error('No refresh token available for re-authentication')
+        }
         const refreshed = await outlookOAuthService.refreshAccessToken(tokens.refresh_token)
         await tokenStorageService.storeTokens(accountId, refreshed)
         accessToken = refreshed.access_token
@@ -346,7 +441,11 @@ export class MoveService {
    * Task 4.5: Update local RxDB email records with new folder/label
    * Task 4.6: Show optimistic UI update while API call in progress
    */
-  private async applyOptimisticUpdate(emailId: string, newFolder: string): Promise<void> {
+  private async applyOptimisticUpdate(
+    emailId: string,
+    newFolder: string,
+    newLabels?: string[]
+  ): Promise<void> {
     if (!isDatabaseInitialized()) {
       return
     }
@@ -361,11 +460,12 @@ export class MoveService {
       return
     }
 
-    // Update folder field
+    // Update folder and labels
+    const labels =
+      newLabels ?? this.updateLabels(email.labels || [], newFolder, email.folder || 'inbox')
     await email.patch({
       folder: newFolder,
-      // Also update labels array for Gmail compatibility
-      labels: this.updateLabels(email.labels || [], newFolder, email.folder || 'inbox'),
+      labels,
     })
 
     logger.debug('move-service', 'Optimistic update applied', {

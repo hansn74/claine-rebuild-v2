@@ -138,11 +138,11 @@ export function initSentry(): void {
     integrations: [
       Sentry.browserTracingIntegration({
         // Only trace API calls
-        tracePropagationTargets: [
-          'localhost',
-          /^https:\/\/gmail\.googleapis\.com/,
-          /^https:\/\/graph\.microsoft\.com/,
-        ],
+        // tracePropagationTargets: [
+        //   'localhost',
+        //   /^https:\/\/gmail\.googleapis\.com/,
+        //   /^https:\/\/graph\.microsoft\.com/,
+        // ],
       }),
     ],
   })

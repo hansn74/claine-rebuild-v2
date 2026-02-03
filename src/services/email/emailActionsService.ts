@@ -14,12 +14,24 @@
  *
  * FR007: Full read/write functionality when offline, queueing actions for later sync
  * NFR001: Sub-50ms input latency for 95% of user interactions
+ *
+ * MIGRATION NOTE (Epic 3):
+ * This service is being migrated to the modifier-based architecture.
+ * New code should use useModifierActions() hook or modifierQueue directly.
+ * This service now acts as a compatibility layer that internally uses modifiers.
  */
 
 import { Subject, Observable } from 'rxjs'
 import { getDatabase } from '@/services/database/init'
 import { logger } from '@/services/logger'
-import { emailActionQueue } from './emailActionQueue'
+import { batchMode } from '@/services/database/batchMode'
+import { modifierQueue } from '@/services/modifiers'
+import {
+  ArchiveModifier,
+  DeleteModifier,
+  MarkReadModifier,
+  MarkUnreadModifier,
+} from '@/services/modifiers/email'
 import type { EmailDocument } from '@/services/database/schemas/email.schema'
 
 /**
@@ -137,7 +149,7 @@ export class EmailActionsService {
    * Archive email - moves from Inbox to Archive folder
    * AC 1: Archive button removes email from inbox
    *
-   * Optimistic update: immediate local change, queue for sync
+   * Uses modifier-based architecture for offline-first behavior.
    *
    * @param emailId - Email ID to archive
    * @returns The action object (for undo capability)
@@ -152,7 +164,7 @@ export class EmailActionsService {
 
     const email = emailDoc.toJSON() as EmailDocument
 
-    // Create action for tracking and undo
+    // Create action for tracking and undo (legacy compatibility)
     const action: EmailAction = {
       id: `action-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
       type: 'archive',
@@ -168,30 +180,35 @@ export class EmailActionsService {
     this.events$.next({ type: 'action-started', action })
 
     try {
-      // Optimistic local update
-      // Archive = remove INBOX label, keep in Archive folder
-      const newLabels = email.labels.filter((l) => l !== 'INBOX')
+      const providerType = getProviderType(email.accountId)
 
+      // Create and queue modifier (Epic 3 - Modifier Architecture)
+      const modifier = new ArchiveModifier({
+        entityId: email.id,
+        accountId: email.accountId,
+        provider: providerType,
+        currentLabels: [...email.labels],
+        currentFolder: email.folder,
+      })
+
+      // Apply modifier locally for immediate UI update
+      const modifiedEmail = modifier.modify(email)
       await emailDoc.update({
         $set: {
-          folder: 'archive',
-          labels: newLabels,
+          folder: modifiedEmail.folder,
+          labels: modifiedEmail.labels,
         },
       })
 
-      logger.info('email-actions', 'Email archived', { emailId, folder: 'archive' })
-      this.events$.next({ type: 'action-completed', action })
+      // Queue modifier for async sync
+      const modDoc = await modifierQueue.add(modifier)
+      action.id = modDoc.id // Use modifier ID for consistency
 
-      // Queue action for sync to provider (Gmail/Outlook)
-      const providerType = getProviderType(email.accountId)
-      try {
-        await emailActionQueue.queueAction(action, providerType)
-      } catch (queueError) {
-        logger.warn('email-actions', 'Failed to queue archive action for sync', {
-          emailId,
-          error: queueError instanceof Error ? queueError.message : String(queueError),
-        })
-      }
+      logger.info('email-actions', 'Email archived via modifier', {
+        emailId,
+        modifierId: modDoc.id,
+      })
+      this.events$.next({ type: 'action-completed', action })
 
       return action
     } catch (error) {
@@ -211,16 +228,22 @@ export class EmailActionsService {
    */
   async archiveEmails(emailIds: string[]): Promise<EmailAction[]> {
     const actions: EmailAction[] = []
-    for (const emailId of emailIds) {
-      try {
-        const action = await this.archiveEmail(emailId)
-        actions.push(action)
-      } catch (error) {
-        logger.warn('email-actions', 'Failed to archive email in bulk', {
-          emailId,
-          error: error instanceof Error ? error.message : String(error),
-        })
+    // Story 1.18: Batch mode for bulk actions (>1 item) to reduce re-renders
+    if (emailIds.length > 1) batchMode.enter()
+    try {
+      for (const emailId of emailIds) {
+        try {
+          const action = await this.archiveEmail(emailId)
+          actions.push(action)
+        } catch (error) {
+          logger.warn('email-actions', 'Failed to archive email in bulk', {
+            emailId,
+            error: error instanceof Error ? error.message : String(error),
+          })
+        }
       }
+    } finally {
+      if (emailIds.length > 1) batchMode.exit()
     }
     logger.info('email-actions', 'Bulk archive completed', {
       total: emailIds.length,
@@ -232,6 +255,8 @@ export class EmailActionsService {
   /**
    * Delete email - moves to Trash (soft delete)
    * AC 2: Delete button moves email to Trash
+   *
+   * Uses modifier-based architecture for offline-first behavior.
    *
    * @param emailId - Email ID to delete
    * @returns The action object (for undo capability)
@@ -246,7 +271,7 @@ export class EmailActionsService {
 
     const email = emailDoc.toJSON() as EmailDocument
 
-    // Create action for tracking and undo
+    // Create action for tracking and undo (legacy compatibility)
     const action: EmailAction = {
       id: `action-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
       type: 'delete',
@@ -262,26 +287,32 @@ export class EmailActionsService {
     this.events$.next({ type: 'action-started', action })
 
     try {
-      // Move to Trash
+      const providerType = getProviderType(email.accountId)
+
+      // Create and queue modifier (Epic 3 - Modifier Architecture)
+      const modifier = new DeleteModifier({
+        entityId: email.id,
+        accountId: email.accountId,
+        provider: providerType,
+        currentFolder: email.folder,
+        currentLabels: [...email.labels],
+      })
+
+      // Apply modifier locally for immediate UI update
+      const modifiedEmail = modifier.modify(email)
       await emailDoc.update({
         $set: {
-          folder: 'trash',
+          folder: modifiedEmail.folder,
+          labels: modifiedEmail.labels,
         },
       })
 
-      logger.info('email-actions', 'Email deleted (moved to trash)', { emailId })
-      this.events$.next({ type: 'action-completed', action })
+      // Queue modifier for async sync
+      const modDoc = await modifierQueue.add(modifier)
+      action.id = modDoc.id
 
-      // Queue action for sync to provider (Gmail/Outlook)
-      const providerType = getProviderType(email.accountId)
-      try {
-        await emailActionQueue.queueAction(action, providerType)
-      } catch (queueError) {
-        logger.warn('email-actions', 'Failed to queue delete action for sync', {
-          emailId,
-          error: queueError instanceof Error ? queueError.message : String(queueError),
-        })
-      }
+      logger.info('email-actions', 'Email deleted via modifier', { emailId, modifierId: modDoc.id })
+      this.events$.next({ type: 'action-completed', action })
 
       return action
     } catch (error) {
@@ -301,16 +332,22 @@ export class EmailActionsService {
    */
   async deleteEmails(emailIds: string[]): Promise<EmailAction[]> {
     const actions: EmailAction[] = []
-    for (const emailId of emailIds) {
-      try {
-        const action = await this.deleteEmail(emailId)
-        actions.push(action)
-      } catch (error) {
-        logger.warn('email-actions', 'Failed to delete email in bulk', {
-          emailId,
-          error: error instanceof Error ? error.message : String(error),
-        })
+    // Story 1.18: Batch mode for bulk actions (>1 item) to reduce re-renders
+    if (emailIds.length > 1) batchMode.enter()
+    try {
+      for (const emailId of emailIds) {
+        try {
+          const action = await this.deleteEmail(emailId)
+          actions.push(action)
+        } catch (error) {
+          logger.warn('email-actions', 'Failed to delete email in bulk', {
+            emailId,
+            error: error instanceof Error ? error.message : String(error),
+          })
+        }
       }
+    } finally {
+      if (emailIds.length > 1) batchMode.exit()
     }
     logger.info('email-actions', 'Bulk delete completed', {
       total: emailIds.length,
@@ -322,6 +359,8 @@ export class EmailActionsService {
   /**
    * Toggle read/unread status
    * AC 3: Mark as read/unread toggles unread status
+   *
+   * Uses modifier-based architecture for offline-first behavior.
    *
    * @param emailId - Email ID to toggle
    * @returns The action object (for undo capability)
@@ -338,7 +377,7 @@ export class EmailActionsService {
     const newReadStatus = !email.read
     const actionType: EmailActionType = newReadStatus ? 'mark-read' : 'mark-unread'
 
-    // Create action for tracking and undo
+    // Create action for tracking and undo (legacy compatibility)
     const action: EmailAction = {
       id: `action-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
       type: actionType,
@@ -354,42 +393,47 @@ export class EmailActionsService {
     this.events$.next({ type: 'action-started', action })
 
     try {
-      // Update labels to reflect read status
-      // Gmail uses UNREAD label for unread emails
-      let newLabels = [...email.labels]
-      if (newReadStatus) {
-        // Mark as read: remove UNREAD label
-        newLabels = newLabels.filter((l) => l !== 'UNREAD')
-      } else {
-        // Mark as unread: add UNREAD label if not present
-        if (!newLabels.includes('UNREAD')) {
-          newLabels.push('UNREAD')
-        }
-      }
+      const providerType = getProviderType(email.accountId)
 
+      // Create appropriate modifier based on current state (Epic 3 - Modifier Architecture)
+      const modifier = newReadStatus
+        ? new MarkReadModifier({
+            entityId: email.id,
+            accountId: email.accountId,
+            provider: providerType,
+            currentLabels: [...email.labels],
+            markAsRead: true,
+          })
+        : new MarkUnreadModifier({
+            entityId: email.id,
+            accountId: email.accountId,
+            provider: providerType,
+            currentLabels: [...email.labels],
+            markAsRead: false,
+          })
+
+      // Apply modifier locally for immediate UI update
+      const modifiedEmail = modifier.modify(email)
       await emailDoc.update({
         $set: {
-          read: newReadStatus,
-          labels: newLabels,
+          read: modifiedEmail.read,
+          labels: modifiedEmail.labels,
         },
       })
 
-      logger.info('email-actions', `Email marked ${newReadStatus ? 'read' : 'unread'}`, {
-        emailId,
-        read: newReadStatus,
-      })
-      this.events$.next({ type: 'action-completed', action })
+      // Queue modifier for async sync
+      const modDoc = await modifierQueue.add(modifier)
+      action.id = modDoc.id
 
-      // Queue action for sync to provider (Gmail/Outlook)
-      const providerType = getProviderType(email.accountId)
-      try {
-        await emailActionQueue.queueAction(action, providerType)
-      } catch (queueError) {
-        logger.warn('email-actions', 'Failed to queue read status action for sync', {
+      logger.info(
+        'email-actions',
+        `Email marked ${newReadStatus ? 'read' : 'unread'} via modifier`,
+        {
           emailId,
-          error: queueError instanceof Error ? queueError.message : String(queueError),
-        })
-      }
+          modifierId: modDoc.id,
+        }
+      )
+      this.events$.next({ type: 'action-completed', action })
 
       return action
     } catch (error) {
@@ -404,6 +448,8 @@ export class EmailActionsService {
    * Mark multiple emails as read
    * AC 5: Bulk actions available (Task 1.5)
    *
+   * Uses modifier-based architecture for offline-first behavior.
+   *
    * @param emailIds - Array of email IDs to mark as read
    * @returns Array of action objects
    */
@@ -411,46 +457,67 @@ export class EmailActionsService {
     const db = getDatabase()
     const actions: EmailAction[] = []
 
-    for (const emailId of emailIds) {
-      try {
-        const emailDoc = await db.emails?.findOne(emailId).exec()
-        if (!emailDoc) continue
+    // Story 1.18: Batch mode for bulk actions (>1 item) to reduce re-renders
+    if (emailIds.length > 1) batchMode.enter()
+    try {
+      for (const emailId of emailIds) {
+        try {
+          const emailDoc = await db.emails?.findOne(emailId).exec()
+          if (!emailDoc) continue
 
-        const email = emailDoc.toJSON() as EmailDocument
+          const email = emailDoc.toJSON() as EmailDocument
 
-        // Skip if already read
-        if (email.read) continue
+          // Skip if already read
+          if (email.read) continue
 
-        // Create action
-        const action: EmailAction = {
-          id: `action-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
-          type: 'mark-read',
-          emailId,
-          accountId: email.accountId,
-          previousState: {
-            read: email.read,
-            labels: [...email.labels],
-          },
-          timestamp: Date.now(),
+          const providerType = getProviderType(email.accountId)
+
+          // Create action for tracking
+          const action: EmailAction = {
+            id: `action-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+            type: 'mark-read',
+            emailId,
+            accountId: email.accountId,
+            previousState: {
+              read: email.read,
+              labels: [...email.labels],
+            },
+            timestamp: Date.now(),
+          }
+
+          // Create modifier (Epic 3 - Modifier Architecture)
+          const modifier = new MarkReadModifier({
+            entityId: email.id,
+            accountId: email.accountId,
+            provider: providerType,
+            currentLabels: [...email.labels],
+            markAsRead: true,
+          })
+
+          // Apply modifier locally for immediate UI update
+          const modifiedEmail = modifier.modify(email)
+          await emailDoc.update({
+            $set: {
+              read: modifiedEmail.read,
+              labels: modifiedEmail.labels,
+            },
+          })
+
+          // Queue modifier for async sync
+          const modDoc = await modifierQueue.add(modifier)
+          action.id = modDoc.id
+
+          actions.push(action)
+          this.events$.next({ type: 'action-completed', action })
+        } catch (error) {
+          logger.warn('email-actions', 'Failed to mark email as read in bulk', {
+            emailId,
+            error: error instanceof Error ? error.message : String(error),
+          })
         }
-
-        // Update email
-        const newLabels = email.labels.filter((l) => l !== 'UNREAD')
-        await emailDoc.update({
-          $set: {
-            read: true,
-            labels: newLabels,
-          },
-        })
-
-        actions.push(action)
-        this.events$.next({ type: 'action-completed', action })
-      } catch (error) {
-        logger.warn('email-actions', 'Failed to mark email as read in bulk', {
-          emailId,
-          error: error instanceof Error ? error.message : String(error),
-        })
       }
+    } finally {
+      if (emailIds.length > 1) batchMode.exit()
     }
 
     logger.info('email-actions', 'Bulk mark as read completed', {
@@ -465,6 +532,8 @@ export class EmailActionsService {
    * Mark multiple emails as unread
    * AC 5: Bulk actions available (Task 1.6)
    *
+   * Uses modifier-based architecture for offline-first behavior.
+   *
    * @param emailIds - Array of email IDs to mark as unread
    * @returns Array of action objects
    */
@@ -472,49 +541,67 @@ export class EmailActionsService {
     const db = getDatabase()
     const actions: EmailAction[] = []
 
-    for (const emailId of emailIds) {
-      try {
-        const emailDoc = await db.emails?.findOne(emailId).exec()
-        if (!emailDoc) continue
+    // Story 1.18: Batch mode for bulk actions (>1 item) to reduce re-renders
+    if (emailIds.length > 1) batchMode.enter()
+    try {
+      for (const emailId of emailIds) {
+        try {
+          const emailDoc = await db.emails?.findOne(emailId).exec()
+          if (!emailDoc) continue
 
-        const email = emailDoc.toJSON() as EmailDocument
+          const email = emailDoc.toJSON() as EmailDocument
 
-        // Skip if already unread
-        if (!email.read) continue
+          // Skip if already unread
+          if (!email.read) continue
 
-        // Create action
-        const action: EmailAction = {
-          id: `action-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
-          type: 'mark-unread',
-          emailId,
-          accountId: email.accountId,
-          previousState: {
-            read: email.read,
-            labels: [...email.labels],
-          },
-          timestamp: Date.now(),
+          const providerType = getProviderType(email.accountId)
+
+          // Create action for tracking
+          const action: EmailAction = {
+            id: `action-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+            type: 'mark-unread',
+            emailId,
+            accountId: email.accountId,
+            previousState: {
+              read: email.read,
+              labels: [...email.labels],
+            },
+            timestamp: Date.now(),
+          }
+
+          // Create modifier (Epic 3 - Modifier Architecture)
+          const modifier = new MarkUnreadModifier({
+            entityId: email.id,
+            accountId: email.accountId,
+            provider: providerType,
+            currentLabels: [...email.labels],
+            markAsRead: false,
+          })
+
+          // Apply modifier locally for immediate UI update
+          const modifiedEmail = modifier.modify(email)
+          await emailDoc.update({
+            $set: {
+              read: modifiedEmail.read,
+              labels: modifiedEmail.labels,
+            },
+          })
+
+          // Queue modifier for async sync
+          const modDoc = await modifierQueue.add(modifier)
+          action.id = modDoc.id
+
+          actions.push(action)
+          this.events$.next({ type: 'action-completed', action })
+        } catch (error) {
+          logger.warn('email-actions', 'Failed to mark email as unread in bulk', {
+            emailId,
+            error: error instanceof Error ? error.message : String(error),
+          })
         }
-
-        // Update email
-        const newLabels = email.labels.includes('UNREAD')
-          ? email.labels
-          : [...email.labels, 'UNREAD']
-
-        await emailDoc.update({
-          $set: {
-            read: false,
-            labels: newLabels,
-          },
-        })
-
-        actions.push(action)
-        this.events$.next({ type: 'action-completed', action })
-      } catch (error) {
-        logger.warn('email-actions', 'Failed to mark email as unread in bulk', {
-          emailId,
-          error: error instanceof Error ? error.message : String(error),
-        })
       }
+    } finally {
+      if (emailIds.length > 1) batchMode.exit()
     }
 
     logger.info('email-actions', 'Bulk mark as unread completed', {
@@ -529,6 +616,8 @@ export class EmailActionsService {
    * Undo an action by restoring the previous state
    * AC 6: Undo option for destructive actions
    *
+   * Uses modifier removal for undo when action was created with modifier system.
+   *
    * @param action - The action to undo
    */
   async undoAction(action: EmailAction): Promise<void> {
@@ -541,7 +630,20 @@ export class EmailActionsService {
     }
 
     try {
-      // Restore previous state
+      // Try to remove the modifier first (Epic 3 - Modifier Architecture)
+      // If action.id starts with 'mod-', it's a modifier ID
+      if (action.id.startsWith('mod-')) {
+        const removed = await modifierQueue.remove(action.id)
+        if (removed) {
+          logger.info('email-actions', 'Action undone via modifier removal', {
+            modifierId: action.id,
+            type: action.type,
+            emailId: action.emailId,
+          })
+        }
+      }
+
+      // Restore previous state locally
       const updateFields: Record<string, unknown> = {}
 
       if (action.previousState.folder !== undefined) {

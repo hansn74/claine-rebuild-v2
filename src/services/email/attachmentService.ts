@@ -168,6 +168,9 @@ export class AttachmentService {
       // Check if token expired
       if (error instanceof Error && error.message.includes('401')) {
         logger.debug('attachment', 'Token expired, refreshing...')
+        if (!tokens.refresh_token) {
+          throw new Error('No refresh token available for re-authentication')
+        }
         try {
           // Attempt token refresh
           const oauthService = provider === 'gmail' ? gmailOAuthService : outlookOAuthService

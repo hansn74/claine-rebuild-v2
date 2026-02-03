@@ -405,8 +405,15 @@ export class GmailSendService implements ISendProvider {
     const encoder = new TextEncoder()
     const bytes = encoder.encode(str)
 
-    // Convert to base64
-    const base64 = btoa(String.fromCharCode(...bytes))
+    // Convert to base64 using chunked approach to avoid stack overflow
+    // The spread operator in String.fromCharCode(...bytes) fails for large arrays
+    const CHUNK_SIZE = 0x8000 // 32KB chunks
+    let binaryString = ''
+    for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {
+      const chunk = bytes.subarray(i, i + CHUNK_SIZE)
+      binaryString += String.fromCharCode.apply(null, chunk as unknown as number[])
+    }
+    const base64 = btoa(binaryString)
 
     // Make URL-safe (replace + with -, / with _, remove padding)
     return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')

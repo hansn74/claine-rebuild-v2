@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
+import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react'
 import { PenSquare, Send, Search, FlaskConical } from 'lucide-react'
 import { Button } from '@shared/components/ui/button'
 import { initDatabase } from '@/services/database/init'
@@ -6,11 +6,20 @@ import { useDatabaseStore } from '@/store/database'
 import { useAccountStore } from '@/store/accountStore'
 import { useComposeStore } from '@/store/composeStore'
 import { useSearchStore } from '@/store/searchStore'
+import { useEmailStore } from '@/store/emailStore'
 import { EmailList, OutboxView, FolderSidebar } from '@/components/email'
-import { AccountSwitcher } from '@/components/account'
+import { AccountSwitcher, AccountSettings } from '@/components/account'
 import { ReAuthNotificationContainer } from '@/components/notifications'
-import { UndoToast, OfflineIndicator, QueueStatusBadge, SyncButton } from '@/components/ui'
+import { CircuitBreakerNotification } from '@/components/notifications/CircuitBreakerNotification'
+import {
+  UndoToast,
+  OfflineIndicator,
+  QueueStatusBadge,
+  SyncButton,
+  HealthIndicator,
+} from '@/components/ui'
 import { ConflictIndicator } from '@/components/conflicts'
+import { PerformanceMonitor } from '@/components/dev'
 import { ComposeLoadingFallback, SearchLoadingFallback } from '@/components/common'
 import { WelcomeScreen } from '@/components/onboarding/WelcomeScreen'
 import { useOnboardingState } from '@/hooks/useOnboardingState'
@@ -18,17 +27,44 @@ import { initializeReAuthNotifications } from '@/services/auth/notificationInteg
 import { tokenRefreshService } from '@/services/auth/tokenRefresh'
 import { loadAccountsFromStorage } from '@/services/auth/accountLoader'
 import { gmailOAuthService } from '@/services/auth/gmailOAuth'
+import { outlookOAuthService } from '@/services/auth/outlookOAuth'
+import {
+  connectGmailAccount,
+  connectOutlookAccount,
+  getOAuthProvider,
+  clearOAuthProvider,
+} from '@/services/auth/accountManager'
+import { tokenStorageService } from '@/services/auth/tokenStorage'
+import { initializeEncryption } from '@/services/auth/encryptionInit'
+import {
+  initializeSyncOrchestrator,
+  syncOrchestratorService,
+} from '@/services/sync/syncOrchestrator'
+import { healthRegistry } from '@/services/sync/healthRegistry'
+import { getDatabase } from '@/services/database/init'
 import { logger } from '@/services/logger'
 import { QueueProcessorProvider } from '@/hooks/useQueueProcessor'
 import { sendQueueService } from '@/services/email/sendQueueService'
+import { emailActionsService } from '@/services/email/emailActionsService'
+import { emailActionQueue } from '@/services/email/emailActionQueue'
+import {
+  prepareAttachmentsForSend,
+  type ComposeAttachment,
+} from '@/components/compose/AttachmentUpload'
 import { useFolderCounts } from '@/hooks/useFolderCounts'
 import { useLabelSync } from '@/hooks/useLabelSync'
+import { useSearchIndex } from '@/hooks/useSearchIndex'
+import { useNetworkStatus } from '@/hooks/useNetworkStatus'
 import { cn } from '@/utils/cn'
 import { loadDemoData, clearDemoData, isDemoDataLoaded } from '@/utils/demoData'
+import { initDebugHelpers } from '@/utils/debugHelpers'
+import { initModifierSystem } from '@/services/modifiers'
+import { buildReplyContext, buildForwardContext } from '@/utils/composeHelpers'
 import { ShortcutProvider } from '@/context/ShortcutContext'
 import { useEmailShortcut, useFolderNavigationShortcuts } from '@/hooks/useEmailShortcut'
 import { useFolderStore } from '@/store/folderStore'
 import { useAttributeStore } from '@/store/attributeStore'
+import { initializeAttributePresets } from '@/services/attributes/presetInitializer'
 // Story 2.11: Task 9 - Accessibility components
 import { SkipLinks, ActionAnnouncer } from '@/components/accessibility'
 
@@ -47,16 +83,22 @@ type ViewType = 'emails' | 'outbox'
 
 /**
  * Story 2.11: Global keyboard shortcuts hook
- * Handles compose, search, and help overlay shortcuts at app level
+ * Handles compose, search, actions, and help overlay shortcuts at app level
+ *
+ * Separate modes:
+ * - / opens search mode (email search only)
+ * - Cmd+K opens actions mode (quick actions only)
  */
 function useGlobalShortcuts({
   onCompose,
-  onSearch,
+  onOpenSearch,
+  onOpenActions,
   onShowHelp,
   enabled = true,
 }: {
   onCompose: () => void
-  onSearch: () => void
+  onOpenSearch: () => void
+  onOpenActions: () => void
   onShowHelp: () => void
   enabled?: boolean
 }) {
@@ -69,33 +111,55 @@ function useGlobalShortcuts({
     description: 'Compose new email',
   })
 
-  // / - Focus search (global scope)
+  // / - Open search (email search only)
   useEmailShortcut({
     keys: '/',
-    handler: onSearch,
+    handler: onOpenSearch,
     scopes: ['global', 'inbox', 'reading'],
     enabled,
-    description: 'Focus search',
+    description: 'Search emails',
   })
 
-  // Cmd+K / Ctrl+K - Command palette (works in form tags)
+  // Cmd+K / Ctrl+K - Open actions (quick actions only)
   useEmailShortcut({
     keys: 'meta+k',
-    handler: onSearch,
+    handler: onOpenActions,
     scopes: ['global'],
     enableOnFormTags: true,
     enabled,
-    description: 'Open command palette',
+    description: 'Open quick actions',
   })
 
-  // ? - Show keyboard shortcuts
+  // ? - Show keyboard shortcuts (use both shift+/ and ? for compatibility)
   useEmailShortcut({
-    keys: 'shift+/',
+    keys: '?',
     handler: onShowHelp,
-    scopes: ['global'],
+    scopes: ['global', 'inbox', 'reading'],
     enabled,
     description: 'Show keyboard shortcuts',
   })
+
+  // Direct event listener for ? shortcut (react-hotkeys-hook workaround)
+  useEffect(() => {
+    if (!enabled) return
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger in form fields
+      const target = e.target as HTMLElement
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+        return
+      }
+
+      // ? key (shift + /)
+      if (e.key === '?' || (e.shiftKey && e.key === '/')) {
+        e.preventDefault()
+        onShowHelp()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [enabled, onShowHelp])
 }
 
 function App() {
@@ -106,10 +170,14 @@ function App() {
   const {
     isOpen: composeOpen,
     context: composeContext,
+    draftId: composeDraftId,
     closeCompose,
     openCompose,
+    openComposeWithContext,
   } = useComposeStore()
-  const { isOpen: searchOpen, openSearch, closeSearch } = useSearchStore()
+  const { isOpen: searchOpen, mode: searchMode, openSearch, closeSearch } = useSearchStore()
+  const selectedEmailId = useEmailStore((state) => state.selectedEmailId)
+  const setSelectedEmail = useEmailStore((state) => state.setSelectedEmail)
   const setSelectedFolder = useFolderStore((state) => state.setSelectedFolder)
 
   // Story 2.12: Onboarding state for first-time users
@@ -122,6 +190,8 @@ function App() {
   const [showShortcutOverlay, setShowShortcutOverlay] = useState(false)
   // Demo mode state for visual testing
   const [demoMode, setDemoMode] = useState(false)
+  // Account settings modal state
+  const [showAccountSettings, setShowAccountSettings] = useState(false)
 
   // Subscribe to folder unread counts (Story 2.9)
   useFolderCounts()
@@ -129,16 +199,83 @@ function App() {
   // Sync labels from email providers (Story 2.9)
   useLabelSync()
 
+  // Build and maintain search index for full-text search (Story 2.5)
+  useSearchIndex()
+
+  // Story 1.20: Bridge network status to health registry
+  const { isOnline: networkIsOnline } = useNetworkStatus()
   useEffect(() => {
-    // Initialize database on app launch
+    healthRegistry.connectNetworkStatus(networkIsOnline)
+  }, [networkIsOnline])
+
+  useEffect(() => {
+    // Initialize database and encryption on app launch
     const init = async () => {
       setLoading(true)
       setError(null)
 
       try {
-        await initDatabase()
+        const db = await initDatabase()
+        // Initialize encryption before any token operations
+        await initializeEncryption()
+
+        // Restore auth tokens if coming from a fullReset
+        const resetTokensJson = sessionStorage.getItem('__reset_tokens__')
+        if (resetTokensJson) {
+          logger.info('app', 'Restoring auth tokens from reset...')
+          try {
+            const tokens = JSON.parse(resetTokensJson)
+            // Add authTokens collection if needed
+            if (!db.authTokens) {
+              const { authTokenSchema } = await import(
+                '@/services/database/schemas/authToken.schema'
+              )
+              await db.addCollections({ authTokens: { schema: authTokenSchema } })
+            }
+            // Restore each token
+            for (const token of tokens) {
+              await db.authTokens.upsert(token)
+            }
+            logger.info('app', `Restored ${tokens.length} auth tokens`)
+            sessionStorage.removeItem('__reset_tokens__')
+          } catch (e) {
+            logger.error('app', 'Failed to restore auth tokens', { error: e })
+          }
+        }
+
+        // Story 1.20: Database health signal
+        healthRegistry.setDatabaseHealth(true)
+
+        // Initialize sync orchestrator with database
+        const orchestrator = initializeSyncOrchestrator(db)
+        // Story 1.20: Connect sync progress for health monitoring
+        healthRegistry.connectSyncProgress(orchestrator.getProgressService())
+        // Initialize attribute presets (Status, Priority, Context) for filtering
+        logger.info('app', 'Initializing attribute presets...')
+        const presetsCreated = await initializeAttributePresets()
+        logger.info('app', 'Attribute presets initialized', { presetsCreated })
+        // Initialize modifier system for offline-first architecture (Epic 3)
+        // This registers all modifier classes and initializes the processor
+        await initModifierSystem()
+        logger.info('app', 'Modifier system initialized')
+
+        // Story 1.20: Connect queue health signals
+        healthRegistry.connectActionQueue(emailActionQueue)
+        healthRegistry.connectSendQueue(sendQueueService)
+
+        // Story 1.15: Subscribe orchestrator to action events for adaptive interval (AC 5)
+        orchestrator.subscribeToActionEvents(emailActionsService.getEvents$())
+        orchestrator.subscribeToActionEvents(sendQueueService.getEvents$())
+
+        // Initialize debug helpers for development testing
+        initDebugHelpers()
         setInitialized(true)
       } catch (err) {
+        // Story 1.20: Database health signal on failure
+        healthRegistry.setDatabaseHealth(
+          false,
+          err instanceof Error ? err.message : 'Unknown error'
+        )
         setError(err as Error)
       } finally {
         setLoading(false)
@@ -147,6 +284,111 @@ function App() {
 
     init()
   }, [setInitialized, setLoading, setError])
+
+  // Handle OAuth callback when redirected back from provider (Gmail or Outlook)
+  useEffect(() => {
+    if (!initialized) return
+
+    const handleOAuthCallback = async () => {
+      const url = new URL(window.location.href)
+      const code = url.searchParams.get('code')
+      const state = url.searchParams.get('state')
+
+      // Not an OAuth callback
+      if (!code || !state) return
+
+      // Determine which provider this callback is for
+      const provider = getOAuthProvider()
+      logger.info('auth', 'OAuth callback detected', { provider })
+
+      try {
+        let accountId: string
+
+        if (provider === 'outlook') {
+          // Handle Outlook OAuth callback
+          const { code: authCode, state: authState } = outlookOAuthService.handleCallback(
+            window.location.href
+          )
+          const tokens = await outlookOAuthService.exchangeCodeForTokens(authCode, authState)
+
+          // Fetch user info from Microsoft Graph to get email
+          const userInfoResponse = await fetch('https://graph.microsoft.com/v1.0/me', {
+            headers: { Authorization: `Bearer ${tokens.access_token}` },
+          })
+
+          if (!userInfoResponse.ok) {
+            throw new Error('Failed to fetch user info from Microsoft')
+          }
+
+          const userInfo = await userInfoResponse.json()
+          accountId = userInfo.mail || userInfo.userPrincipalName
+
+          if (!accountId) {
+            throw new Error('No email returned from Microsoft userinfo')
+          }
+
+          // Store tokens
+          await tokenStorageService.storeTokens(accountId, tokens)
+        } else {
+          // Default to Gmail OAuth callback
+          const { code: authCode, state: authState } = gmailOAuthService.handleCallback(
+            window.location.href
+          )
+          const tokens = await gmailOAuthService.exchangeCodeForTokens(authCode, authState)
+
+          // Fetch user info from Google to get email
+          const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+            headers: { Authorization: `Bearer ${tokens.access_token}` },
+          })
+
+          if (!userInfoResponse.ok) {
+            throw new Error('Failed to fetch user info from Google')
+          }
+
+          const userInfo = await userInfoResponse.json()
+          accountId = userInfo.email
+
+          if (!accountId) {
+            throw new Error('No email returned from Google userinfo')
+          }
+
+          // Store tokens
+          await tokenStorageService.storeTokens(accountId, tokens)
+        }
+
+        logger.info('auth', 'OAuth flow completed successfully', { accountId, provider })
+
+        // Clear provider tracking
+        clearOAuthProvider()
+
+        // Clear URL parameters and redirect to root
+        window.history.replaceState({}, document.title, '/')
+
+        // Reload accounts from storage
+        const loadedAccounts = await loadAccountsFromStorage()
+        setAccounts(loadedAccounts)
+
+        // Initialize sync state and start syncing for the new account
+        if (syncOrchestratorService) {
+          await syncOrchestratorService.addAccount(accountId, provider || 'gmail')
+          // Start orchestrator if not already started
+          await syncOrchestratorService.start()
+          logger.info('sync', 'Account registered with sync orchestrator', { accountId, provider })
+        }
+      } catch (err) {
+        logger.error('auth', 'OAuth callback failed', {
+          error: err instanceof Error ? err.message : String(err),
+          provider,
+        })
+        // Clear provider tracking
+        clearOAuthProvider()
+        // Clear URL parameters even on error and redirect to root
+        window.history.replaceState({}, document.title, '/')
+      }
+    }
+
+    handleOAuthCallback()
+  }, [initialized, setAccounts])
 
   // Initialize token refresh and re-auth notification system
   useEffect(() => {
@@ -158,14 +400,49 @@ function App() {
     // Initialize re-auth notification integration
     const cleanupNotifications = initializeReAuthNotifications()
 
-    // Load accounts from token storage
-    loadAccountsFromStorage().then(setAccounts)
+    // Load accounts from token storage and initialize sync orchestrator
+    const initializeAccounts = async () => {
+      const loadedAccounts = await loadAccountsFromStorage()
+      setAccounts(loadedAccounts)
+
+      // Ensure active account is set (fix for sync button being disabled)
+      if (loadedAccounts.length > 0 && !useAccountStore.getState().activeAccountId) {
+        useAccountStore.getState().setActiveAccount(loadedAccounts[0].id)
+        logger.info('auth', 'Set active account', { accountId: loadedAccounts[0].id })
+      }
+
+      // Register all loaded accounts with sync orchestrator and start it
+      if (syncOrchestratorService && loadedAccounts.length > 0) {
+        for (const account of loadedAccounts) {
+          await syncOrchestratorService.addAccount(account.id, account.provider)
+        }
+        await syncOrchestratorService.start()
+        logger.info('sync', 'Sync orchestrator started with loaded accounts', {
+          accountCount: loadedAccounts.length,
+        })
+      }
+    }
+
+    initializeAccounts()
 
     return () => {
       tokenRefreshService.stopScheduler()
       cleanupNotifications()
+      // Stop sync orchestrator on unmount
+      syncOrchestratorService?.stop()
     }
   }, [initialized, setAccounts])
+
+  // Story 1.15: Trigger immediate sync on account switch (AC 8)
+  const prevAccountIdRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!initialized || !activeAccountId || !syncOrchestratorService) return
+    // Only trigger on actual switch, not initial load
+    if (prevAccountIdRef.current !== null && prevAccountIdRef.current !== activeAccountId) {
+      syncOrchestratorService.onAccountSwitch(activeAccountId)
+    }
+    prevAccountIdRef.current = activeAccountId
+  }, [activeAccountId, initialized])
 
   // Update outbox count periodically
   useEffect(() => {
@@ -222,16 +499,33 @@ function App() {
     }
   }, [accounts.length, isFirstLaunch, completeOnboarding])
 
-  // Handle connect account click - initiate Gmail OAuth flow
-  const handleConnectAccount = useCallback(async () => {
+  // Handle connect Gmail account click - initiate Gmail OAuth flow
+  const handleConnectGmail = useCallback(async () => {
     try {
       // Dismiss welcome screen on connect action
       if (!hasSeenWelcome) {
         dismissWelcome()
       }
-      await gmailOAuthService.initiateAuth()
+      // Use accountManager to track provider and initiate OAuth
+      await connectGmailAccount()
     } catch (err) {
-      logger.error('auth', 'Failed to initiate OAuth', {
+      logger.error('auth', 'Failed to initiate Gmail OAuth', {
+        error: err instanceof Error ? err.message : String(err),
+      })
+    }
+  }, [hasSeenWelcome, dismissWelcome])
+
+  // Handle connect Outlook account click - initiate Microsoft OAuth flow
+  const handleConnectOutlook = useCallback(async () => {
+    try {
+      // Dismiss welcome screen on connect action
+      if (!hasSeenWelcome) {
+        dismissWelcome()
+      }
+      // Use accountManager to track provider and initiate OAuth
+      await connectOutlookAccount()
+    } catch (err) {
+      logger.error('auth', 'Failed to initiate Outlook OAuth', {
         error: err instanceof Error ? err.message : String(err),
       })
     }
@@ -252,6 +546,33 @@ function App() {
     setShowShortcutOverlay(false)
   }, [])
 
+  // Handle email selection from search results
+  const handleSearchSelectEmail = useCallback(
+    async (emailId: string) => {
+      try {
+        const db = getDatabase()
+        const email = await db.emails.findOne(emailId).exec()
+        if (email) {
+          const emailDoc = email.toJSON()
+          // Switch to the email's folder so it's visible in the list
+          if (emailDoc.folder) {
+            setSelectedFolder(emailDoc.folder)
+          }
+          setSelectedEmail(emailDoc.id, emailDoc.threadId)
+          setActiveView('emails')
+          logger.info('search', 'Email selected from search', {
+            emailId,
+            threadId: emailDoc.threadId,
+            folder: emailDoc.folder,
+          })
+        }
+      } catch (err) {
+        logger.error('search', 'Failed to select email from search', { emailId, error: err })
+      }
+    },
+    [setSelectedEmail, setSelectedFolder]
+  )
+
   // Handle folder navigation (Story 2.11: Task 3.5)
   const handleNavigateToFolder = useCallback(
     (folder: string) => {
@@ -262,12 +583,184 @@ function App() {
     [setSelectedFolder]
   )
 
+  // Email action handlers for CommandPalette
+  const handleArchive = useCallback(async () => {
+    if (!selectedEmailId) {
+      logger.warn('actions', 'No email selected for archive')
+      return
+    }
+    try {
+      await emailActionsService.archiveEmail(selectedEmailId)
+      logger.info('actions', 'Email archived via command palette', { emailId: selectedEmailId })
+    } catch (err) {
+      logger.error('actions', 'Failed to archive email', { error: err })
+    }
+  }, [selectedEmailId])
+
+  const handleDelete = useCallback(async () => {
+    if (!selectedEmailId) {
+      logger.warn('actions', 'No email selected for delete')
+      return
+    }
+    try {
+      await emailActionsService.deleteEmail(selectedEmailId)
+      logger.info('actions', 'Email deleted via command palette', { emailId: selectedEmailId })
+    } catch (err) {
+      logger.error('actions', 'Failed to delete email', { error: err })
+    }
+  }, [selectedEmailId])
+
+  const handleStar = useCallback(async () => {
+    if (!selectedEmailId) {
+      logger.warn('actions', 'No email selected for star')
+      return
+    }
+    try {
+      const db = getDatabase()
+      const emailDoc = await db.emails.findOne(selectedEmailId).exec()
+      if (emailDoc) {
+        const email = emailDoc.toJSON()
+        const newStarred = !email.starred
+        const newLabels = newStarred
+          ? [...email.labels.filter((l: string) => l !== 'STARRED'), 'STARRED']
+          : email.labels.filter((l: string) => l !== 'STARRED')
+        await emailDoc.update({
+          $set: { starred: newStarred, labels: newLabels },
+        })
+        logger.info(
+          'actions',
+          `Email ${newStarred ? 'starred' : 'unstarred'} via command palette`,
+          { emailId: selectedEmailId }
+        )
+      }
+    } catch (err) {
+      logger.error('actions', 'Failed to toggle star', { error: err })
+    }
+  }, [selectedEmailId])
+
+  const handleReply = useCallback(async () => {
+    if (!selectedEmailId) {
+      logger.warn('actions', 'No email selected for reply')
+      return
+    }
+    try {
+      const db = getDatabase()
+      const emailDoc = await db.emails.findOne(selectedEmailId).exec()
+      if (emailDoc) {
+        const email = emailDoc.toJSON()
+        const context = buildReplyContext(email)
+        openComposeWithContext(context)
+        logger.info('actions', 'Reply initiated via keyboard shortcut', {
+          emailId: selectedEmailId,
+        })
+      }
+    } catch (err) {
+      logger.error('actions', 'Failed to initiate reply', { error: err })
+    }
+  }, [selectedEmailId, openComposeWithContext])
+
+  const handleForward = useCallback(async () => {
+    if (!selectedEmailId) {
+      logger.warn('actions', 'No email selected for forward')
+      return
+    }
+    try {
+      const db = getDatabase()
+      const emailDoc = await db.emails.findOne(selectedEmailId).exec()
+      if (emailDoc) {
+        const email = emailDoc.toJSON()
+        const context = buildForwardContext(email)
+        openComposeWithContext(context)
+        logger.info('actions', 'Forward initiated via keyboard shortcut', {
+          emailId: selectedEmailId,
+        })
+      }
+    } catch (err) {
+      logger.error('actions', 'Failed to initiate forward', { error: err })
+    }
+  }, [selectedEmailId, openComposeWithContext])
+
+  // Handle sending email via send queue
+  // Matches ComposeDialog onSend prop type
+  const handleSendEmail = useCallback(
+    async (data: {
+      to: { name: string; email: string }[]
+      cc: { name: string; email: string }[]
+      bcc: { name: string; email: string }[]
+      subject: string
+      body: { html: string; text: string }
+      attachments: ComposeAttachment[]
+    }) => {
+      try {
+        // Get the active account to construct proper provider:email format
+        const activeAccount = accounts.find((a) => a.id === activeAccountId)
+        if (!activeAccount) {
+          throw new Error('No account selected for sending')
+        }
+
+        // Construct accountId in format expected by sendQueueService (provider:email)
+        const sendAccountId = `${activeAccount.provider}:${activeAccount.email}`
+
+        // Get reply context from compose context (set when opening reply/forward)
+        const replyToEmailId = composeContext?.replyToEmailId
+        const threadId = composeContext?.threadId
+        const isReply = composeContext?.type === 'reply' || composeContext?.type === 'reply-all'
+        const isForward = composeContext?.type === 'forward'
+
+        // Prepare attachments with base64 content
+        const preparedAttachments =
+          data.attachments.length > 0 ? await prepareAttachmentsForSend(data.attachments) : []
+
+        // Create draft document for send queue
+        const draftType = isReply ? 'reply' : isForward ? 'forward' : 'new'
+        const draft = {
+          id: `draft-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+          accountId: sendAccountId,
+          type: draftType as 'new' | 'reply' | 'forward',
+          to: data.to,
+          cc: data.cc,
+          bcc: data.bcc,
+          subject: data.subject,
+          body: data.body,
+          attachments: preparedAttachments,
+          replyToEmailId,
+          threadId,
+          createdAt: Date.now(),
+          lastSaved: Date.now(),
+        }
+
+        // Queue for sending
+        await sendQueueService.queueEmail(draft)
+        logger.info('compose', 'Email queued for sending', {
+          to: data.to.length,
+          subject: data.subject.slice(0, 50),
+          attachmentCount: preparedAttachments.length,
+        })
+      } catch (err) {
+        logger.error('compose', 'Failed to queue email', { error: err })
+        throw err // Re-throw so ComposeDialog can show error
+      }
+    },
+    [accounts, activeAccountId, composeContext]
+  )
+
   // Story 2.11: Global keyboard shortcuts using react-hotkeys-hook
   // Shortcuts only active when not in compose or search modes
   const shortcutsEnabled = initialized && !composeOpen && !searchOpen
+
+  // Separate handlers for search (/) and actions (Cmd+K)
+  const handleOpenSearch = useCallback(() => {
+    openSearch('search')
+  }, [openSearch])
+
+  const handleOpenActions = useCallback(() => {
+    openSearch('actions')
+  }, [openSearch])
+
   useGlobalShortcuts({
     onCompose: openCompose,
-    onSearch: openSearch,
+    onOpenSearch: handleOpenSearch,
+    onOpenActions: handleOpenActions,
     onShowHelp: handleShowShortcutOverlay,
     enabled: shortcutsEnabled,
   })
@@ -306,7 +799,13 @@ function App() {
   const showWelcomeScreen = initialized && accounts.length === 0 && !hasSeenWelcome
 
   if (showWelcomeScreen) {
-    return <WelcomeScreen onConnectAccount={handleConnectAccount} onSkip={dismissWelcome} />
+    return (
+      <WelcomeScreen
+        onConnectGmail={handleConnectGmail}
+        onConnectOutlook={handleConnectOutlook}
+        onSkip={dismissWelcome}
+      />
+    )
   }
 
   // Show email client UI once database is initialized
@@ -317,12 +816,15 @@ function App() {
           {/* Story 2.11: Task 9.4 - Skip links for keyboard-only users */}
           <SkipLinks />
 
+          {/* Undo toast (fixed position, bottom-right) - outside main container for proper fixed positioning */}
+          <UndoToast />
+
           <div className="h-screen flex flex-col">
             {/* Re-auth notifications (fixed position, top-right) */}
             <ReAuthNotificationContainer />
 
-            {/* Undo toast (fixed position, bottom-right) */}
-            <UndoToast />
+            {/* Circuit breaker notifications (fixed position, top-center) - Story 1.19 */}
+            <CircuitBreakerNotification />
 
             {/* Compose Dialog - Lazy loaded (Story 2.10: Task 6) */}
             {composeOpen && (
@@ -331,21 +833,60 @@ function App() {
                   open={composeOpen}
                   onClose={closeCompose}
                   initialContext={composeContext ?? undefined}
+                  draftId={composeDraftId ?? undefined}
                   accountId={activeAccountId ?? ''}
+                  onSend={handleSendEmail}
                 />
               </Suspense>
             )}
 
+            {/* Account Settings Modal */}
+            {showAccountSettings && (
+              // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
+              <div
+                className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+                role="dialog"
+                aria-modal="true"
+                aria-label="Account settings"
+                onClick={(e) => {
+                  // Close on backdrop click
+                  if (e.target === e.currentTarget) {
+                    setShowAccountSettings(false)
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    setShowAccountSettings(false)
+                  }
+                }}
+              >
+                <div style={{ width: '400px', maxHeight: '90vh' }} className="overflow-y-auto">
+                  <AccountSettings
+                    onClose={() => setShowAccountSettings(false)}
+                    onConnectGmail={handleConnectGmail}
+                    onConnectOutlook={handleConnectOutlook}
+                  />
+                </div>
+              </div>
+            )}
+
             {/* Command Palette / Search - Lazy loaded (Story 2.10: Task 6) */}
+            {/* / opens search mode, Cmd+K opens actions mode */}
             {searchOpen && (
               <Suspense fallback={<SearchLoadingFallback />}>
                 <CommandPalette
                   open={searchOpen}
                   onClose={closeSearch}
-                  onSelectEmail={(emailId) => {
-                    logger.info('search', 'Email selected from search', { emailId })
-                    // TODO: Navigate to email detail view
-                  }}
+                  mode={searchMode}
+                  onSelectEmail={handleSearchSelectEmail}
+                  onCompose={openCompose}
+                  onNavigate={handleNavigateToFolder}
+                  onArchive={handleArchive}
+                  onDelete={handleDelete}
+                  onReply={handleReply}
+                  onForward={handleForward}
+                  onStar={handleStar}
+                  onShowShortcuts={handleShowShortcutOverlay}
                 />
               </Suspense>
             )}
@@ -368,14 +909,14 @@ function App() {
                 {/* Search button - preloads search dialog on hover */}
                 <Button
                   variant="outline"
-                  onClick={openSearch}
+                  onClick={handleOpenSearch}
                   onMouseEnter={() => lazyComponents.commandPalette.preload()}
                   className="flex items-center gap-2 text-slate-500"
                 >
                   <Search className="w-4 h-4" />
                   <span className="hidden sm:inline">Search</span>
                   <kbd className="hidden sm:inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-medium bg-slate-100 rounded">
-                    <span className="text-xs">&#8984;</span>K
+                    /
                   </kbd>
                 </Button>
 
@@ -401,6 +942,9 @@ function App() {
                 {/* Offline indicator */}
                 <OfflineIndicator />
 
+                {/* Subsystem health indicator - Story 1.20 */}
+                <HealthIndicator />
+
                 {/* Sync status indicators */}
                 <div className="flex items-center gap-2">
                   <QueueStatusBadge />
@@ -409,7 +953,11 @@ function App() {
                 </div>
 
                 {/* Account switcher */}
-                <AccountSwitcher onConnectAccount={handleConnectAccount} />
+                <AccountSwitcher
+                  onConnectGmail={handleConnectGmail}
+                  onConnectOutlook={handleConnectOutlook}
+                  onManageAccounts={() => setShowAccountSettings(true)}
+                />
               </div>
             </header>
 
@@ -459,6 +1007,9 @@ function App() {
               </Suspense>
             )}
           </div>
+
+          {/* Dev-only performance monitor with health debug panel */}
+          {import.meta.env.DEV && <PerformanceMonitor />}
         </QueueProcessorProvider>
       </ActionAnnouncer>
     </ShortcutProvider>

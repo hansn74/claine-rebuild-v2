@@ -12,20 +12,29 @@ import { create } from 'zustand'
 import { logger } from '@/services/logger'
 
 /**
+ * Mode for command palette
+ * - 'search': Email search only (opened with /)
+ * - 'actions': Quick actions only (opened with Cmd+K)
+ */
+export type PaletteMode = 'search' | 'actions'
+
+/**
  * Search store state and actions
  */
 interface SearchState {
   /** Whether command palette is open */
   isOpen: boolean
+  /** Which mode the palette is in */
+  mode: PaletteMode
   /** Current search query (for URL persistence) */
   currentQuery: string
   /** Whether search is active (showing results view) */
   isSearchActive: boolean
 
   // Actions
-  openSearch: () => void
+  openSearch: (mode?: PaletteMode) => void
   closeSearch: () => void
-  toggleSearch: () => void
+  toggleSearch: (mode?: PaletteMode) => void
   setCurrentQuery: (query: string) => void
   clearSearch: () => void
 }
@@ -48,15 +57,16 @@ interface SearchState {
  */
 export const useSearchStore = create<SearchState>((set, get) => ({
   isOpen: false,
+  mode: 'search',
   currentQuery: '',
   isSearchActive: false,
 
   /**
-   * Open the command palette
+   * Open the command palette in specified mode
    */
-  openSearch: () => {
-    set({ isOpen: true })
-    logger.debug('search', 'Command palette opened')
+  openSearch: (mode: PaletteMode = 'search') => {
+    set({ isOpen: true, mode })
+    logger.debug('search', `Command palette opened in ${mode} mode`)
   },
 
   /**
@@ -70,10 +80,16 @@ export const useSearchStore = create<SearchState>((set, get) => ({
   /**
    * Toggle command palette visibility
    */
-  toggleSearch: () => {
-    const { isOpen } = get()
-    set({ isOpen: !isOpen })
-    logger.debug('search', `Command palette ${!isOpen ? 'opened' : 'closed'}`)
+  toggleSearch: (mode: PaletteMode = 'search') => {
+    const { isOpen, mode: currentMode } = get()
+    // If already open in same mode, close. Otherwise open in new mode.
+    if (isOpen && currentMode === mode) {
+      set({ isOpen: false })
+      logger.debug('search', 'Command palette closed')
+    } else {
+      set({ isOpen: true, mode })
+      logger.debug('search', `Command palette opened in ${mode} mode`)
+    }
   },
 
   /**

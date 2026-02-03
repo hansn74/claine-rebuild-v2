@@ -31,6 +31,8 @@ export interface StoredTokens extends OAuthTokens {
   expires_at: string
   /** Account identifier (email) */
   account_id: string
+  /** Email provider (gmail or outlook) */
+  provider?: 'gmail' | 'outlook'
 }
 
 /**

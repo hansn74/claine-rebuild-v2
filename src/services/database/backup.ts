@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { RxDocument } from 'rxdb'
 import type { AppDatabase } from './types'
 
@@ -36,7 +37,7 @@ export class BackupService {
     const data: Record<string, unknown[]> = {}
 
     for (const collectionName of collectionNames) {
-      const collection = db.collections[collectionName]
+      const collection = (db.collections as any)[collectionName]
       if (collection) {
         const docs = await collection.find().exec()
         // Use RxDocument<unknown> since we're iterating over different collection types dynamically
@@ -69,7 +70,7 @@ export class BackupService {
   ): Promise<void> {
     // Clear all existing documents from collections
     for (const collectionName of backup.metadata.collections) {
-      const collection = db.collections[collectionName]
+      const collection = (db.collections as any)[collectionName]
       if (collection) {
         // Remove all documents, not the collection itself
         await collection.find().remove()
@@ -78,7 +79,7 @@ export class BackupService {
 
     // Restore data to each collection
     for (const [collectionName, docs] of Object.entries(backup.data)) {
-      const collection = db.collections[collectionName]
+      const collection = (db.collections as any)[collectionName]
       if (collection && docs.length > 0) {
         // Insert documents in bulk
         await collection.bulkInsert(docs)

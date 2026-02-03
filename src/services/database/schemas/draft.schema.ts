@@ -47,6 +47,10 @@ export interface DraftDocument {
   // Timestamps
   createdAt: number // Unix timestamp (ms) when draft was created
   lastSaved: number // Unix timestamp (ms) of last save (for auto-save indicator)
+
+  // Server sync
+  remoteDraftId?: string // Gmail/Outlook server draft ID for sync
+  syncedAt?: number // Last successful sync timestamp
 }
 
 /**
@@ -164,6 +168,16 @@ export const draftSchema: RxJsonSchema<DraftDocument> = {
       type: 'number',
       minimum: 0,
       maximum: 9999999999999, // Year 2286
+      multipleOf: 1,
+    },
+    remoteDraftId: {
+      type: 'string',
+      maxLength: 200,
+    },
+    syncedAt: {
+      type: 'number',
+      minimum: 0,
+      maximum: 9999999999999,
       multipleOf: 1,
     },
   },

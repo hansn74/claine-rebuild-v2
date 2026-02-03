@@ -28,6 +28,8 @@ interface ComposeState {
   openComposeWithContext: (context: ComposeContext) => void
   /** Open compose dialog for existing draft */
   openDraft: (draftId: string) => void
+  /** Set draft ID (after creating a new draft) */
+  setDraftId: (draftId: string) => void
   /** Close compose dialog */
   closeCompose: () => void
 }
@@ -59,6 +61,10 @@ export const useComposeStore = create<ComposeState>((set) => ({
       context: null,
       draftId,
     })
+  },
+
+  setDraftId: (draftId) => {
+    set({ draftId })
   },
 
   closeCompose: () => {

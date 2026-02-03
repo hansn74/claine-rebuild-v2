@@ -16,7 +16,10 @@
 
 import { Subject, Observable } from 'rxjs'
 import { getDatabase } from '@/services/database/init'
+import { circuitBreaker } from '@/services/sync/circuitBreaker'
+import { classifyError } from '@/services/sync/errorClassification'
 import { logger } from '@/services/logger'
+import type { ProviderId } from '@/services/sync/circuitBreakerTypes'
 import type { DraftDocument } from '@/services/database/schemas/draft.schema'
 import type {
   SendQueueDocument,
@@ -66,6 +69,12 @@ export class SendQueueService {
   private providers: Map<string, ISendProvider> = new Map()
   private processingIds = new Set<string>()
   private initialized = false
+  /**
+   * Memory cache for attachment content to avoid RxDB stack overflow with large files.
+   * Key format: `${queueId}:${attachmentId}`
+   * Note: Cache is lost on page refresh - pending emails with attachments need to be re-queued
+   */
+  private attachmentContentCache = new Map<string, string>()
 
   private constructor() {
     // Private constructor for singleton pattern
@@ -111,6 +120,19 @@ export class SendQueueService {
   }
 
   /**
+   * Extract provider ID from accountId for circuit breaker (Task 6)
+   * @param accountId - Account identifier (format: 'provider:email')
+   * @returns ProviderId or null
+   */
+  private getProviderIdForAccount(accountId: string): ProviderId | null {
+    const providerType = accountId.split(':')[0]
+    if (providerType === 'gmail' || providerType === 'outlook') {
+      return providerType
+    }
+    return null
+  }
+
+  /**
    * Queue an email for sending
    * AC 1: Emails sent while offline are queued locally
    *
@@ -120,9 +142,40 @@ export class SendQueueService {
   async queueEmail(draft: DraftDocument): Promise<SendQueueDocument> {
     const db = getDatabase()
     const now = Date.now()
+    const queueId = `send-${now}-${Math.random().toString(36).slice(2, 11)}`
+
+    // Convert draft attachments to send queue format
+    // Store content in memory cache (not in RxDB) to avoid stack overflow with large files
+    const attachments = (draft.attachments || []).map((att) => {
+      // Store large content in memory cache instead of RxDB
+      if (att.content && att.content.length > 0) {
+        this.attachmentContentCache.set(`${queueId}:${att.id}`, att.content)
+      }
+      return {
+        id: att.id,
+        filename: att.filename,
+        mimeType: att.mimeType,
+        size: att.size,
+        // Don't store content in RxDB - it's in the cache
+        content: '',
+      }
+    })
+
+    // Debug logging for attachments
+    logger.info('sendQueue', 'Attachment debug', {
+      draftAttachmentCount: draft.attachments?.length || 0,
+      queueAttachmentCount: attachments.length,
+      cachedContentCount: this.attachmentContentCache.size,
+      attachmentDetails: attachments.map((a) => ({
+        filename: a.filename,
+        mimeType: a.mimeType,
+        size: a.size,
+        hasCachedContent: this.attachmentContentCache.has(`${queueId}:${a.id}`),
+      })),
+    })
 
     const queueItem: SendQueueDocument = {
-      id: `send-${now}-${Math.random().toString(36).slice(2, 11)}`,
+      id: queueId,
       accountId: draft.accountId,
       draftId: draft.id,
       threadId: draft.threadId,
@@ -133,7 +186,7 @@ export class SendQueueService {
       bcc: draft.bcc,
       subject: draft.subject,
       body: draft.body,
-      attachments: [], // Attachments handled separately
+      attachments,
       status: 'pending',
       attempts: 0,
       maxAttempts: MAX_ATTEMPTS,
@@ -215,12 +268,24 @@ export class SendQueueService {
   /**
    * Send a single queued email
    *
+   * Story 1.19: Added forceSend parameter (Task 6, AC 17)
    * @param item - Queue item to send
+   * @param forceSend - If true, bypasses circuit breaker check (for user-initiated sends)
    */
-  private async sendQueuedEmail(item: SendQueueDocument): Promise<void> {
+  private async sendQueuedEmail(item: SendQueueDocument, forceSend = false): Promise<void> {
     const db = getDatabase()
     const sendQueue = db.sendQueue
     if (!sendQueue) return
+
+    // Story 1.19: Check circuit breaker before sending (Task 6.2, AC 17)
+    const providerId = this.getProviderIdForAccount(item.accountId)
+    if (!forceSend && providerId && !circuitBreaker.canExecute(providerId)) {
+      logger.debug('sync', 'Circuit open, deferring send', {
+        queueId: item.id,
+        provider: providerId,
+      })
+      return // Leave as pending, will be processed when circuit closes
+    }
 
     // Mark as sending
     this.processingIds.add(item.id)
@@ -236,8 +301,26 @@ export class SendQueueService {
         throw new Error(`No send provider registered for account: ${item.accountId}`)
       }
 
+      // Hydrate attachment content from cache before sending
+      const hydratedItem = this.hydrateAttachmentContent(item)
+
+      logger.debug('sendQueue', 'Sending with hydrated attachments', {
+        id: item.id,
+        attachmentCount: hydratedItem.attachments.length,
+        hasContent: hydratedItem.attachments.map((a) => ({
+          filename: a.filename,
+          hasContent: !!a.content && a.content.length > 0,
+          contentLength: a.content?.length || 0,
+        })),
+      })
+
       // Send via provider
-      const sentMessageId = await provider.sendEmail(item)
+      const sentMessageId = await provider.sendEmail(hydratedItem)
+
+      // Story 1.19: Record success (Task 6.5)
+      if (providerId) {
+        circuitBreaker.recordSuccess(providerId)
+      }
 
       // Update status to sent
       const now = Date.now()
@@ -255,12 +338,84 @@ export class SendQueueService {
         sentMessageId,
       })
 
+      // Clean up attachment content from cache after successful send
+      this.cleanupAttachmentCache(item.id, item.attachments)
+
       const sentItem = { ...item, status: 'sent' as const, sentAt: now, sentMessageId }
       this.events$.next({ type: 'sent', item: sentItem, messageId: sentMessageId })
     } catch (error) {
+      // Story 1.19: Record failure for transient errors (Task 6.4)
+      if (providerId) {
+        const classified = classifyError(error)
+        if (classified.type === 'transient' || classified.type === 'unknown') {
+          circuitBreaker.recordFailure(providerId)
+        }
+      }
       await this.handleSendError(item, error)
     } finally {
       this.processingIds.delete(item.id)
+    }
+  }
+
+  /**
+   * Hydrate attachment content from memory cache
+   * Restores the base64 content that was stored in cache instead of RxDB
+   *
+   * @param item - Queue item with empty attachment content
+   * @returns Queue item with hydrated attachment content
+   */
+  private hydrateAttachmentContent(item: SendQueueDocument): SendQueueDocument {
+    if (!item.attachments || item.attachments.length === 0) {
+      return item
+    }
+
+    const hydratedAttachments = item.attachments.map((att) => {
+      const cacheKey = `${item.id}:${att.id}`
+      const cachedContent = this.attachmentContentCache.get(cacheKey)
+
+      if (cachedContent) {
+        logger.debug('sendQueue', 'Hydrated attachment from cache', {
+          filename: att.filename,
+          contentLength: cachedContent.length,
+        })
+        return { ...att, content: cachedContent }
+      }
+
+      // Content not in cache - may happen after page refresh
+      logger.warn('sendQueue', 'Attachment content not in cache', {
+        queueId: item.id,
+        attachmentId: att.id,
+        filename: att.filename,
+      })
+      return att
+    })
+
+    return { ...item, attachments: hydratedAttachments }
+  }
+
+  /**
+   * Clean up attachment content from cache after successful send
+   *
+   * @param queueId - Queue item ID
+   * @param attachments - Attachments to clean up
+   */
+  private cleanupAttachmentCache(
+    queueId: string,
+    attachments: SendQueueDocument['attachments']
+  ): void {
+    if (!attachments || attachments.length === 0) {
+      return
+    }
+
+    for (const att of attachments) {
+      const cacheKey = `${queueId}:${att.id}`
+      if (this.attachmentContentCache.delete(cacheKey)) {
+        logger.debug('sendQueue', 'Cleaned up attachment from cache', {
+          queueId,
+          attachmentId: att.id,
+          filename: att.filename,
+        })
+      }
     }
   }
 
@@ -363,7 +518,10 @@ export class SendQueueService {
     })
 
     logger.info('sendQueue', 'Email cancelled', { id })
-    this.events$.next({ type: 'cancelled', item: { ...item.toJSON(), status: 'cancelled' } })
+    this.events$.next({
+      type: 'cancelled',
+      item: { ...item.toJSON(), status: 'cancelled' as SendQueueStatus } as SendQueueDocument,
+    })
 
     return true
   }
@@ -406,10 +564,10 @@ export class SendQueueService {
 
     logger.info('sendQueue', 'Email queued for retry', { id })
 
-    // Process immediately
+    // Process immediately — user-initiated retry bypasses circuit breaker (AC 17)
     const updatedItem = await sendQueue.findOne(id).exec()
     if (updatedItem) {
-      this.sendQueuedEmail(updatedItem.toJSON() as SendQueueDocument)
+      this.sendQueuedEmail(updatedItem.toJSON() as SendQueueDocument, true)
     }
 
     return true
@@ -511,6 +669,9 @@ export class SendQueueService {
 
     logger.info('sendQueue', 'Initializing send queue service')
 
+    // Subscribe to circuit breaker recovery to drain deferred sends (AC 6)
+    this.subscribeToCircuitRecovery()
+
     // Clean up old sent/cancelled items
     await this.cleanupOldItems()
 
@@ -523,6 +684,33 @@ export class SendQueueService {
     }
 
     this.initialized = true
+  }
+
+  /**
+   * Subscribe to circuit breaker state changes to drain deferred sends
+   * when a provider's circuit recovers (AC 6: drain queued items on close)
+   */
+  private subscribeToCircuitRecovery(): void {
+    let previousStates: Record<string, string> = {}
+
+    circuitBreaker.subscribe(() => {
+      const gmailState = circuitBreaker.getStatus('gmail').state
+      const outlookState = circuitBreaker.getStatus('outlook').state
+
+      const gmailRecovered =
+        (previousStates['gmail'] === 'open' || previousStates['gmail'] === 'half-open') &&
+        gmailState === 'closed'
+      const outlookRecovered =
+        (previousStates['outlook'] === 'open' || previousStates['outlook'] === 'half-open') &&
+        outlookState === 'closed'
+
+      if (gmailRecovered || outlookRecovered) {
+        logger.info('sendQueue', 'Circuit recovered, draining deferred sends')
+        this.processQueue()
+      }
+
+      previousStates = { gmail: gmailState, outlook: outlookState }
+    })
   }
 }
 

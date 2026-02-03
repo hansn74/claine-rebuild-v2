@@ -1,5 +1,6 @@
 import type { Config } from 'tailwindcss'
 import tailwindcssAnimate from 'tailwindcss-animate'
+import typography from '@tailwindcss/typography'
 
 /**
  * UX Design System - Theme 3: Technical Calm
@@ -179,5 +180,5 @@ export default {
       },
     },
   },
-  plugins: [tailwindcssAnimate],
+  plugins: [tailwindcssAnimate, typography],
 } satisfies Config

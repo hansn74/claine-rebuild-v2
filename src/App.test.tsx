@@ -12,6 +12,26 @@ vi.mock('@/services/logger', () => ({
   },
 }))
 
+// Mock health registry to avoid circuit breaker side effects at import time
+vi.mock('@/services/sync/healthRegistry', () => ({
+  healthRegistry: {
+    setDatabaseHealth: vi.fn(),
+    connectActionQueue: vi.fn(),
+    connectSendQueue: vi.fn(),
+    connectNetworkStatus: vi.fn(),
+    connectSyncProgress: vi.fn(),
+    subscribe: vi.fn(() => vi.fn()),
+    getSnapshot: vi.fn(() => ({
+      subsystems: new Map(),
+      overallState: 'healthy',
+      lastUpdated: Date.now(),
+    })),
+    getOverallState: vi.fn(() => 'healthy'),
+    dispose: vi.fn(),
+    reset: vi.fn(),
+  },
+}))
+
 describe('App', () => {
   it('renders welcome screen with Claine branding on first launch', async () => {
     render(<App />)

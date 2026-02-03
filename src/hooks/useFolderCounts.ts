@@ -11,6 +11,7 @@
 
 import { useEffect } from 'react'
 import { getDatabase, isDatabaseInitialized } from '@/services/database/init'
+import { createBatchedObservable } from '@/services/database/reactive'
 import { useFolderStore } from '@/store/folderStore'
 import { useDatabaseStore } from '@/store/database'
 import { logger } from '@/services/logger'
@@ -62,7 +63,8 @@ export function useFolderCounts(): void {
           },
         })
 
-        const subscription = query.$.subscribe({
+        // Story 1.18: Batch folder count updates during bulk operations
+        const subscription = createBatchedObservable(query.$).subscribe({
           next: (results) => {
             // Calculate counts by folder
             const counts: Record<string, number> = {}

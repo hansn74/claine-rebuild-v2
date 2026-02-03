@@ -179,7 +179,7 @@ describe('SyncOrchestratorService', () => {
       // Try starting again
       await orchestrator.start()
 
-      expect(logger.debug).toHaveBeenCalledWith(expect.stringContaining('Already started'))
+      expect(logger.debug).toHaveBeenCalledWith('sync-orchestrator', 'Already started')
     })
   })
 
@@ -326,7 +326,8 @@ describe('SyncOrchestratorService', () => {
 
       // First account should fail, but second should succeed
       expect(logger.error).toHaveBeenCalledWith(
-        expect.stringContaining('Initial sync failed'),
+        'sync-orchestrator',
+        'Initial sync failed',
         expect.objectContaining({ accountId: testAccountId1 })
       )
     })

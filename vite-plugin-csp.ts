@@ -27,7 +27,7 @@ export function cspHeadersPlugin(): Plugin {
             "default-src 'self'",
             "script-src 'self' 'unsafe-inline' 'unsafe-eval'", // unsafe-eval needed for development HMR
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com", // unsafe-inline for Tailwind, Google Fonts stylesheets
-            "connect-src 'self' https://accounts.google.com https://oauth2.googleapis.com https://gmail.googleapis.com https://login.microsoftonline.com https://graph.microsoft.com",
+            "connect-src 'self' https://accounts.google.com https://oauth2.googleapis.com https://www.googleapis.com https://gmail.googleapis.com https://login.microsoftonline.com https://graph.microsoft.com",
             "img-src 'self' data: https:",
             "font-src 'self' data: https://fonts.gstatic.com", // Google Fonts font files
             "frame-src 'self' https://accounts.google.com https://login.microsoftonline.com https://rxdb.info", // Allow Google/Microsoft OAuth iframes and RxDB dev iframe

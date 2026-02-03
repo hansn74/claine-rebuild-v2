@@ -14,7 +14,11 @@ import { Button } from '@shared/components/ui/button'
 export interface AccountSettingsProps {
   /** Called when settings panel should be closed */
   onClose?: () => void
-  /** Called when user wants to connect a new account */
+  /** Called when user clicks "Connect Gmail Account" */
+  onConnectGmail?: () => void
+  /** Called when user clicks "Connect Outlook Account" */
+  onConnectOutlook?: () => void
+  /** @deprecated Use onConnectGmail instead */
   onConnectAccount?: () => void
 }
 
@@ -22,10 +26,16 @@ export interface AccountSettingsProps {
  * AccountSettings component
  * Full account management panel
  */
-export function AccountSettings({ onClose, onConnectAccount }: AccountSettingsProps) {
+export function AccountSettings({
+  onClose,
+  onConnectGmail,
+  onConnectOutlook,
+  onConnectAccount,
+}: AccountSettingsProps) {
   const accounts = useAccountStore((state) => state.accounts)
   const [disconnecting, setDisconnecting] = useState<string | null>(null)
   const [showConfirmDialog, setShowConfirmDialog] = useState<string | null>(null)
+  const [showProviderMenu, setShowProviderMenu] = useState(false)
 
   const canAddMore = accounts.length < MAX_ACCOUNTS
 
@@ -53,7 +63,7 @@ export function AccountSettings({ onClose, onConnectAccount }: AccountSettingsPr
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-lg border border-slate-200 w-full max-w-md">
+    <div className="bg-white rounded-lg shadow-lg border border-slate-200">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
         <h2 className="text-lg font-semibold text-slate-900">Connected Accounts</h2>
@@ -91,10 +101,59 @@ export function AccountSettings({ onClose, onConnectAccount }: AccountSettingsPr
       {/* Footer */}
       <div className="px-4 py-3 border-t border-slate-200 bg-slate-50 rounded-b-lg">
         {canAddMore ? (
-          <Button onClick={onConnectAccount} className="w-full" variant="outline">
-            <PlusIcon />
-            Connect another account ({accounts.length}/{MAX_ACCOUNTS})
-          </Button>
+          !showProviderMenu ? (
+            <Button
+              onClick={() => {
+                // If new props provided, show provider menu; otherwise use legacy behavior
+                if (onConnectGmail || onConnectOutlook) {
+                  setShowProviderMenu(true)
+                } else {
+                  onConnectAccount?.()
+                }
+              }}
+              className="w-full"
+              variant="outline"
+            >
+              <PlusIcon />
+              Connect another account ({accounts.length}/{MAX_ACCOUNTS})
+            </Button>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">
+                Choose provider
+              </p>
+              <Button
+                onClick={() => {
+                  onConnectGmail?.()
+                  onClose?.()
+                }}
+                className="w-full justify-start"
+                variant="outline"
+              >
+                <GmailIcon />
+                <span className="ml-2">Gmail</span>
+              </Button>
+              <Button
+                onClick={() => {
+                  onConnectOutlook?.()
+                  onClose?.()
+                }}
+                className="w-full justify-start"
+                variant="outline"
+              >
+                <OutlookIcon />
+                <span className="ml-2">Outlook</span>
+              </Button>
+              <Button
+                onClick={() => setShowProviderMenu(false)}
+                variant="ghost"
+                size="sm"
+                className="w-full text-slate-500"
+              >
+                ← Back
+              </Button>
+            </div>
+          )
         ) : (
           <p className="text-sm text-slate-500 text-center">
             Maximum {MAX_ACCOUNTS} accounts reached. Disconnect an account to add another.
@@ -249,6 +308,34 @@ function CloseIcon() {
   return (
     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+    </svg>
+  )
+}
+
+/**
+ * Gmail icon for provider selection
+ */
+function GmailIcon() {
+  return (
+    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
+      <path
+        d="M20 4H4C2.9 4 2 4.9 2 6V18C2 19.1 2.9 20 4 20H20C21.1 20 22 19.1 22 18V6C22 4.9 21.1 4 20 4ZM20 8L12 13L4 8V6L12 11L20 6V8Z"
+        fill="#EA4335"
+      />
+    </svg>
+  )
+}
+
+/**
+ * Outlook icon for provider selection
+ */
+function OutlookIcon() {
+  return (
+    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
+      <path
+        d="M7 3H17C18.1 3 19 3.9 19 5V19C19 20.1 18.1 21 17 21H7C5.9 21 5 20.1 5 19V5C5 3.9 5.9 3 7 3ZM12 15.5L17 11V7L12 11.5L7 7V11L12 15.5Z"
+        fill="#0078D4"
+      />
     </svg>
   )
 }

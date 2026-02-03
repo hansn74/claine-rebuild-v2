@@ -11,11 +11,13 @@
  * - Integration with recipient inputs and rich text editor
  */
 
-import { useState, useCallback, useEffect, useRef } from 'react'
+import React, { useState, useCallback, useEffect, useRef } from 'react'
 import { X, Minus, Maximize2, Minimize2, Send, Trash2 } from 'lucide-react'
 import { Button } from '@shared/components/ui/button'
 import { cn } from '@/utils/cn'
 import { logger } from '@/services/logger'
+import { useContacts } from '@/hooks/useContacts'
+import { useDraft } from '@/hooks/useDraft'
 import { RecipientInput } from './RecipientInput'
 import { RichTextEditor } from './RichTextEditor'
 import { AttachmentUpload, type ComposeAttachment } from './AttachmentUpload'
@@ -23,6 +25,10 @@ import type { EmailAddress } from '@/services/database/schemas/email.schema'
 import type { DraftType } from '@/services/database/schemas/draft.schema'
 
 export type ComposeMode = 'floating' | 'fullscreen' | 'minimized'
+
+// Module-level flag to prevent duplicate draft creation in StrictMode
+// Refs reset on unmount, but module variables persist
+let isCreatingDraft = false
 
 export interface ComposeContext {
   type: DraftType
@@ -72,12 +78,34 @@ export function ComposeDialog({
   open,
   onClose,
   initialContext,
+  draftId: existingDraftId,
   accountId,
   onSend,
   onDeleteDraft,
-  isSaving = false,
-  lastSaved,
 }: ComposeDialogProps) {
+  // Fetch contacts for autocomplete
+  const { contacts } = useContacts(accountId)
+
+  // Draft management with auto-save
+  const {
+    draft,
+    draftId,
+    isLoading: isDraftLoading,
+    isSaving,
+    lastSaved,
+    createDraft,
+    updateDraft,
+    deleteDraft,
+  } = useDraft(existingDraftId || null)
+
+  // Track if we've created a draft for this compose session
+  const draftCreatedRef = useRef(false)
+  // Track if we've populated form from loaded draft
+  const formPopulatedRef = useRef(false)
+
+  // Track if user has made edits (only show "Saved" after user edits)
+  const [hasUserEdited, setHasUserEdited] = useState(false)
+
   // Compose mode state
   const [mode, setMode] = useState<ComposeMode>('floating')
 
@@ -120,7 +148,60 @@ export function ComposeDialog({
     setBodyText('')
     setAttachments([])
     setSendError(null)
+    draftCreatedRef.current = false // Reset draft tracking for new context
+    formPopulatedRef.current = false // Reset form population tracking
+    setHasUserEdited(false) // Reset edit tracking
   }, [initialContext])
+
+  // Populate form from loaded draft (when opening existing draft)
+  useEffect(() => {
+    if (draft && existingDraftId && !formPopulatedRef.current) {
+      formPopulatedRef.current = true
+      setTo(draft.to || [])
+      setCc(draft.cc || [])
+      setBcc(draft.bcc || [])
+      setSubject(draft.subject || '')
+      setBodyHtml(draft.body?.html || '')
+      setBodyText(draft.body?.text || '')
+      setShowCcBcc((draft.cc?.length || 0) > 0 || (draft.bcc?.length || 0) > 0)
+    }
+  }, [draft, existingDraftId])
+
+  // Create draft when dialog opens (if no existing draft)
+  // Don't create if we're loading an existing draft (existingDraftId is set)
+  // Use module-level flag to prevent StrictMode double-creation (refs reset on unmount)
+  useEffect(() => {
+    if (open && !draftId && !existingDraftId && !isCreatingDraft && accountId) {
+      isCreatingDraft = true
+      createDraft(accountId, {
+        type: initialContext?.type || 'new',
+        to: initialContext?.to || [],
+        cc: initialContext?.cc || [],
+        bcc: [],
+        subject: initialContext?.subject || '',
+        body: {
+          html: initialContext?.quotedContent || '',
+          text: '',
+        },
+        replyToEmailId: initialContext?.replyToEmailId,
+        threadId: initialContext?.threadId,
+      })
+        .then(() => {
+          isCreatingDraft = false
+        })
+        .catch((err) => {
+          logger.error('compose', 'Failed to create draft', { error: err })
+          isCreatingDraft = false
+        })
+    }
+  }, [open, draftId, existingDraftId, accountId, initialContext, createDraft])
+
+  // Reset module-level flag when dialog closes
+  useEffect(() => {
+    if (!open) {
+      isCreatingDraft = false
+    }
+  }, [open])
 
   // Focus subject input when dialog opens (for new messages) or when recipients are pre-filled
   useEffect(() => {
@@ -136,10 +217,53 @@ export function ComposeDialog({
   }, [open, to.length, subject])
 
   // Handle body content change from editor
-  const handleBodyChange = useCallback((html: string, text: string) => {
-    setBodyHtml(html)
-    setBodyText(text)
-  }, [])
+  const handleBodyChange = useCallback(
+    (html: string, text: string) => {
+      setBodyHtml(html)
+      setBodyText(text)
+      setHasUserEdited(true)
+      if (draftId) updateDraft({ body: { html, text } })
+    },
+    [draftId, updateDraft]
+  )
+
+  // Wrapper handlers that track user edits and save to draft
+  const handleToChange = useCallback(
+    (recipients: EmailAddress[]) => {
+      setTo(recipients)
+      setHasUserEdited(true)
+      if (draftId) updateDraft({ to: recipients })
+    },
+    [draftId, updateDraft]
+  )
+
+  const handleCcChange = useCallback(
+    (recipients: EmailAddress[]) => {
+      setCc(recipients)
+      setHasUserEdited(true)
+      if (draftId) updateDraft({ cc: recipients })
+    },
+    [draftId, updateDraft]
+  )
+
+  const handleBccChange = useCallback(
+    (recipients: EmailAddress[]) => {
+      setBcc(recipients)
+      setHasUserEdited(true)
+      if (draftId) updateDraft({ bcc: recipients })
+    },
+    [draftId, updateDraft]
+  )
+
+  const handleSubjectChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const value = e.target.value
+      setSubject(value)
+      setHasUserEdited(true)
+      if (draftId) updateDraft({ subject: value })
+    },
+    [draftId, updateDraft]
+  )
 
   // Handle send
   const handleSend = useCallback(async () => {
@@ -215,11 +339,12 @@ export function ComposeDialog({
   }, [open, onClose, handleSend])
 
   // Handle delete draft
-  const handleDelete = useCallback(() => {
+  const handleDelete = useCallback(async () => {
     logger.debug('compose', 'Deleting draft')
+    await deleteDraft()
     onDeleteDraft?.()
     onClose()
-  }, [onDeleteDraft, onClose])
+  }, [deleteDraft, onDeleteDraft, onClose])
 
   // Mode controls
   const handleMinimize = useCallback(() => {
@@ -272,7 +397,7 @@ export function ComposeDialog({
   const isFullscreen = mode === 'fullscreen'
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-end">
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop (only in floating mode) */}
       {!isFullscreen && (
         <div className="absolute inset-0 bg-black/20" onClick={onClose} aria-hidden="true" />
@@ -288,7 +413,7 @@ export function ComposeDialog({
           'relative bg-white shadow-xl flex flex-col',
           isFullscreen
             ? 'w-full h-full'
-            : 'w-full max-w-2xl h-[600px] max-h-[80vh] m-4 mr-8 mb-8 rounded-lg border border-slate-200'
+            : 'w-[640px] h-[600px] max-h-[80vh] rounded-lg border border-slate-200'
         )}
       >
         {/* Header */}
@@ -304,9 +429,15 @@ export function ComposeDialog({
           </h2>
 
           <div className="flex items-center gap-1">
-            {/* Save indicator */}
-            {isSaving && <span className="text-xs text-slate-500 mr-2">Saving...</span>}
-            {!isSaving && lastSaved && (
+            {/* Loading indicator for existing draft */}
+            {isDraftLoading && (
+              <span className="text-xs text-slate-500 mr-2">Loading draft...</span>
+            )}
+            {/* Save indicator - only show after user has made edits */}
+            {!isDraftLoading && hasUserEdited && isSaving && (
+              <span className="text-xs text-slate-500 mr-2">Saving...</span>
+            )}
+            {!isDraftLoading && hasUserEdited && !isSaving && lastSaved && (
               <span className="text-xs text-slate-500 mr-2">Saved {formatTime(lastSaved)}</span>
             )}
 
@@ -344,16 +475,29 @@ export function ComposeDialog({
             <RecipientInput
               label="To"
               value={to}
-              onChange={setTo}
+              onChange={handleToChange}
               placeholder="Recipients"
+              contacts={contacts}
               // eslint-disable-next-line jsx-a11y/no-autofocus
               autoFocus={open && to.length === 0}
             />
 
             {showCcBcc ? (
               <>
-                <RecipientInput label="Cc" value={cc} onChange={setCc} placeholder="Cc" />
-                <RecipientInput label="Bcc" value={bcc} onChange={setBcc} placeholder="Bcc" />
+                <RecipientInput
+                  label="Cc"
+                  value={cc}
+                  onChange={handleCcChange}
+                  placeholder="Cc"
+                  contacts={contacts}
+                />
+                <RecipientInput
+                  label="Bcc"
+                  value={bcc}
+                  onChange={handleBccChange}
+                  placeholder="Bcc"
+                  contacts={contacts}
+                />
               </>
             ) : (
               <button
@@ -372,7 +516,7 @@ export function ComposeDialog({
               ref={subjectInputRef}
               type="text"
               value={subject}
-              onChange={(e) => setSubject(e.target.value)}
+              onChange={handleSubjectChange}
               placeholder="Subject"
               className={cn('w-full text-sm outline-none', 'placeholder:text-slate-400')}
             />

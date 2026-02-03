@@ -15,6 +15,8 @@ import { useEffect, useRef, useCallback, type ReactNode } from 'react'
 import { sendQueueService } from '@/services/email/sendQueueService'
 import { gmailSendService } from '@/services/email/gmailSendService'
 import { outlookSendService } from '@/services/email/outlookSendService'
+import { emailActionQueue } from '@/services/email/emailActionQueue'
+import { gmailActionsService } from '@/services/email/gmailActionsService'
 import { useNetworkStatus } from './useNetworkStatus'
 import { logger } from '@/services/logger'
 
@@ -42,16 +44,22 @@ const DEFAULT_CONFIG: Required<QueueProcessorConfig> = {
 let providersRegistered = false
 
 /**
- * Register send providers with the queue service
+ * Register send and action providers with the queue services
  */
 function registerProviders(): void {
   if (providersRegistered) return
 
+  // Register send providers
   sendQueueService.registerProvider('gmail', gmailSendService)
   sendQueueService.registerProvider('outlook', outlookSendService)
+
+  // Register action providers for archive/delete/mark-read sync
+  emailActionQueue.registerProvider('gmail', gmailActionsService)
+  // Note: Outlook actions provider can be added when implemented
+
   providersRegistered = true
 
-  logger.debug('queueProcessor', 'Send providers registered')
+  logger.debug('queueProcessor', 'Send and action providers registered')
 }
 
 /**
@@ -101,9 +109,9 @@ export function useQueueProcessor(config: QueueProcessorConfig = {}): void {
     // Register providers
     registerProviders()
 
-    // Initialize the service
-    sendQueueService.initialize().then(() => {
-      logger.debug('queueProcessor', 'Send queue service initialized')
+    // Initialize the services
+    Promise.all([sendQueueService.initialize(), emailActionQueue.initialize()]).then(() => {
+      logger.debug('queueProcessor', 'Send and action queue services initialized')
     })
   }, [])
 

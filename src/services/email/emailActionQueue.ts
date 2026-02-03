@@ -19,7 +19,10 @@
 
 import { Subject, Observable } from 'rxjs'
 import { getDatabase } from '@/services/database/init'
+import { circuitBreaker } from '@/services/sync/circuitBreaker'
+import { classifyError } from '@/services/sync/errorClassification'
 import { logger } from '@/services/logger'
+import type { ProviderId } from '@/services/sync/circuitBreakerTypes'
 import type {
   ActionQueueDocument,
   ActionQueueStatus,
@@ -83,6 +86,7 @@ export class EmailActionQueue {
   private processingIds = new Set<string>()
   private initialized = false
   private online = navigator.onLine
+  private retryingInsert = false
 
   private constructor() {
     // Set up network status listeners
@@ -142,21 +146,91 @@ export class EmailActionQueue {
 
     const now = Date.now()
 
+    // Validate action type is one of the allowed values
+    const validTypes = ['archive', 'delete', 'mark-read', 'mark-unread'] as const
+    if (!validTypes.includes(action.type as (typeof validTypes)[number])) {
+      logger.error('action-queue', 'Invalid action type', { type: action.type })
+      throw new Error(`Invalid action type: ${action.type}`)
+    }
+
+    // Serialize previousState safely
+    const previousStateJson = JSON.stringify(action.previousState || {})
+    if (previousStateJson.length > 10000) {
+      logger.warn('action-queue', 'previousState too large, truncating', {
+        originalLength: previousStateJson.length,
+      })
+    }
+
+    // Truncate/validate all string fields to match schema constraints
+    const sanitizedId = action.id.slice(0, 100)
+    const sanitizedEmailId = action.emailId.slice(0, 200)
+    const sanitizedAccountId = action.accountId.slice(0, 100)
+    const sanitizedProviderType = providerType.slice(0, 20)
+
     const queueItem: ActionQueueDocument = {
-      id: action.id,
+      id: sanitizedId,
       type: action.type as ActionQueueDocument['type'],
-      emailId: action.emailId,
-      accountId: action.accountId,
-      providerType,
+      emailId: sanitizedEmailId,
+      accountId: sanitizedAccountId,
+      providerType: sanitizedProviderType,
       status: 'pending',
       attempts: 0,
       maxAttempts: MAX_ATTEMPTS,
       createdAt: now,
       updatedAt: now,
-      previousState: JSON.stringify(action.previousState),
+      previousState: previousStateJson.slice(0, 10000), // Ensure within schema limit
     }
 
-    await db.actionQueue.insert(queueItem)
+    // Log field lengths for debugging
+    logger.debug('action-queue', 'Queue item field lengths', {
+      id: sanitizedId.length,
+      emailId: sanitizedEmailId.length,
+      accountId: sanitizedAccountId.length,
+      providerType: sanitizedProviderType.length,
+      previousState: queueItem.previousState.length,
+    })
+
+    try {
+      // Use upsert to handle potential duplicate IDs
+      await db.actionQueue.upsert(queueItem)
+    } catch (insertError) {
+      // Log detailed error for debugging schema issues
+      const errorObj = insertError as { parameters?: Record<string, unknown> }
+      const errorMessage = insertError instanceof Error ? insertError.message : String(insertError)
+
+      logger.error('action-queue', 'Failed to insert queue item', {
+        queueItem: JSON.stringify(queueItem, null, 2),
+        error: errorMessage,
+        parameters: errorObj?.parameters,
+        stack: insertError instanceof Error ? insertError.stack : undefined,
+      })
+
+      // If this is a schema validation error, try to clear the collection and retry once
+      if (errorMessage.includes('schema') && !this.retryingInsert) {
+        this.retryingInsert = true
+        try {
+          logger.warn('action-queue', 'Schema error detected, attempting to clear and retry...')
+          // Clear all documents from the collection
+          const allDocs = await db.actionQueue.find().exec()
+          for (const doc of allDocs) {
+            await doc.remove()
+          }
+          // Retry the insert
+          await db.actionQueue.upsert(queueItem)
+          logger.info('action-queue', 'Retry successful after clearing collection')
+          this.retryingInsert = false
+          return queueItem
+        } catch (retryError) {
+          this.retryingInsert = false
+          logger.error('action-queue', 'Retry also failed', {
+            error: retryError instanceof Error ? retryError.message : String(retryError),
+          })
+        }
+      }
+
+      // Re-throw but the caller should handle gracefully
+      throw insertError
+    }
 
     logger.info('action-queue', 'Action queued', {
       id: queueItem.id,
@@ -245,6 +319,17 @@ export class EmailActionQueue {
   }
 
   /**
+   * Resolve provider ID from providerType string (Subtask 5.5)
+   * Maps providerType to ProviderId for circuit breaker
+   */
+  private getProviderForAccount(providerType: string): ProviderId | null {
+    if (providerType === 'gmail' || providerType === 'outlook') {
+      return providerType
+    }
+    return null
+  }
+
+  /**
    * Process a single action
    *
    * @param item - Action queue item to process
@@ -253,6 +338,16 @@ export class EmailActionQueue {
     const db = getDatabase()
     const actionQueue = db.actionQueue
     if (!actionQueue) return
+
+    // Story 1.19: Check circuit breaker before processing (Task 5, AC 16)
+    const providerId = this.getProviderForAccount(item.providerType)
+    if (providerId && !circuitBreaker.canExecute(providerId)) {
+      logger.debug('sync', 'Circuit open, deferring action', {
+        actionId: item.id,
+        provider: providerId,
+      })
+      return // Leave as pending, will be processed on next queue run
+    }
 
     // Mark as processing
     this.processingIds.add(item.id)
@@ -270,6 +365,11 @@ export class EmailActionQueue {
 
       // Sync via provider
       await provider.syncAction(item)
+
+      // Story 1.19: Record success (Task 5.4)
+      if (providerId) {
+        circuitBreaker.recordSuccess(providerId)
+      }
 
       // Update status to completed
       const now = Date.now()
@@ -300,6 +400,13 @@ export class EmailActionQueue {
         }
       }, 5000)
     } catch (error) {
+      // Story 1.19: Record failure for transient errors (Task 5.3)
+      if (providerId) {
+        const classified = classifyError(error)
+        if (classified.type === 'transient' || classified.type === 'unknown') {
+          circuitBreaker.recordFailure(providerId)
+        }
+      }
       await this.handleSyncError(item, error)
     } finally {
       this.processingIds.delete(item.id)
@@ -442,6 +549,9 @@ export class EmailActionQueue {
 
     logger.info('action-queue', 'Initializing email action queue service')
 
+    // Subscribe to circuit breaker recovery to drain deferred actions (AC 6)
+    this.subscribeToCircuitRecovery()
+
     // Log pending items count
     const pendingCount = await this.getPendingCount()
     if (pendingCount > 0) {
@@ -456,6 +566,33 @@ export class EmailActionQueue {
     }
 
     this.initialized = true
+  }
+
+  /**
+   * Subscribe to circuit breaker state changes to drain deferred actions
+   * when a provider's circuit recovers (AC 6: drain queued items on close)
+   */
+  private subscribeToCircuitRecovery(): void {
+    let previousStates: Record<string, string> = {}
+
+    circuitBreaker.subscribe(() => {
+      const gmailState = circuitBreaker.getStatus('gmail').state
+      const outlookState = circuitBreaker.getStatus('outlook').state
+
+      const gmailRecovered =
+        (previousStates['gmail'] === 'open' || previousStates['gmail'] === 'half-open') &&
+        gmailState === 'closed'
+      const outlookRecovered =
+        (previousStates['outlook'] === 'open' || previousStates['outlook'] === 'half-open') &&
+        outlookState === 'closed'
+
+      if ((gmailRecovered || outlookRecovered) && this.online) {
+        logger.info('action-queue', 'Circuit recovered, draining deferred actions')
+        this.processQueue()
+      }
+
+      previousStates = { gmail: gmailState, outlook: outlookState }
+    })
   }
 
   /**

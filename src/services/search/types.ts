@@ -123,6 +123,8 @@ export interface SearchPerformanceMetrics {
   resultCount: number
   /** Timestamp of search */
   timestamp: number
+  /** Index signature for logger compatibility */
+  [key: string]: unknown
 }
 
 /**

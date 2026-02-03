@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { getDatabase } from './init'
 import type { RxCollection, RxDocument } from 'rxdb'
 
@@ -38,7 +39,7 @@ export async function create<T>(
   _options: CreateOptions = {}
 ): Promise<RxDocument<T>> {
   const db = getDatabase()
-  const collection = db[collectionName] as RxCollection<T>
+  const collection = (db as any)[collectionName] as RxCollection<T>
 
   if (!collection) {
     throw new Error(`Collection "${collectionName}" does not exist`)
@@ -70,12 +71,12 @@ export async function create<T>(
  */
 export async function read<T>(
   collectionName: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
   query: any = {},
   options: ReadOptions = {}
 ): Promise<RxDocument<T>[]> {
   const db = getDatabase()
-  const collection = db[collectionName] as RxCollection<T>
+  const collection = (db as any)[collectionName] as RxCollection<T>
 
   if (!collection) {
     throw new Error(`Collection "${collectionName}" does not exist`)
@@ -94,7 +95,6 @@ export async function read<T>(
     if (options.sort) {
       // Convert sort object to RxDB format
       for (const [field, direction] of Object.entries(options.sort)) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         rxQuery = rxQuery.sort({ [field]: direction === 1 ? 'asc' : 'desc' } as any)
       }
     }
@@ -120,7 +120,7 @@ export async function readOne<T>(
   id: string
 ): Promise<RxDocument<T> | null> {
   const db = getDatabase()
-  const collection = db[collectionName] as RxCollection<T>
+  const collection = (db as any)[collectionName] as RxCollection<T>
 
   if (!collection) {
     throw new Error(`Collection "${collectionName}" does not exist`)
@@ -145,7 +145,7 @@ export async function update<T>(
   options: UpdateOptions = {}
 ): Promise<RxDocument<T>> {
   const db = getDatabase()
-  const collection = db[collectionName] as RxCollection<T>
+  const collection = (db as any)[collectionName] as RxCollection<T>
 
   if (!collection) {
     throw new Error(`Collection "${collectionName}" does not exist`)
@@ -164,11 +164,10 @@ export async function update<T>(
 
     // Check for conflicts if enabled
     if (options.checkConflict) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const currentRev = (doc as any)._rev
       await doc.update({ $set: data })
       const updatedDoc = await collection.findOne(id).exec()
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       if (updatedDoc && (updatedDoc as any)._rev === currentRev) {
         throw new Error('Update conflict detected')
       }
@@ -203,7 +202,7 @@ export async function remove(
   options: DeleteOptions = {}
 ): Promise<boolean> {
   const db = getDatabase()
-  const collection = db[collectionName] as RxCollection
+  const collection = (db as any)[collectionName] as RxCollection
 
   if (!collection) {
     throw new Error(`Collection "${collectionName}" does not exist`)
@@ -246,11 +245,11 @@ export async function remove(
  */
 export async function count(
   collectionName: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
   query: any = {}
 ): Promise<number> {
   const db = getDatabase()
-  const collection = db[collectionName] as RxCollection
+  const collection = (db as any)[collectionName] as RxCollection
 
   if (!collection) {
     throw new Error(`Collection "${collectionName}" does not exist`)
@@ -271,7 +270,7 @@ export async function bulkInsert<T>(
   documents: T[]
 ): Promise<RxDocument<T>[]> {
   const db = getDatabase()
-  const collection = db[collectionName] as RxCollection<T>
+  const collection = (db as any)[collectionName] as RxCollection<T>
 
   if (!collection) {
     throw new Error(`Collection "${collectionName}" does not exist`)

@@ -107,6 +107,9 @@ export class GmailActionsService implements IActionSyncProvider {
     } catch (error) {
       // Check if token expired
       if (error instanceof Error && error.message.includes('401')) {
+        if (!tokens.refresh_token) {
+          throw new Error('No refresh token available for re-authentication')
+        }
         try {
           // Attempt token refresh
           logger.debug('gmail-actions', 'Token expired, refreshing...')

@@ -122,15 +122,23 @@ const GMAIL_HIDDEN_LABELS = new Set([
 
 /**
  * Outlook well-known folder to standard folder mapping
+ * Note: Microsoft Graph API may return different casing, so we normalize to lowercase
  */
 const OUTLOOK_WELL_KNOWN_MAP: Record<string, string> = {
   inbox: 'inbox',
-  sentItems: 'sent',
+  sentitems: 'sent',
   drafts: 'drafts',
-  deletedItems: 'trash',
+  deleteditems: 'trash',
   junkemail: 'spam',
   archive: 'archive',
   outbox: 'outbox',
+}
+
+/**
+ * Normalize wellKnownName to lowercase for consistent lookup
+ */
+function normalizeWellKnownName(name: string | undefined): string | undefined {
+  return name?.toLowerCase()
 }
 
 /**
@@ -206,6 +214,9 @@ export class LabelService {
       if (!response.ok) {
         // Check if token expired
         if (response.status === 401) {
+          if (!tokens.refresh_token) {
+            throw new Error('No refresh token available for re-authentication')
+          }
           logger.debug('label-service', 'Token expired, refreshing...')
           const refreshed = await gmailOAuthService.refreshAccessToken(tokens.refresh_token)
           await tokenStorageService.storeTokens(accountId, refreshed)
@@ -254,10 +265,14 @@ export class LabelService {
    * Task 2.3: Map Gmail system labels to standard folders
    * Task 2.5: Display user-created Gmail labels
    * Task 2.6: Handle label colors from Gmail API
+   * AC 2: Support hierarchical labels (Parent/Child structure)
    */
   private mapGmailLabels(labels: GmailLabel[]): FolderItem[] {
     const folderItems: FolderItem[] = []
+    // Map full label name to label info for hierarchy resolution
+    const labelsByFullName = new Map<string, { id: string; label: GmailLabel }>()
 
+    // First pass: collect all valid labels
     for (const label of labels) {
       // Skip hidden labels
       if (GMAIL_HIDDEN_LABELS.has(label.id)) {
@@ -286,12 +301,36 @@ export class LabelService {
         continue
       }
 
+      labelsByFullName.set(label.name, { id: label.id, label })
+    }
+
+    // Second pass: create folder items with hierarchy
+    for (const [fullName, { id, label }] of labelsByFullName) {
+      // Parse hierarchy from label name (Gmail uses "/" for hierarchy)
+      const nameParts = fullName.split('/')
+      let displayName = fullName
+      let parentId: string | undefined
+
+      if (nameParts.length > 1) {
+        // Check if parent label exists
+        const parentPath = nameParts.slice(0, -1).join('/')
+        const parentInfo = labelsByFullName.get(parentPath)
+
+        if (parentInfo) {
+          // Parent exists - show just the last part and set parentId
+          displayName = nameParts[nameParts.length - 1]
+          parentId = parentInfo.id
+        }
+        // If parent doesn't exist, keep full name and no parentId
+      }
+
       const folderItem: FolderItem = {
-        id: label.id,
-        name: label.name,
+        id,
+        name: displayName,
         type: 'gmail-label',
         unreadCount: label.messagesUnread || 0,
         color: label.color?.backgroundColor,
+        parentId,
       }
 
       folderItems.push(folderItem)
@@ -332,6 +371,9 @@ export class LabelService {
       if (!response.ok) {
         // Check if token expired
         if (response.status === 401) {
+          if (!tokens.refresh_token) {
+            throw new Error('No refresh token available for re-authentication')
+          }
           logger.debug('label-service', 'Token expired, refreshing...')
           const refreshed = await outlookOAuthService.refreshAccessToken(tokens.refresh_token)
           await tokenStorageService.storeTokens(accountId, refreshed)
@@ -386,49 +428,65 @@ export class LabelService {
    */
   private mapOutlookFolders(folders: OutlookFolder[]): FolderItem[] {
     const folderItems: FolderItem[] = []
+    // Track which folder IDs were added (for parent reference)
+    const addedFolderIds = new Set<string>()
 
-    const processFolder = (folder: OutlookFolder, parentId?: string) => {
+    const processFolder = (folder: OutlookFolder, parentId?: string): boolean => {
       // Skip hidden folders
       if (folder.isHidden) {
-        return
+        return false
       }
 
+      // Normalize wellKnownName for consistent lookup
+      const normalizedWellKnown = normalizeWellKnownName(folder.wellKnownName)
+
       // Skip well-known folders that are hidden
-      if (folder.wellKnownName && OUTLOOK_HIDDEN_FOLDERS.has(folder.wellKnownName)) {
-        return
+      if (normalizedWellKnown && OUTLOOK_HIDDEN_FOLDERS.has(normalizedWellKnown)) {
+        return false
       }
 
       // Skip system folders that map to standard folders (already in sidebar)
-      const standardFolder = folder.wellKnownName && OUTLOOK_WELL_KNOWN_MAP[folder.wellKnownName]
+      const standardFolder = normalizedWellKnown && OUTLOOK_WELL_KNOWN_MAP[normalizedWellKnown]
       if (
         standardFolder &&
         ['inbox', 'sent', 'drafts', 'trash', 'spam', 'archive'].includes(standardFolder)
       ) {
-        return
+        return false
       }
+
+      // Only set parentId if parent was actually added to the list
+      const effectiveParentId = parentId && addedFolderIds.has(parentId) ? parentId : undefined
 
       const folderItem: FolderItem = {
         id: folder.id,
         name: folder.displayName,
         type: 'outlook-folder',
         unreadCount: folder.unreadItemCount,
-        parentId: parentId,
+        parentId: effectiveParentId,
       }
 
       folderItems.push(folderItem)
+      addedFolderIds.add(folder.id)
+      return true
     }
 
-    // Process top-level folders
-    for (const folder of folders) {
-      processFolder(folder)
+    // Recursive function to process folder and children
+    const processFolderWithChildren = (folder: OutlookFolder, parentId?: string) => {
+      const wasAdded = processFolder(folder, parentId)
 
-      // Process child folders recursively
+      // Process child folders - use folder.id as parent only if this folder was added
+      const childParentId = wasAdded ? folder.id : parentId
       if ((folder as unknown as { childFolders?: OutlookFolder[] }).childFolders) {
         const childFolders = (folder as unknown as { childFolders: OutlookFolder[] }).childFolders
         for (const child of childFolders) {
-          processFolder(child, folder.id)
+          processFolderWithChildren(child, childParentId)
         }
       }
+    }
+
+    // Process all top-level folders
+    for (const folder of folders) {
+      processFolderWithChildren(folder)
     }
 
     // Sort folders alphabetically

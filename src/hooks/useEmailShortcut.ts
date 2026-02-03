@@ -115,8 +115,9 @@ export function useEmailShortcut(options: UseEmailShortcutOptions): void {
   )
 
   // Configure react-hotkeys-hook options
+  const isEnabled = shouldBeEnabled()
   const hotkeysOptions: HotkeysOptions = {
-    enabled: shouldBeEnabled(),
+    enabled: isEnabled,
     preventDefault,
     enableOnFormTags: enableOnFormTags ? ['INPUT', 'TEXTAREA', 'SELECT'] : false,
     // Don't enable on contentEditable unless explicitly allowed
@@ -124,7 +125,7 @@ export function useEmailShortcut(options: UseEmailShortcutOptions): void {
   }
 
   // Register with react-hotkeys-hook
-  useHotkeys(keys, wrappedHandler, hotkeysOptions, [wrappedHandler, shouldBeEnabled()])
+  useHotkeys(keys, wrappedHandler, hotkeysOptions, [wrappedHandler, isEnabled])
 }
 
 /**
@@ -207,11 +208,13 @@ export function useNavigationShortcuts(options: UseNavigationShortcutOptions): v
   })
 
   // Vim mode: gg - Go to top
+  // Note: Sequence shortcuts like 'gg' need custom handling
+  // For now, use shift+g for go to top (alternative binding)
   useEmailShortcut({
-    keys: 'g g',
+    keys: 'home',
     handler: () => onGoToTop?.(),
     scopes: ['inbox'],
-    enabled: enabled && vimModeEnabled && !!onGoToTop,
+    enabled: enabled && !!onGoToTop,
     description: 'Go to top of list',
   })
 
@@ -243,6 +246,8 @@ interface UseActionShortcutOptions {
   onStar?: () => void
   /** Handler for select (x key) */
   onSelect?: () => void
+  /** Handler for toggle read/unread (u key) */
+  onToggleRead?: () => void
   /** Handler for mark read (Shift+I) */
   onMarkRead?: () => void
   /** Handler for mark unread (Shift+U) */
@@ -269,6 +274,7 @@ export function useActionShortcuts(options: UseActionShortcutOptions): void {
     onForward,
     onStar,
     onSelect,
+    onToggleRead,
     onMarkRead,
     onMarkUnread,
     enabled = true,
@@ -297,7 +303,7 @@ export function useActionShortcuts(options: UseActionShortcutOptions): void {
   useEmailShortcut({
     keys: 'r',
     handler: () => onReply?.(),
-    scopes: ['reading'],
+    scopes: ['inbox', 'reading'],
     enabled: enabled && !!onReply,
     description: 'Reply to email',
   })
@@ -306,7 +312,7 @@ export function useActionShortcuts(options: UseActionShortcutOptions): void {
   useEmailShortcut({
     keys: 'a',
     handler: () => onReplyAll?.(),
-    scopes: ['reading'],
+    scopes: ['inbox', 'reading'],
     enabled: enabled && !!onReplyAll,
     description: 'Reply all',
   })
@@ -315,7 +321,7 @@ export function useActionShortcuts(options: UseActionShortcutOptions): void {
   useEmailShortcut({
     keys: 'f',
     handler: () => onForward?.(),
-    scopes: ['reading'],
+    scopes: ['inbox', 'reading'],
     enabled: enabled && !!onForward,
     description: 'Forward email',
   })
@@ -324,7 +330,7 @@ export function useActionShortcuts(options: UseActionShortcutOptions): void {
   useEmailShortcut({
     keys: 's',
     handler: () => onStar?.(),
-    scopes,
+    scopes: ['inbox', 'reading'],
     enabled: enabled && !!onStar,
     description: 'Star/Unstar email',
   })
@@ -336,6 +342,15 @@ export function useActionShortcuts(options: UseActionShortcutOptions): void {
     scopes: ['inbox'],
     enabled: enabled && !!onSelect,
     description: 'Select email',
+  })
+
+  // u - Toggle read/unread
+  useEmailShortcut({
+    keys: 'u',
+    handler: () => onToggleRead?.(),
+    scopes,
+    enabled: enabled && !!onToggleRead,
+    description: 'Toggle read/unread',
   })
 
   // Shift+I - Mark as read
@@ -372,46 +387,91 @@ interface UseFolderNavigationOptions {
  *
  * Task 3.5: g+i, g+s, g+t, g+d for folder navigation
  *
+ * Uses a state machine approach since react-hotkeys-hook doesn't
+ * support key sequences natively. Press 'g' to enter navigation mode,
+ * then press i/s/t/d within 1 second.
+ *
  * @param options - Navigation handlers
  */
 export function useFolderNavigationShortcuts(options: UseFolderNavigationOptions): void {
   const { onNavigateToFolder, enabled = true } = options
+  const { activeScope, enabled: globalEnabled } = useShortcuts()
 
-  // g i - Go to Inbox
-  useEmailShortcut({
-    keys: 'g i',
-    handler: () => onNavigateToFolder?.('INBOX'),
-    scopes: ['global'],
-    enabled: enabled && !!onNavigateToFolder,
-    description: 'Go to Inbox',
-  })
+  // State for tracking 'g' prefix
+  const gPrefixActiveRef = useRef(false)
+  const gPrefixTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // g s - Go to Starred
-  useEmailShortcut({
-    keys: 'g s',
-    handler: () => onNavigateToFolder?.('STARRED'),
-    scopes: ['global'],
-    enabled: enabled && !!onNavigateToFolder,
-    description: 'Go to Starred',
-  })
+  // Check if shortcuts should be active
+  const isActive = enabled && globalEnabled && ['global', 'inbox', 'reading'].includes(activeScope)
 
-  // g t - Go to Sent
-  useEmailShortcut({
-    keys: 'g t',
-    handler: () => onNavigateToFolder?.('SENT'),
-    scopes: ['global'],
-    enabled: enabled && !!onNavigateToFolder,
-    description: 'Go to Sent',
-  })
+  // Handle 'g' key to enter navigation mode
+  useEffect(() => {
+    if (!isActive || !onNavigateToFolder) return
 
-  // g d - Go to Drafts
-  useEmailShortcut({
-    keys: 'g d',
-    handler: () => onNavigateToFolder?.('DRAFTS'),
-    scopes: ['global'],
-    enabled: enabled && !!onNavigateToFolder,
-    description: 'Go to Drafts',
-  })
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger in form fields
+      const target = e.target as HTMLElement
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+        return
+      }
+
+      const key = e.key.toLowerCase()
+
+      // 'g' starts navigation mode
+      if (key === 'g' && !gPrefixActiveRef.current) {
+        gPrefixActiveRef.current = true
+        // Clear any existing timeout
+        if (gPrefixTimeoutRef.current) {
+          clearTimeout(gPrefixTimeoutRef.current)
+        }
+        // Reset after 1 second
+        gPrefixTimeoutRef.current = setTimeout(() => {
+          gPrefixActiveRef.current = false
+        }, 1000)
+        e.preventDefault()
+        return
+      }
+
+      // If 'g' was pressed, check for second key
+      if (gPrefixActiveRef.current) {
+        gPrefixActiveRef.current = false
+        if (gPrefixTimeoutRef.current) {
+          clearTimeout(gPrefixTimeoutRef.current)
+        }
+
+        switch (key) {
+          case 'i':
+            e.preventDefault()
+            onNavigateToFolder('inbox')
+            logger.info('shortcuts', 'Folder navigation: g+i -> inbox')
+            break
+          case 's':
+            e.preventDefault()
+            onNavigateToFolder('starred')
+            logger.info('shortcuts', 'Folder navigation: g+s -> starred')
+            break
+          case 't':
+            e.preventDefault()
+            onNavigateToFolder('sent')
+            logger.info('shortcuts', 'Folder navigation: g+t -> sent')
+            break
+          case 'd':
+            e.preventDefault()
+            onNavigateToFolder('drafts')
+            logger.info('shortcuts', 'Folder navigation: g+d -> drafts')
+            break
+        }
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+      if (gPrefixTimeoutRef.current) {
+        clearTimeout(gPrefixTimeoutRef.current)
+      }
+    }
+  }, [isActive, onNavigateToFolder, activeScope, globalEnabled])
 }
 
 export type {

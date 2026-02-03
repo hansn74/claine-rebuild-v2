@@ -13,9 +13,12 @@
 
 import { Search } from 'lucide-react'
 import { cn } from '@shared/utils/cn'
-import { EmptyState, type EmptyStateProps } from './EmptyState'
 
-export interface EmptySearchProps extends Omit<EmptyStateProps, 'icon' | 'title' | 'description'> {
+export interface EmptySearchProps {
+  /** Additional CSS classes */
+  className?: string
+  /** Whether to use compact styling */
+  compact?: boolean
   /** The search query that returned no results */
   query?: string
   /** Whether to show search tips */
@@ -40,24 +43,27 @@ export function EmptySearch({
   title,
   description,
   className,
-  ...props
 }: EmptySearchProps) {
   const defaultTitle = query ? `No results for "${query}"` : 'No results found'
 
   const defaultDescription = showTips ? 'Try different keywords or check your spelling' : undefined
 
   return (
-    <div className={cn('flex flex-col items-center', className)}>
-      <EmptyState
-        icon={<Search className="w-8 h-8 text-slate-400" strokeWidth={1.5} aria-hidden="true" />}
-        title={title ?? defaultTitle}
-        description={description ?? defaultDescription}
-        testId="empty-search"
-        {...props}
-      />
+    <div className={cn('p-6 text-center', className)}>
+      <div className="flex justify-center mb-3">
+        <div className="w-12 h-12 flex items-center justify-center rounded-full bg-slate-100">
+          <Search className="w-6 h-6 text-slate-400" strokeWidth={1.5} aria-hidden="true" />
+        </div>
+      </div>
+
+      <h3 className="font-medium text-slate-900 mb-1">{title ?? defaultTitle}</h3>
+
+      {(description ?? defaultDescription) && (
+        <p className="text-sm text-slate-500 mb-4">{description ?? defaultDescription}</p>
+      )}
 
       {showTips && (
-        <div className="mt-4 text-sm text-slate-500 max-w-sm text-left">
+        <div className="text-sm text-slate-500 text-left inline-block">
           <p className="font-medium text-slate-600 mb-2">Search tips:</p>
           <ul className="list-disc list-inside space-y-1">
             <li>Use keywords from the email subject or body</li>

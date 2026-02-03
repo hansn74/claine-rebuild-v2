@@ -31,14 +31,27 @@ interface EmailListState {
 }
 
 /**
+ * Maximum age (in ms) for restoring scroll position
+ * Only restore if saved within this window (for in-app navigation)
+ * A page refresh takes longer, so old positions won't be restored
+ */
+const MAX_SCROLL_RESTORE_AGE_MS = 5000 // 5 seconds
+
+/**
  * Load scroll position from localStorage
+ * Only restores if saved recently (within MAX_SCROLL_RESTORE_AGE_MS)
+ * This ensures scroll is restored for in-app navigation but not page refresh
  */
 function loadPersistedScrollPosition(): number {
   try {
     const saved = localStorage.getItem(SCROLL_POSITION_KEY)
     if (saved) {
       const parsed = JSON.parse(saved)
-      return parsed.offset ?? 0
+      const age = Date.now() - (parsed.timestamp ?? 0)
+      // Only restore if saved recently (in-app navigation)
+      if (age < MAX_SCROLL_RESTORE_AGE_MS) {
+        return parsed.offset ?? 0
+      }
     }
   } catch {
     // Ignore localStorage errors

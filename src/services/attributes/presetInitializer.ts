@@ -50,14 +50,26 @@ function markPresetsInitialized(): void {
  */
 export async function initializeAttributePresets(): Promise<number> {
   try {
+    logger.debug('presets', 'Starting attribute preset initialization...')
+
     // Check if we have any attributes already
     const hasAttributes = await attributeService.hasAttributes()
+    logger.debug('presets', 'Has existing attributes', { hasAttributes })
 
-    // If attributes exist and we've marked as initialized, skip
+    // Only skip if we have attributes AND localStorage flag is set
+    // If database was cleared but localStorage wasn't, we need to recreate presets
     if (hasAttributes && hasInitializedPresets()) {
       logger.debug('presets', 'Presets already initialized, skipping')
       return 0
     }
+
+    // If localStorage says initialized but no attributes exist, reset the flag
+    if (!hasAttributes && hasInitializedPresets()) {
+      logger.info('presets', 'Database cleared but localStorage flag exists, resetting...')
+      resetPresetInitialization()
+    }
+
+    logger.debug('presets', 'Creating presets...')
 
     let createdCount = 0
 

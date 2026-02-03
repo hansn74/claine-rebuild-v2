@@ -114,7 +114,7 @@ export class GmailOAuthService {
       prompt: 'consent', // Force consent screen to ensure refresh token
     }
 
-    const searchParams = new URLSearchParams(params as Record<string, string>)
+    const searchParams = new URLSearchParams(params as unknown as Record<string, string>)
     return `${this.config.authorizationEndpoint}?${searchParams.toString()}`
   }
 

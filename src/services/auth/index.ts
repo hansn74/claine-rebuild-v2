@@ -55,6 +55,9 @@ export {
 // Account loader
 export { loadAccountsFromStorage } from './accountLoader'
 
+// Encryption initialization
+export { initializeEncryption } from './encryptionInit'
+
 // Types
 export type {
   OAuthTokens,

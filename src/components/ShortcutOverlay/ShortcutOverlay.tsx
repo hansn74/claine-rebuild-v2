@@ -192,7 +192,7 @@ export default function ShortcutOverlay({ open, onClose }: ShortcutOverlayProps)
       {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */}
       <div
         ref={overlayRef}
-        className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col"
+        className="bg-white rounded-lg shadow-xl w-[640px] max-h-[80vh] overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={handleDialogKeyDown}
         role="dialog"

@@ -250,13 +250,13 @@ export const useConflictStore = create<ConflictState>((set, get) => ({
    * Note: 'content' conflicts are never auto-resolved regardless of preference
    */
   shouldAutoResolve: (type: ConflictType) => {
-    // Content conflicts always require manual resolution
-    if (type === 'content') {
+    // Content conflicts and 'none' always require manual resolution
+    if (type === 'content' || type === 'none') {
       return false
     }
 
     const { preferences } = get()
-    const preference = preferences[type]
+    const preference = preferences[type as keyof ConflictPreferences]
     return preference !== 'always-ask'
   },
 
@@ -265,13 +265,13 @@ export const useConflictStore = create<ConflictState>((set, get) => ({
    * Returns null if should ask user
    */
   getAutoResolutionStrategy: (type: ConflictType): 'local' | 'server' | null => {
-    // Content conflicts never auto-resolve
-    if (type === 'content') {
+    // Content conflicts and 'none' never auto-resolve
+    if (type === 'content' || type === 'none') {
       return null
     }
 
     const { preferences } = get()
-    const preference = preferences[type]
+    const preference = preferences[type as keyof ConflictPreferences]
 
     switch (preference) {
       case 'always-local':

@@ -4,17 +4,20 @@
  * Story 2.6: Email Actions (Archive, Delete, Mark Read/Unread)
  * Task 4.1: Create EmailActionBar with archive, delete, read/unread buttons
  *
- * Action bar displayed in email list and thread detail view.
- * Provides buttons for archive, delete, and mark read/unread actions.
+ * Story 2.3: Compose & Reply Interface
+ * AC 2: Reply/Reply-all/Forward actions available in thread view
  *
- * AC 1: Archive button removes email from inbox
- * AC 2: Delete button moves email to Trash
- * AC 3: Mark as read/unread toggles unread status
+ * Story 2.9: Email Folders & Labels
+ * AC 4: Move to folder dropdown integration
+ *
+ * Action bar displayed in email list and thread detail view.
+ * Provides buttons for reply, archive, delete, and mark read/unread actions.
  */
 
-import { Archive, Trash2, Mail, MailOpen } from 'lucide-react'
+import { Archive, Trash2, Mail, MailOpen, Reply, ReplyAll, Forward } from 'lucide-react'
 import { cn } from '@/utils/cn'
 import { EmailActionButton } from './EmailActionButton'
+import { MoveToFolderDropdown } from './MoveToFolderDropdown'
 
 interface EmailActionBarProps {
   /** Whether the email is currently read */
@@ -25,12 +28,24 @@ interface EmailActionBarProps {
   onDelete: () => void
   /** Handler for toggle read/unread action */
   onToggleRead: () => void
+  /** Handler for reply action */
+  onReply?: () => void
+  /** Handler for reply-all action */
+  onReplyAll?: () => void
+  /** Handler for forward action */
+  onForward?: () => void
   /** Whether actions are currently loading */
   isLoading?: boolean
   /** Whether to show in compact mode (icon only) */
   compact?: boolean
   /** Additional className */
   className?: string
+  /** Email ID(s) for move-to-folder functionality (AC 4) */
+  emailIds?: string | string[]
+  /** Current folder for move-to-folder (to disable current option) */
+  currentFolder?: string
+  /** Callback when move completes (for auto-advance) */
+  onMoveComplete?: () => void
 }
 
 /**
@@ -51,9 +66,15 @@ export function EmailActionBar({
   onArchive,
   onDelete,
   onToggleRead,
+  onReply,
+  onReplyAll,
+  onForward,
   isLoading = false,
   compact = false,
   className,
+  emailIds,
+  currentFolder,
+  onMoveComplete,
 }: EmailActionBarProps) {
   return (
     <div
@@ -61,6 +82,50 @@ export function EmailActionBar({
       role="toolbar"
       aria-label="Email actions"
     >
+      {/* Reply button */}
+      {onReply && (
+        <EmailActionButton
+          icon={<Reply className={compact ? 'w-4 h-4' : 'w-4 h-4'} />}
+          label={compact ? '' : 'Reply'}
+          tooltip="Reply (r)"
+          onClick={onReply}
+          disabled={isLoading}
+          variant="ghost"
+          size={compact ? 'icon' : 'sm'}
+        />
+      )}
+
+      {/* Reply All button */}
+      {onReplyAll && (
+        <EmailActionButton
+          icon={<ReplyAll className={compact ? 'w-4 h-4' : 'w-4 h-4'} />}
+          label={compact ? '' : 'Reply All'}
+          tooltip="Reply All (Shift+r)"
+          onClick={onReplyAll}
+          disabled={isLoading}
+          variant="ghost"
+          size={compact ? 'icon' : 'sm'}
+        />
+      )}
+
+      {/* Forward button */}
+      {onForward && (
+        <EmailActionButton
+          icon={<Forward className={compact ? 'w-4 h-4' : 'w-4 h-4'} />}
+          label={compact ? '' : 'Forward'}
+          tooltip="Forward (f)"
+          onClick={onForward}
+          disabled={isLoading}
+          variant="ghost"
+          size={compact ? 'icon' : 'sm'}
+        />
+      )}
+
+      {/* Separator between reply and organize actions */}
+      {(onReply || onReplyAll || onForward) && (
+        <div className="w-px h-5 bg-slate-200 mx-1" aria-hidden="true" />
+      )}
+
       {/* Archive button */}
       <EmailActionButton
         icon={<Archive className={compact ? 'w-4 h-4' : 'w-4 h-4'} />}
@@ -83,6 +148,17 @@ export function EmailActionBar({
         size={compact ? 'icon' : 'sm'}
         destructive
       />
+
+      {/* Move to folder dropdown (AC 4) */}
+      {emailIds && (
+        <MoveToFolderDropdown
+          emailIds={emailIds}
+          currentFolder={currentFolder}
+          onMoveComplete={onMoveComplete}
+          variant="icon"
+          disabled={isLoading}
+        />
+      )}
 
       {/* Toggle read/unread button */}
       <EmailActionButton

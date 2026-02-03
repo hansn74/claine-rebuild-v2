@@ -65,6 +65,25 @@ export function FolderSidebar({ className }: FolderSidebarProps) {
   const { selectedFolder, setSelectedFolder, gmailLabels, outlookFolders, unreadCounts } =
     useFolderStore()
 
+  // Separate top-level and nested Gmail labels (AC 2: hierarchical labels)
+  const { topLevelGmailLabels, nestedGmailLabels } = useMemo(() => {
+    const topLevel: FolderItem[] = []
+    const nested: Record<string, FolderItem[]> = {}
+
+    gmailLabels.forEach((label) => {
+      if (label.parentId) {
+        if (!nested[label.parentId]) {
+          nested[label.parentId] = []
+        }
+        nested[label.parentId].push(label)
+      } else {
+        topLevel.push(label)
+      }
+    })
+
+    return { topLevelGmailLabels: topLevel, nestedGmailLabels: nested }
+  }, [gmailLabels])
+
   // Separate top-level and nested Outlook folders
   const { topLevelOutlookFolders, nestedOutlookFolders } = useMemo(() => {
     const topLevel: FolderItem[] = []
@@ -85,7 +104,7 @@ export function FolderSidebar({ className }: FolderSidebarProps) {
   }, [outlookFolders])
 
   return (
-    <nav className={cn('flex flex-col py-2 bg-slate-50', className)}>
+    <nav className={cn('flex flex-col py-2 bg-slate-50 overflow-y-auto', className)}>
       {/* Standard Folders Section */}
       <div className="px-2">
         <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-2 py-1">
@@ -125,46 +144,23 @@ export function FolderSidebar({ className }: FolderSidebarProps) {
         })}
       </div>
 
-      {/* Gmail Labels Section */}
+      {/* Gmail Labels Section (AC 2: Hierarchical) */}
       {gmailLabels.length > 0 && (
         <div className="px-2 mt-4">
           <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-2 py-1">
             Labels
           </div>
-          {gmailLabels.map((label) => {
-            const unreadCount = unreadCounts[label.id] || 0
-            const isActive = selectedFolder === label.id
-
-            return (
-              <button
-                key={label.id}
-                type="button"
-                onClick={() => setSelectedFolder(label.id)}
-                className={cn(
-                  'w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors',
-                  isActive
-                    ? 'bg-cyan-100 text-cyan-700 font-medium'
-                    : 'text-slate-700 hover:bg-slate-100'
-                )}
-              >
-                <Tag
-                  className="w-4 h-4 flex-shrink-0"
-                  style={label.color ? { color: label.color } : undefined}
-                />
-                <span className="flex-1 text-left truncate">{label.name}</span>
-                {unreadCount > 0 && (
-                  <span
-                    className={cn(
-                      'px-1.5 py-0.5 text-xs font-medium rounded-full',
-                      isActive ? 'bg-cyan-200 text-cyan-800' : 'bg-slate-200 text-slate-700'
-                    )}
-                  >
-                    {unreadCount > 99 ? '99+' : unreadCount}
-                  </span>
-                )}
-              </button>
-            )
-          })}
+          {topLevelGmailLabels.map((label) => (
+            <GmailLabelItem
+              key={label.id}
+              label={label}
+              nestedLabels={nestedGmailLabels}
+              selectedFolder={selectedFolder}
+              onSelect={setSelectedFolder}
+              unreadCounts={unreadCounts}
+              depth={0}
+            />
+          ))}
         </div>
       )}
 
@@ -255,6 +251,80 @@ function OutlookFolderItem({
               key={child.id}
               folder={child}
               nestedFolders={nestedFolders}
+              selectedFolder={selectedFolder}
+              onSelect={onSelect}
+              unreadCounts={unreadCounts}
+              depth={depth + 1}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Recursive component for rendering Gmail label hierarchy (AC 2)
+ */
+interface GmailLabelItemProps {
+  label: FolderItem
+  nestedLabels: Record<string, FolderItem[]>
+  selectedFolder: string
+  onSelect: (folderId: string) => void
+  unreadCounts: Record<string, number>
+  depth: number
+}
+
+function GmailLabelItem({
+  label,
+  nestedLabels,
+  selectedFolder,
+  onSelect,
+  unreadCounts,
+  depth,
+}: GmailLabelItemProps) {
+  const children = nestedLabels[label.id] || []
+  const hasChildren = children.length > 0
+  const unreadCount = unreadCounts[label.id] || 0
+  const isActive = selectedFolder === label.id
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => onSelect(label.id)}
+        className={cn(
+          'w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors',
+          isActive ? 'bg-cyan-100 text-cyan-700 font-medium' : 'text-slate-700 hover:bg-slate-100'
+        )}
+        style={{ paddingLeft: `${12 + depth * 16}px` }}
+      >
+        {hasChildren && <ChevronRight className="w-3 h-3 flex-shrink-0 text-slate-400" />}
+        <Tag
+          className="w-4 h-4 flex-shrink-0"
+          style={label.color ? { color: label.color } : undefined}
+        />
+        <span className="flex-1 text-left truncate">{label.name}</span>
+        {unreadCount > 0 && (
+          <span
+            className={cn(
+              'px-1.5 py-0.5 text-xs font-medium rounded-full',
+              isActive ? 'bg-cyan-200 text-cyan-800' : 'bg-slate-200 text-slate-700'
+            )}
+          >
+            {unreadCount > 99 ? '99+' : unreadCount}
+          </span>
+        )}
+      </button>
+
+      {/* Nested labels */}
+      {hasChildren && (
+        <div>
+          {children.map((child) => (
+            <GmailLabelItem
+              key={child.id}
+              label={child}
+              nestedLabels={nestedLabels}
               selectedFolder={selectedFolder}
               onSelect={onSelect}
               unreadCounts={unreadCounts}

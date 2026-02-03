@@ -12,6 +12,7 @@ import { useState, useEffect, useCallback, useRef, memo } from 'react'
 import { metricsService } from '@/utils/performance/metrics'
 import { queryCache } from '@/services/database/queryCache'
 import { cn } from '@/utils/cn'
+import { HealthDebugPanel } from './HealthDebugPanel'
 
 /**
  * Position for the monitor panel
@@ -204,7 +205,7 @@ export function PerformanceMonitor({
 
   const lastFrameTime = useRef(0)
   const frameCount = useRef(0)
-  const animationFrameId = useRef<number>()
+  const animationFrameId = useRef<number | undefined>(undefined)
 
   // Only render in development mode - must be after hooks
   const isDev = import.meta.env.DEV
@@ -215,7 +216,7 @@ export function PerformanceMonitor({
   }, [])
 
   // FPS calculation loop
-  const measureFps = useCallback(function fpsLoop() {
+  const measureFps = useCallback(function fpsLoop(_time: number) {
     const now = performance.now()
     frameCount.current++
 
@@ -363,6 +364,11 @@ export function PerformanceMonitor({
             <MemoryUsage memory={memory} />
             <QueryCacheStats />
             <MetricsOverview />
+          </div>
+
+          {/* Health Debug Panel - Story 1.20 */}
+          <div className="border-t border-slate-100">
+            <HealthDebugPanel />
           </div>
         </div>
       )}

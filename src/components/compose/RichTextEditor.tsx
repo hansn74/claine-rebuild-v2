@@ -185,7 +185,7 @@ export function RichTextEditor({
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
-        // Disable some features we don't need
+        // Disable some features we don't need or configure separately
         heading: false,
         codeBlock: false,
         blockquote: {
@@ -194,6 +194,7 @@ export function RichTextEditor({
           },
         },
       }),
+      // Note: StarterKit doesn't include Link, so this is fine
       Link.configure({
         openOnClick: false, // Don't open links when editing
         HTMLAttributes: {

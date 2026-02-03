@@ -11,7 +11,7 @@
  */
 
 import type { AppDatabase } from '../database/types'
-import type { EmailDocument } from '../database/schemas/email.schema'
+import type { EmailDocument, Attachment } from '../database/schemas/email.schema'
 import { createGmailRateLimiter, type RateLimiter } from './rateLimiter'
 import { SyncProgressService } from './syncProgress'
 import { tokenStorageService } from '../auth/tokenStorage'
@@ -19,12 +19,31 @@ import { gmailOAuthService } from '../auth/gmailOAuth'
 import { SyncFailureService } from './syncFailureService'
 import { classifyHttpError, shouldRetry } from './errorClassification'
 import { waitForRetry, DEFAULT_RETRY_CONFIG } from './retryEngine'
+import { extractAndSaveContacts } from '@/hooks/useContacts'
 import { logger } from '@/services/logger'
+import { hasPendingMove, getPendingMoveFolder } from '@/services/email/moveService'
+import { batchMode } from '@/services/database/batchMode'
 
 /**
  * Gmail API Message resource (simplified)
  * Full spec: https://developers.google.com/gmail/api/reference/rest/v1/users.messages
  */
+/**
+ * Gmail message part (for body and attachments)
+ */
+interface GmailMessagePart {
+  partId?: string
+  mimeType: string
+  filename?: string
+  headers?: Array<{ name: string; value: string }>
+  body: {
+    attachmentId?: string
+    size?: number
+    data?: string
+  }
+  parts?: GmailMessagePart[]
+}
+
 interface GmailMessage {
   id: string
   threadId: string
@@ -35,12 +54,8 @@ interface GmailMessage {
   payload: {
     mimeType?: string
     headers: Array<{ name: string; value: string }>
-    parts?: Array<{
-      mimeType: string
-      body: { data?: string }
-      parts?: Array<{ mimeType: string; body: { data?: string } }>
-    }>
-    body: { data?: string }
+    parts?: GmailMessagePart[]
+    body: { data?: string; attachmentId?: string; size?: number }
   }
 }
 
@@ -209,6 +224,8 @@ export class GmailSyncService {
       status: 'syncing',
     })
 
+    // Story 1.18: Enter batch mode to reduce reactive query re-renders during bulk sync
+    batchMode.enter()
     try {
       do {
         // Check if network is still online (AC6)
@@ -243,6 +260,9 @@ export class GmailSyncService {
         if (!listResponse.ok) {
           if (listResponse.status === 401) {
             // Token expired, attempt refresh
+            if (!tokens.refresh_token) {
+              throw new Error('No refresh token available for re-authentication')
+            }
             try {
               const refreshed = await gmailOAuthService.refreshAccessToken(tokens.refresh_token)
               await tokenStorageService.storeTokens(accountId, refreshed)
@@ -347,6 +367,9 @@ export class GmailSyncService {
         lastError: error instanceof Error ? error.message : 'Unknown error',
       })
       throw error
+    } finally {
+      // Story 1.18: Always exit batch mode, even on error
+      batchMode.exit()
     }
   }
 
@@ -378,6 +401,8 @@ export class GmailSyncService {
       return await this.performInitialSync(accountId)
     }
 
+    // Story 1.18: Enter batch mode for delta sync (can have many changes)
+    batchMode.enter()
     try {
       await this.progressService.updateProgress(accountId, {
         status: 'syncing',
@@ -416,6 +441,9 @@ export class GmailSyncService {
         if (!historyResponse.ok) {
           if (historyResponse.status === 401) {
             // Token expired, attempt refresh
+            if (!tokens.refresh_token) {
+              throw new Error('No refresh token available for re-authentication')
+            }
             try {
               const refreshed = await gmailOAuthService.refreshAccessToken(tokens.refresh_token)
               await tokenStorageService.storeTokens(accountId, refreshed)
@@ -525,6 +553,9 @@ export class GmailSyncService {
         lastError: error instanceof Error ? error.message : 'Unknown error',
       })
       throw error
+    } finally {
+      // Story 1.18: Always exit batch mode, even on error
+      batchMode.exit()
     }
   }
 
@@ -716,43 +747,68 @@ export class GmailSyncService {
     // Extract body (handle multipart messages)
     const { html, text } = this.extractBody(message.payload)
 
-    // Parse labels
-    const labels = message.labelIds || []
-    const folder = labels.includes('INBOX') ? 'INBOX' : labels[0] || 'UNKNOWN'
+    // Parse labels - normalize to lowercase for consistent querying
+    const labels = (message.labelIds || []).map((l) => l.toLowerCase())
+    const folder = labels.includes('inbox') ? 'inbox' : labels[0] || 'unknown'
 
-    // Build EmailDocument
+    // Build EmailDocument with schema-safe values
+    // Truncate strings to match schema maxLength constraints
     const emailDoc: EmailDocument = {
-      id: message.id,
-      threadId: message.threadId,
+      id: message.id.slice(0, 200),
+      threadId: message.threadId.slice(0, 200),
       from,
-      to,
+      to: to.length > 0 ? to : [{ name: 'Unknown', email: 'unknown@unknown.com' }], // Schema validation requires non-empty to
       cc,
-      subject: headers.subject || '(no subject)',
+      subject: (headers.subject || '(no subject)').slice(0, 2000),
       body: {
-        html,
-        text: text || message.snippet,
+        html: html?.slice(0, 500000),
+        text: (text || message.snippet || '').slice(0, 500000),
       },
-      timestamp: parseInt(message.internalDate, 10),
-      accountId,
-      attachments: [],
-      snippet: message.snippet,
-      labels,
-      folder,
-      read: !labels.includes('UNREAD'),
-      starred: labels.includes('STARRED'),
+      timestamp: parseInt(message.internalDate, 10) || Date.now(),
+      accountId: accountId.slice(0, 100),
+      attachments: this.extractAttachments(message.payload),
+      snippet: (message.snippet || '').slice(0, 200),
+      labels: labels.map((l) => l.slice(0, 100)),
+      folder: folder.slice(0, 100),
+      read: !labels.includes('unread'),
+      starred: labels.includes('starred'),
       importance: 'normal',
-      historyId: message.historyId,
+      historyId: message.historyId?.slice(0, 100),
       attributes: {},
     }
 
     // Insert or update email (upsert pattern)
+    // Check for pending move to prevent sync from overwriting local folder changes (AC 4)
     const existing = await this.db.emails.findOne(message.id).exec()
     if (existing) {
+      // If there's a pending move, preserve the local folder value
+      if (hasPendingMove(message.id)) {
+        const pendingFolder = getPendingMoveFolder(message.id)
+        if (pendingFolder) {
+          emailDoc.folder = pendingFolder
+          logger.debug('gmail-sync', 'Preserving pending move folder during sync', {
+            emailId: message.id,
+            pendingFolder,
+          })
+        }
+      }
       await existing.update({
         $set: emailDoc,
       })
     } else {
       await this.db.emails.insert(emailDoc)
+    }
+
+    // Extract and save contacts for autocomplete (AC4)
+    // From address - mark as 'received' since we received email from them
+    await extractAndSaveContacts(accountId, [from], 'received')
+    // To/Cc addresses - mark as 'sent' if this is from sent folder, otherwise 'received'
+    const isSentEmail = labels.includes('sent')
+    if (to.length > 0) {
+      await extractAndSaveContacts(accountId, to, isSentEmail ? 'sent' : 'received')
+    }
+    if (cc && cc.length > 0) {
+      await extractAndSaveContacts(accountId, cc, isSentEmail ? 'sent' : 'received')
     }
   }
 
@@ -764,10 +820,29 @@ export class GmailSyncService {
     let html = ''
     let text = ''
 
+    // Recursive helper to process parts at any nesting level
+    const processPartForBody = (part: GmailMessagePart): void => {
+      // Check for body content in this part
+      if (part.body.data) {
+        const decoded = this.decodeBase64Url(part.body.data)
+        if (part.mimeType === 'text/plain' && !text) {
+          text = decoded
+        } else if (part.mimeType === 'text/html' && !html) {
+          html = decoded
+        }
+      }
+
+      // Recursively process nested parts
+      if (part.parts) {
+        for (const nestedPart of part.parts) {
+          processPartForBody(nestedPart)
+        }
+      }
+    }
+
     // Simple message (body in payload.body.data)
     if (payload.body.data) {
       const decoded = this.decodeBase64Url(payload.body.data)
-      // If mimeType is text/html, it's HTML, otherwise plain text
       if (payload.mimeType === 'text/html') {
         html = decoded
       } else {
@@ -776,27 +851,68 @@ export class GmailSyncService {
       return { html, text }
     }
 
-    // Multipart message (body in parts)
+    // Multipart message - process recursively
     if (payload.parts) {
       for (const part of payload.parts) {
-        if (part.mimeType === 'text/plain' && part.body.data) {
-          text = this.decodeBase64Url(part.body.data)
-        } else if (part.mimeType === 'text/html' && part.body.data) {
-          html = this.decodeBase64Url(part.body.data)
-        } else if (part.parts) {
-          // Nested multipart (e.g., multipart/alternative inside multipart/mixed)
-          for (const nestedPart of part.parts) {
-            if (nestedPart.mimeType === 'text/plain' && nestedPart.body.data) {
-              text = this.decodeBase64Url(nestedPart.body.data)
-            } else if (nestedPart.mimeType === 'text/html' && nestedPart.body.data) {
-              html = this.decodeBase64Url(nestedPart.body.data)
-            }
-          }
-        }
+        processPartForBody(part)
       }
     }
 
     return { html, text }
+  }
+
+  /**
+   * Extract attachments from Gmail message payload
+   * Handles both direct attachments and nested multipart structures
+   */
+  private extractAttachments(payload: GmailMessage['payload']): Attachment[] {
+    const attachments: Attachment[] = []
+
+    const processPartForAttachments = (part: GmailMessagePart): void => {
+      // Get Content-ID header for inline attachments
+      const contentIdHeader = part.headers?.find((h) => h.name.toLowerCase() === 'content-id')
+      const contentId = contentIdHeader?.value?.replace(/[<>]/g, '')
+
+      // Check if this part is an attachment or inline image:
+      // 1. Has a filename (regular attachment)
+      // 2. Has Content-ID (inline image, may or may not have filename)
+      // 3. Has attachmentId but no body data (large attachment)
+      const hasFilename = part.filename && part.filename.length > 0
+      const hasContentId = Boolean(contentId)
+      const hasAttachmentId = Boolean(part.body?.attachmentId)
+      const isImageType = part.mimeType?.startsWith('image/')
+
+      // Include if it's a named file, an inline image with Content-ID, or an attachment needing fetch
+      if (hasFilename || (hasContentId && isImageType) || hasAttachmentId) {
+        // Determine if inline (has Content-ID)
+        const isInline = hasContentId
+
+        attachments.push({
+          id: (part.body.attachmentId || part.partId || `att-${attachments.length}`).slice(0, 500),
+          filename: (part.filename || `inline-${contentId || attachments.length}`).slice(0, 500),
+          mimeType: (part.mimeType || 'application/octet-stream').slice(0, 100),
+          size: part.body.size || 0,
+          isInline,
+          contentId: contentId?.slice(0, 200),
+        })
+      }
+
+      // Recursively process nested parts
+      if (part.parts) {
+        for (const nestedPart of part.parts) {
+          processPartForAttachments(nestedPart)
+        }
+      }
+    }
+
+    // Process all parts in the payload
+    if (payload.parts) {
+      for (const part of payload.parts) {
+        processPartForAttachments(part)
+      }
+    }
+
+    return attachments
   }
 
   /**
@@ -807,13 +923,15 @@ export class GmailSyncService {
     const match = header.match(/^(.*?)\s*<(.+)>$/)
     if (match) {
       return {
-        name: match[1].replace(/"/g, '').trim(),
-        email: match[2].trim(),
+        name: (match[1].replace(/"/g, '').trim() || 'Unknown').slice(0, 200),
+        email: match[2].trim().slice(0, 200),
       }
     }
+    // Ensure we always have valid name and email (schema requires both)
+    const trimmed = header.trim().slice(0, 200)
     return {
-      name: header.trim(),
-      email: header.trim(),
+      name: trimmed || 'Unknown',
+      email: trimmed || 'unknown@unknown.com',
     }
   }
 

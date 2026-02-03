@@ -227,18 +227,13 @@ export const ThreadMessage = memo(function ThreadMessage({
         <div className="px-4 pb-4 border-t border-slate-100">
           {/* Main content */}
           <div className="pt-3">
-            {isHtml && hasInlineImages ? (
-              // Use InlineImageRenderer to fetch and display inline images
+            {isHtml ? (
+              // Use InlineImageRenderer for all HTML - handles inline images and hides broken external images
               <InlineImageRenderer
                 html={parsedContent.mainContent}
                 inlineAttachments={inlineAttachments}
                 accountId={email.accountId}
                 emailId={email.id}
-              />
-            ) : isHtml ? (
-              <div
-                className="prose prose-sm max-w-none prose-slate"
-                dangerouslySetInnerHTML={{ __html: processedContent }}
               />
             ) : processedContent ? (
               <pre className="whitespace-pre-wrap font-sans text-slate-800 text-sm">

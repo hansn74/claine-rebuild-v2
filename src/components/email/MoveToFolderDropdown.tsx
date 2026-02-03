@@ -110,6 +110,30 @@ export function MoveToFolderDropdown({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [open])
 
+  // Keyboard shortcut: 'v' to open move dropdown
+  useEffect(() => {
+    if (disabled) return
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (
+        e.key === 'v' &&
+        !e.ctrlKey &&
+        !e.metaKey &&
+        !e.altKey &&
+        !(e.target instanceof HTMLInputElement) &&
+        !(e.target instanceof HTMLTextAreaElement) &&
+        !(e.target instanceof HTMLSelectElement) &&
+        !(e.target as HTMLElement)?.isContentEditable
+      ) {
+        e.preventDefault()
+        setOpen((prev) => !prev)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [disabled])
+
   // Handle move to folder
   const handleMove = async (targetFolder: string) => {
     setOpen(false)
@@ -148,13 +172,14 @@ export function MoveToFolderDropdown({
           onClick={() => setOpen(!open)}
           disabled={disabled || loading}
           className={cn(
-            'p-2 rounded-md text-slate-600 hover:bg-slate-100',
-            'focus:outline-none focus:ring-2 focus:ring-cyan-500',
-            'disabled:opacity-50 disabled:cursor-not-allowed'
+            'h-8 w-8 p-0 inline-flex items-center justify-center rounded-md',
+            'text-slate-600 hover:text-slate-900 hover:bg-slate-100',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-gray-500',
+            'disabled:opacity-50 disabled:pointer-events-none'
           )}
-          title="Move to folder"
+          title="Move to folder (v)"
         >
-          <FolderInput className="w-5 h-5" />
+          <FolderInput className="w-4 h-4" />
         </button>
       )}
 

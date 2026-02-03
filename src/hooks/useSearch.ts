@@ -63,6 +63,61 @@ const DEFAULT_OPTIONS: Required<UseSearchOptions> = {
 }
 
 /**
+ * Convert search query to use wildcards for partial matching
+ * - Adds * suffix to terms that don't already have wildcards
+ * - Preserves quoted phrases (exact match)
+ * - Preserves field-specific searches (e.g., subject:budget)
+ */
+function addWildcards(query: string): string {
+  // Don't add wildcards if query already has them or is very short
+  if (query.includes('*') || query.length < 2) {
+    return query
+  }
+
+  // Split on spaces but preserve quoted phrases
+  const parts: string[] = []
+  let current = ''
+  let inQuotes = false
+
+  for (const char of query) {
+    if (char === '"') {
+      inQuotes = !inQuotes
+      current += char
+    } else if (char === ' ' && !inQuotes) {
+      if (current) {
+        parts.push(current)
+        current = ''
+      }
+    } else {
+      current += char
+    }
+  }
+  if (current) {
+    parts.push(current)
+  }
+
+  // Add wildcards to non-quoted, non-field terms
+  return parts
+    .map((part) => {
+      // Skip quoted phrases
+      if (part.startsWith('"') && part.endsWith('"')) {
+        return part
+      }
+      // Skip field-specific searches (e.g., subject:budget)
+      if (part.includes(':')) {
+        return part
+      }
+      // Skip if already has wildcard
+      if (part.includes('*')) {
+        return part
+      }
+      // Add wildcard for partial matching
+      return `${part}*`
+    })
+    .join(' ')
+}
+
+/**
  * Generate highlight snippets for an email based on search terms
  */
 function generateHighlights(email: EmailDocument, terms: string[]): SearchHighlights {
@@ -158,8 +213,9 @@ export function useSearch(options: UseSearchOptions = {}): UseSearchResult {
       const startTime = performance.now()
 
       try {
-        // Execute search
-        const searchResults = searchIndexService.search(searchQuery)
+        // Execute search with wildcards for partial matching
+        const wildcardQuery = addWildcards(searchQuery)
+        const searchResults = searchIndexService.search(wildcardQuery)
         const duration = performance.now() - startTime
 
         // Check if this is still the latest query (prevent stale results)

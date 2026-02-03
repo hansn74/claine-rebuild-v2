@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { createRxDatabase, removeRxDatabase, addRxPlugin } from 'rxdb'
 import { getRxStorageDexie } from 'rxdb/plugins/storage-dexie'
 import { RxDBUpdatePlugin } from 'rxdb/plugins/update'
@@ -5,7 +6,22 @@ import { RxDBQueryBuilderPlugin } from 'rxdb/plugins/query-builder'
 import { RxDBDevModePlugin } from 'rxdb/plugins/dev-mode'
 import { wrappedValidateAjvStorage } from 'rxdb/plugins/validate-ajv'
 import type { AppDatabase } from './types'
-import { metadataSchema } from './schemas/metadata.schema'
+import {
+  metadataSchema,
+  syncStateSchema,
+  emailSchema,
+  threadSchema,
+  authTokenSchema,
+  actionQueueSchema,
+  attributeSchema,
+  syncFailureSchema,
+  conflictAuditSchema,
+  draftSchema,
+  contactSchema,
+  sendQueueSchema,
+  searchIndexSchema,
+  modifierSchema,
+} from './schemas'
 import { logger } from '@/services/logger'
 
 // Add required plugins (must be synchronous)
@@ -18,7 +34,7 @@ if (import.meta.env.DEV) {
   addRxPlugin(RxDBDevModePlugin)
 }
 
-export const DATABASE_NAME = 'claine-email-v4' // Fresh start with migration system
+export const DATABASE_NAME = 'claine-email-v6' // Bump for draft sync fields (remoteDraftId, syncedAt)
 export const DATABASE_VERSION = 0 // Initial version - bump when adding migrations
 
 let dbInstance: AppDatabase | null = null
@@ -105,17 +121,65 @@ export async function initDatabase(dbName: string = DATABASE_NAME): Promise<AppD
       })
       logger.debug('db', 'RxDatabase created successfully')
 
-      // Create metadata collection for version tracking and migrations
-      // Check if collection already exists (database might have been reopened)
+      // Create required collections for version tracking, migrations, sync, and data
+      // Check if collections already exist (database might have been reopened)
       const typedDb = db as unknown as AppDatabase
+      const collectionsToCreate: Record<string, { schema: any }> = {}
+
+      // System collections
       if (!typedDb.metadata) {
-        logger.debug('db', 'Creating metadata collection...')
-        await db.addCollections({
-          metadata: { schema: metadataSchema },
+        collectionsToCreate.metadata = { schema: metadataSchema }
+      }
+      if (!typedDb.syncState) {
+        collectionsToCreate.syncState = { schema: syncStateSchema }
+      }
+      if (!typedDb.authTokens) {
+        collectionsToCreate.authTokens = { schema: authTokenSchema }
+      }
+      if (!typedDb.actionQueue) {
+        collectionsToCreate.actionQueue = { schema: actionQueueSchema }
+      }
+      if (!typedDb.syncFailures) {
+        collectionsToCreate.syncFailures = { schema: syncFailureSchema }
+      }
+      if (!typedDb.conflictAudit) {
+        collectionsToCreate.conflictAudit = { schema: conflictAuditSchema }
+      }
+
+      // Data collections
+      if (!typedDb.emails) {
+        collectionsToCreate.emails = { schema: emailSchema }
+      }
+      if (!typedDb.threads) {
+        collectionsToCreate.threads = { schema: threadSchema }
+      }
+      if (!typedDb.attributes) {
+        collectionsToCreate.attributes = { schema: attributeSchema }
+      }
+      if (!typedDb.drafts) {
+        collectionsToCreate.drafts = { schema: draftSchema }
+      }
+      if (!typedDb.contacts) {
+        collectionsToCreate.contacts = { schema: contactSchema }
+      }
+      if (!typedDb.sendQueue) {
+        collectionsToCreate.sendQueue = { schema: sendQueueSchema }
+      }
+      if (!typedDb.searchIndex) {
+        collectionsToCreate.searchIndex = { schema: searchIndexSchema }
+      }
+      if (!typedDb.modifiers) {
+        collectionsToCreate.modifiers = { schema: modifierSchema }
+      }
+
+      if (Object.keys(collectionsToCreate).length > 0) {
+        logger.debug('db', 'Creating collections...', {
+          collections: Object.keys(collectionsToCreate),
         })
-        logger.debug('db', 'Metadata collection created')
+        await db.addCollections(collectionsToCreate)
+        logger.debug('db', 'Collections created')
       } else {
-        logger.debug('db', 'Metadata collection already exists')
+        logger.debug('db', 'All required collections already exist')
       }
 
       // Check version and initialize if needed
@@ -209,8 +273,8 @@ export async function closeDatabase(remove: boolean = false): Promise<void> {
       if (remove && !db.destroyed) {
         const collections = Object.keys(db.collections)
         for (const collectionName of collections) {
-          const collection = db.collections[collectionName]
-          if (collection && !collection.destroyed && !collection.closed) {
+          const collection = (db.collections as any)[collectionName]
+          if (collection && !collection.closed) {
             try {
               await collection.remove()
             } catch (removeError) {

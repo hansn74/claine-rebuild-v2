@@ -29,8 +29,14 @@ import { groupMessagesBySender } from '@/utils/threadGrouping'
 import { ThreadMessage } from './ThreadMessage'
 import { EmailActionBar } from './EmailActionBar'
 import { useEmailStore } from '@/store/emailStore'
+import { useComposeStore } from '@/store/composeStore'
 import { logger } from '@/services/logger'
 import { emailAttributeService } from '@/services/email/emailAttributeService'
+import {
+  buildReplyContext,
+  buildReplyAllContext,
+  buildForwardContext,
+} from '@/utils/composeHelpers'
 import { AttributePanel, AttributeTagList } from './attributes'
 import type { Attachment } from '@/services/database/schemas/email.schema'
 import type { EmailAttributeValues } from '@/types/attributes'
@@ -103,10 +109,16 @@ function ThreadHeader({
   onArchive,
   onDelete,
   onToggleRead,
+  onReply,
+  onReplyAll,
+  onForward,
   onToggleAttributePanel,
   onRemoveAttribute,
+  onMoveComplete,
   isLoading,
   showAttributeToggle,
+  emailId,
+  currentFolder,
 }: {
   subject: string
   participantCount: number
@@ -117,10 +129,16 @@ function ThreadHeader({
   onArchive: () => void
   onDelete: () => void
   onToggleRead: () => void
+  onReply: () => void
+  onReplyAll: () => void
+  onForward: () => void
   onToggleAttributePanel: () => void
   onRemoveAttribute: (attributeId: string) => void
+  onMoveComplete?: () => void
   isLoading?: boolean
   showAttributeToggle?: boolean
+  emailId?: string
+  currentFolder?: string
 }) {
   return (
     <div className="sticky top-0 z-10 bg-white border-b border-slate-200 px-4 py-3">
@@ -136,6 +154,7 @@ function ThreadHeader({
               'focus:outline-none focus:ring-2 focus:ring-cyan-500'
             )}
             aria-label="Back to inbox"
+            title="Back to inbox"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
@@ -190,7 +209,14 @@ function ThreadHeader({
           onArchive={onArchive}
           onDelete={onDelete}
           onToggleRead={onToggleRead}
+          onReply={onReply}
+          onReplyAll={onReplyAll}
+          onForward={onForward}
+          onMoveComplete={onMoveComplete}
           isLoading={isLoading}
+          compact
+          emailIds={emailId}
+          currentFolder={currentFolder}
         />
       </div>
     </div>
@@ -213,6 +239,9 @@ export function ThreadDetailView({
 
   // Email store actions
   const { archiveEmail, deleteEmail, toggleReadStatus, isActionLoading } = useEmailStore()
+
+  // Compose store for reply actions
+  const openComposeWithContext = useComposeStore((state) => state.openComposeWithContext)
 
   // Attribute panel state
   const [isAttributePanelOpen, setIsAttributePanelOpen] = useState(false)
@@ -259,6 +288,32 @@ export function ThreadDetailView({
     if (!firstEmailId) return
     toggleReadStatus(firstEmailId)
   }, [firstEmailId, toggleReadStatus])
+
+  // Handle move complete (go back after moving)
+  const handleMoveComplete = useCallback(() => {
+    onBack?.()
+  }, [onBack])
+
+  // Get last email for reply (most recent message in thread)
+  const lastEmail = emails[emails.length - 1]
+
+  // Handle reply - uses shared helper for consistent formatting
+  const handleReply = useCallback(() => {
+    if (!lastEmail) return
+    openComposeWithContext(buildReplyContext(lastEmail))
+  }, [lastEmail, openComposeWithContext])
+
+  // Handle reply all - uses shared helper for consistent formatting
+  const handleReplyAll = useCallback(() => {
+    if (!lastEmail) return
+    openComposeWithContext(buildReplyAllContext(lastEmail))
+  }, [lastEmail, openComposeWithContext])
+
+  // Handle forward - uses shared helper for consistent formatting
+  const handleForward = useCallback(() => {
+    if (!lastEmail) return
+    openComposeWithContext(buildForwardContext(lastEmail))
+  }, [lastEmail, openComposeWithContext])
 
   // Handle attachment download
   const handleDownloadAttachment = useCallback(
@@ -349,10 +404,16 @@ export function ThreadDetailView({
         onArchive={handleArchive}
         onDelete={handleDelete}
         onToggleRead={handleToggleRead}
+        onReply={handleReply}
+        onReplyAll={handleReplyAll}
+        onForward={handleForward}
         onToggleAttributePanel={handleToggleAttributePanel}
         onRemoveAttribute={handleRemoveAttribute}
+        onMoveComplete={handleMoveComplete}
         isLoading={isActionLoading}
         showAttributeToggle={true}
+        emailId={firstEmailId}
+        currentFolder={firstEmail?.folder}
       />
 
       {/* Attribute panel (collapsible) */}

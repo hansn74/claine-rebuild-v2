@@ -145,7 +145,7 @@ function parseHtmlQuotes(html: string): ParsedContent {
       let current: Element | null = div
       while (current) {
         quotedContent += current.outerHTML
-        const next = current.nextElementSibling
+        const next: Element | null = current.nextElementSibling
         current.remove()
         current = next
       }

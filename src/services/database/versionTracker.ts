@@ -120,11 +120,12 @@ export class VersionTracker {
         id: doc.id,
         version: doc.version,
         migrationName: doc.migrationName || doc.id,
-        status: doc.status,
+        status: doc.status as 'start' | 'success' | 'failure',
         timestamp: doc.timestamp || doc.lastMigration,
         duration: doc.duration,
         error: doc.error,
       }))
+      .filter((log) => log.status !== undefined)
       .sort(
         (a: MigrationLog, b: MigrationLog) =>
           new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()

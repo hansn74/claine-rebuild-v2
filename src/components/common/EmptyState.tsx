@@ -112,10 +112,11 @@ export function EmptyState({
       {description && (
         <p
           className={cn(
-            'text-slate-500 max-w-sm',
+            'text-slate-500 text-center',
             compact ? 'text-sm' : 'text-base',
             action ? 'mb-4' : undefined
           )}
+          style={{ maxWidth: compact ? '280px' : '320px' }}
         >
           {description}
         </p>

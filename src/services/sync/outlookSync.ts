@@ -20,6 +20,7 @@ import { SyncFailureService } from './syncFailureService'
 import { classifyHttpError, shouldRetry } from './errorClassification'
 import { waitForRetry, DEFAULT_RETRY_CONFIG } from './retryEngine'
 import { logger } from '@/services/logger'
+import { batchMode } from '@/services/database/batchMode'
 
 /**
  * Microsoft Graph Message resource (simplified)
@@ -291,12 +292,16 @@ export class OutlookSyncService {
 
     let deltaLink: string | undefined
 
+    // Story 1.18: Enter batch mode to reduce reactive query re-renders during bulk sync
+    batchMode.enter()
     try {
       // Build initial URL if no resume link
+      // Note: Delta endpoint doesn't support $filter, so we use regular messages endpoint for initial sync
       if (!nextLink) {
-        const url = new URL('https://graph.microsoft.com/v1.0/me/messages/delta')
+        const url = new URL('https://graph.microsoft.com/v1.0/me/messages')
         url.searchParams.set('$filter', `receivedDateTime ge ${afterDateISO}`)
         url.searchParams.set('$top', '50') // Page size
+        url.searchParams.set('$orderby', 'receivedDateTime desc')
         url.searchParams.set(
           '$select',
           'id,conversationId,receivedDateTime,sentDateTime,subject,bodyPreview,isRead,isDraft,importance,flag,from,toRecipients,ccRecipients,bccRecipients,body,hasAttachments,parentFolderId,categories'
@@ -330,6 +335,9 @@ export class OutlookSyncService {
         if (!response.ok) {
           if (response.status === 401) {
             // Token expired, attempt refresh
+            if (!tokens.refresh_token) {
+              throw new Error('No refresh token available for re-authentication')
+            }
             try {
               const refreshed = await outlookOAuthService.refreshAccessToken(tokens.refresh_token)
               await tokenStorageService.storeTokens(accountId, refreshed)
@@ -402,16 +410,49 @@ export class OutlookSyncService {
           }
         }
 
-        // Save deltaLink when we reach the end
-        if (data['@odata.deltaLink']) {
-          deltaLink = data['@odata.deltaLink']
-        }
-
         nextLink = data['@odata.nextLink']
       } while (nextLink)
 
+      // After initial sync, get a deltaLink for future incremental syncs
+      // We need to call the delta endpoint once to get the initial deltaLink
+      try {
+        await this.rateLimiter.acquireAndWait(1)
+        const deltaResponse = await fetch(
+          'https://graph.microsoft.com/v1.0/me/messages/delta?$select=id&$top=1',
+          {
+            headers: {
+              Authorization: `Bearer ${tokens.access_token}`,
+            },
+          }
+        )
+        if (deltaResponse.ok) {
+          // Follow through all pages to get the final deltaLink
+          let deltaData: GraphMessagesListResponse = await deltaResponse.json()
+          while (deltaData['@odata.nextLink']) {
+            await this.rateLimiter.acquireAndWait(1)
+            const nextDeltaResponse = await fetch(deltaData['@odata.nextLink'], {
+              headers: { Authorization: `Bearer ${tokens.access_token}` },
+            })
+            if (nextDeltaResponse.ok) {
+              deltaData = await nextDeltaResponse.json()
+            } else {
+              break
+            }
+          }
+          if (deltaData['@odata.deltaLink']) {
+            deltaLink = deltaData['@odata.deltaLink']
+          }
+        }
+      } catch (deltaError) {
+        logger.warn('sync', 'Failed to get initial deltaLink', { error: deltaError })
+      }
+
       // Mark sync complete and store deltaLink for incremental sync
       await this.progressService.markSyncComplete(accountId, deltaLink)
+      logger.info('sync', 'Outlook initial sync complete', {
+        syncedMessages,
+        deltaLink: !!deltaLink,
+      })
     } catch (error) {
       // Save error state for debugging
       await this.progressService.updateProgress(accountId, {
@@ -420,6 +461,9 @@ export class OutlookSyncService {
         emailsSynced: syncedMessages,
       })
       throw error
+    } finally {
+      // Story 1.18: Always exit batch mode, even on error
+      batchMode.exit()
     }
   }
 
@@ -451,6 +495,8 @@ export class OutlookSyncService {
       return await this.performInitialSync(accountId)
     }
 
+    // Story 1.18: Enter batch mode for delta sync (can have many changes)
+    batchMode.enter()
     try {
       await this.progressService.updateProgress(accountId, {
         status: 'syncing',
@@ -485,6 +531,9 @@ export class OutlookSyncService {
         if (!response.ok) {
           if (response.status === 401) {
             // Token expired, attempt refresh
+            if (!tokens.refresh_token) {
+              throw new Error('No refresh token available for re-authentication')
+            }
             try {
               const refreshed = await outlookOAuthService.refreshAccessToken(tokens.refresh_token)
               await tokenStorageService.storeTokens(accountId, refreshed)
@@ -565,6 +614,9 @@ export class OutlookSyncService {
         emailsSynced: progress.emailsSynced,
       })
       throw error
+    } finally {
+      // Story 1.18: Always exit batch mode, even on error
+      batchMode.exit()
     }
   }
 
@@ -712,24 +764,24 @@ export class OutlookSyncService {
       throw new Error('Emails collection not initialized')
     }
 
-    // Parse from address
+    // Parse from address (truncate to schema maxLength)
     const from = message.from
       ? {
-          name: message.from.emailAddress.name || '',
-          email: message.from.emailAddress.address,
+          name: (message.from.emailAddress.name || '').slice(0, 200),
+          email: message.from.emailAddress.address.slice(0, 200),
         }
-      : { name: '', email: '' }
+      : { name: 'Unknown', email: 'unknown@unknown.com' }
 
     // Parse to addresses (handle empty/missing toRecipients)
     const to = (message.toRecipients || []).map((r) => ({
-      name: r.emailAddress.name || '',
-      email: r.emailAddress.address,
+      name: (r.emailAddress.name || '').slice(0, 200),
+      email: r.emailAddress.address.slice(0, 200),
     }))
 
     // Parse cc addresses
     const cc = message.ccRecipients?.map((r) => ({
-      name: r.emailAddress.name || '',
-      email: r.emailAddress.address,
+      name: (r.emailAddress.name || '').slice(0, 200),
+      email: r.emailAddress.address.slice(0, 200),
     }))
 
     // Parse body (handle missing body)
@@ -743,35 +795,36 @@ export class OutlookSyncService {
       body.text = message.bodyPreview || ''
     }
 
-    // Map folder ID to name
-    const folderName = this.folderIdMap.get(message.parentFolderId) || message.parentFolderId
+    // Map folder ID to name and normalize to lowercase (like Gmail)
+    const rawFolderName = this.folderIdMap.get(message.parentFolderId) || message.parentFolderId
+    const folderName = rawFolderName.toLowerCase()
 
     // Parse attachments if present
     const attachments =
       message.attachments?.map((att) => ({
-        id: att.id,
-        filename: att.name,
-        mimeType: att.contentType,
+        id: att.id.slice(0, 200),
+        filename: (att.name || 'attachment').slice(0, 500),
+        mimeType: (att.contentType || 'application/octet-stream').slice(0, 100),
         size: att.size,
         isInline: att.isInline,
-        contentId: att.contentId,
+        contentId: att.contentId?.slice(0, 200),
       })) || []
 
-    // Build EmailDocument
+    // Build EmailDocument with schema-safe values (truncate to maxLength per schema)
     const emailDoc: EmailDocument = {
-      id: `outlook-${message.id}`, // Prefix to avoid Gmail ID conflicts
-      threadId: message.conversationId,
+      id: `outlook-${message.id}`.slice(0, 200), // Prefix to avoid Gmail ID conflicts
+      threadId: message.conversationId.slice(0, 200),
       from,
-      to,
+      to: to.length > 0 ? to : [{ name: 'Unknown', email: 'unknown@unknown.com' }],
       cc,
-      subject: message.subject || '(no subject)',
+      subject: (message.subject || '(no subject)').slice(0, 2000),
       body,
       timestamp: new Date(message.receivedDateTime).getTime(),
-      accountId,
+      accountId: accountId.slice(0, 100), // schema maxLength: 100
       attachments,
-      snippet: message.bodyPreview || '',
-      labels: message.categories || [],
-      folder: folderName,
+      snippet: (message.bodyPreview || '').slice(0, 200), // schema maxLength: 200
+      labels: (message.categories || []).map((l) => l.slice(0, 100)),
+      folder: folderName.slice(0, 100),
       read: message.isRead,
       starred: message.flag?.flagStatus === 'flagged',
       importance: message.importance || 'normal',

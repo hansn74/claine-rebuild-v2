@@ -6,16 +6,21 @@
  */
 
 import { getDatabase } from '@/services/database/init'
-import { versionTracker } from '@/services/database/versionTracker'
+import { versionTracker, type MigrationLog } from '@/services/database/versionTracker'
+import type { MetadataDocument } from '@/services/database/schemas'
 
 export interface TestHelpers {
   isDatabaseReady: () => boolean
   setVersion: (version: number) => Promise<void>
   getVersion: () => Promise<number>
-  logMigration: (name: string, status: string, duration: number) => Promise<void>
-  getMigrationHistory: () => Promise<Record<string, unknown>[]>
-  insertMetadata: (data: Record<string, unknown>) => Promise<void>
-  queryMetadata: (selector: Record<string, unknown>) => Promise<Record<string, unknown>[]>
+  logMigration: (
+    name: string,
+    status: 'success' | 'start' | 'failure',
+    duration: number
+  ) => Promise<void>
+  getMigrationHistory: () => Promise<MigrationLog[]>
+  insertMetadata: (data: MetadataDocument) => Promise<void>
+  queryMetadata: (selector: Record<string, unknown>) => Promise<MetadataDocument[]>
   clearTestData: () => Promise<void>
 }
 
@@ -44,7 +49,7 @@ export const testHelpers: TestHelpers = {
   async logMigration(name: string, status: 'success' | 'start' | 'failure', duration: number) {
     const db = getDatabase()
     if (!db) throw new Error('Database not initialized')
-    await versionTracker.logMigration(db, name, status, duration)
+    await versionTracker.logMigration(db, name, status, { duration })
   },
 
   async getMigrationHistory() {
@@ -53,7 +58,7 @@ export const testHelpers: TestHelpers = {
     return await versionTracker.getMigrationHistory(db)
   },
 
-  async insertMetadata(data: Record<string, unknown>) {
+  async insertMetadata(data: MetadataDocument) {
     const db = getDatabase()
     if (!db) throw new Error('Database not initialized')
     await db.metadata.insert(data)
@@ -63,7 +68,7 @@ export const testHelpers: TestHelpers = {
     const db = getDatabase()
     if (!db) throw new Error('Database not initialized')
     const results = await db.metadata.find({ selector }).exec()
-    return results.map((doc) => doc.toJSON())
+    return results.map((doc) => doc.toJSON() as MetadataDocument)
   },
 
   async clearTestData() {

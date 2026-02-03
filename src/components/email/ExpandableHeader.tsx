@@ -85,8 +85,6 @@ export const ExpandableHeader = memo(function ExpandableHeader({
     }
   }
 
-  const hasExtraRecipients = (cc && cc.length > 0) || (bcc && bcc.length > 0) || to.length > 1
-
   return (
     <div className={cn('text-sm', className)}>
       {/* Compact view - always visible */}
@@ -97,34 +95,32 @@ export const ExpandableHeader = memo(function ExpandableHeader({
             {from.name?.trim() || from.email}
           </span>
 
-          {/* Expand indicator if there are more details */}
-          {hasExtraRecipients && (
-            <button
-              type="button"
-              onClick={onToggle}
-              onKeyDown={handleKeyDown}
-              className={cn(
-                'flex items-center gap-0.5 px-1.5 py-0.5 rounded',
-                'text-xs text-slate-500 hover:text-slate-700',
-                'hover:bg-slate-100 transition-colors',
-                'focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-1'
-              )}
-              aria-expanded={isExpanded}
-              aria-label={isExpanded ? 'Hide email details' : 'Show email details'}
-            >
-              {isExpanded ? (
-                <>
-                  <span>less</span>
-                  <ChevronUp className="w-3 h-3" />
-                </>
-              ) : (
-                <>
-                  <span>more</span>
-                  <ChevronDown className="w-3 h-3" />
-                </>
-              )}
-            </button>
-          )}
+          {/* Expand indicator - always show so users can access full headers */}
+          <button
+            type="button"
+            onClick={onToggle}
+            onKeyDown={handleKeyDown}
+            className={cn(
+              'flex items-center gap-0.5 px-1.5 py-0.5 rounded',
+              'text-xs text-slate-500 hover:text-slate-700',
+              'hover:bg-slate-100 transition-colors',
+              'focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-1'
+            )}
+            aria-expanded={isExpanded}
+            aria-label={isExpanded ? 'Hide email details' : 'Show email details'}
+          >
+            {isExpanded ? (
+              <>
+                <span>less</span>
+                <ChevronUp className="w-3 h-3" />
+              </>
+            ) : (
+              <>
+                <span>more</span>
+                <ChevronDown className="w-3 h-3" />
+              </>
+            )}
+          </button>
         </div>
 
         {/* Date */}

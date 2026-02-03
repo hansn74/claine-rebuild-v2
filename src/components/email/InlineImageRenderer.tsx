@@ -152,6 +152,28 @@ export const InlineImageRenderer = memo(function InlineImageRenderer({
     }
   }, [handleImageClick])
 
+  // Hide broken images (like Gmail does)
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+
+    const images = container.querySelectorAll('img')
+    const errorHandler = (e: Event) => {
+      const img = e.target as HTMLImageElement
+      img.style.display = 'none'
+    }
+
+    images.forEach((img) => {
+      img.addEventListener('error', errorHandler)
+    })
+
+    return () => {
+      images.forEach((img) => {
+        img.removeEventListener('error', errorHandler)
+      })
+    }
+  }, [processedHtml])
+
   return (
     <div className={className}>
       {/* Loading indicator for inline images */}

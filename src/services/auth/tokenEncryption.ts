@@ -38,7 +38,6 @@ const IV_LENGTH = 12 // 96-bit IV (recommended for AES-GCM)
  */
 export class TokenEncryptionService {
   private encryptionKey: CryptoKey | null = null
-  private _keyDerivationPassword: string | null = null
 
   /**
    * Initializes the encryption service with a key derivation password
@@ -52,7 +51,6 @@ export class TokenEncryptionService {
       throw new Error('Encryption password cannot be empty')
     }
 
-    this._keyDerivationPassword = password
     this.encryptionKey = await this.deriveEncryptionKey(password)
   }
 
@@ -212,7 +210,6 @@ export class TokenEncryptionService {
    */
   clear(): void {
     this.encryptionKey = null
-    this._keyDerivationPassword = null
   }
 }
 

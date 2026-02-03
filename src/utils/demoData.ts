@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Demo Mode Data Generator
  * Creates sample email data for visual testing and development
@@ -414,7 +415,7 @@ async function createCollectionWithTimeout<T>(
       resolve(false)
     }, timeoutMs)
 
-    db.addCollections({ [name]: { schema } })
+    db.addCollections({ [name]: { schema } } as any)
       .then(() => {
         clearTimeout(timeout)
         logger.info('db', `${name} collection created`)
@@ -459,16 +460,18 @@ export async function loadDemoData(): Promise<void> {
 
   // Insert demo emails (upsert to avoid duplicates)
   let insertedCount = 0
-  for (const email of demoEmails) {
-    try {
-      await db.emails.upsert(email)
-      insertedCount++
-    } catch (error) {
-      logger.warn('db', `Failed to insert demo email ${email.id}`, { error })
+  if (db.emails) {
+    for (const email of demoEmails) {
+      try {
+        await db.emails.upsert(email)
+        insertedCount++
+      } catch (error) {
+        logger.warn('db', `Failed to insert demo email ${email.id}`, { error })
+      }
     }
-  }
 
-  logger.info('db', `Loaded ${insertedCount}/${demoEmails.length} demo emails`)
+    logger.info('db', `Loaded ${insertedCount}/${demoEmails.length} demo emails`)
+  }
 
   // Insert demo attributes (upsert to avoid duplicates)
   if (db.attributes) {
