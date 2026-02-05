@@ -38,3 +38,13 @@ export type {
 } from './types'
 
 export { DEFAULT_REBUILD_CONFIG } from './types'
+
+// Search operator parser (Story 2.22)
+export {
+  parseSearchOperators,
+  matchesOperatorFilters,
+  getOperatorSearchHints,
+  KNOWN_OPERATORS,
+} from './searchOperatorParser'
+
+export type { SearchOperator, ParsedOperatorQuery, OperatorType } from './searchOperatorParser'

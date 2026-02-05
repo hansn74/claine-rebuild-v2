@@ -34,6 +34,8 @@ import { SearchInput } from './SearchInput'
 import { SearchResults } from './SearchResults'
 import { logger } from '@/services/logger'
 import { searchHistoryService } from '@/services/search'
+import { getOperatorSearchHints } from '@/services/search/searchOperatorParser'
+import { getAttributeSearchHints } from '@/services/search/attributeSearchParser'
 
 /**
  * Story 2.11: Task 5.3 - Command definitions with shortcut hints
@@ -228,7 +230,7 @@ export const CommandPalette = memo(function CommandPalette({
   onStar,
   onShowShortcuts,
 }: CommandPaletteProps) {
-  const { query, setQuery, results, isSearching, searchTime, clear } = useSearch()
+  const { query, setQuery, results, isSearching, searchTime, clear, activeOperators } = useSearch()
   const [selectedIndex, setSelectedIndex] = useState(0)
   // Initialize recent searches lazily
   const [recentSearches, setRecentSearches] = useState<string[]>(() =>
@@ -313,6 +315,20 @@ export const CommandPalette = memo(function CommandPalette({
     return filterCommands(QUICK_COMMANDS, query)
   }, [mode, query])
 
+  /**
+   * Story 2.22: Task 4.2/4.3 - Dynamic operator/attribute hints
+   * Show combined hints when user types a colon (:) at end of a word
+   */
+  const operatorHints = useMemo(() => {
+    if (mode !== 'search' || !query) return []
+    // Check if the cursor is at an operator prefix (word ending with colon)
+    const match = query.match(/(?:^|\s)(\w+):$/)
+    if (!match) return []
+    const prefix = match[1].toLowerCase()
+    const allHints = [...getOperatorSearchHints(), ...getAttributeSearchHints()]
+    return allHints.filter((h) => h.label.toLowerCase().startsWith(prefix))
+  }, [mode, query])
+
   // Track open state changes and perform side effects
   if (open && !prevOpenRef.current) {
     // Modal just opened - reset state synchronously during render
@@ -375,12 +391,40 @@ export const CommandPalette = memo(function CommandPalette({
     [query, onSelectEmail, onClose]
   )
 
+  // Handle removing an operator chip (Story 2.22: Task 5.4)
+  const handleRemoveOperator = useCallback(
+    (operatorIndex: number) => {
+      const op = activeOperators[operatorIndex]
+      if (!op) return
+      // Build a regex that matches the operator with any quote style (", ', or none)
+      const escapedType = op.type.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      const escapedValue = op.value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      // Match type:value, type:"value", or type:'value'
+      const regex = new RegExp(`${escapedType}:(?:["']${escapedValue}["']|${escapedValue})`, 'i')
+      const newQuery = query.replace(regex, '').trim().replace(/\s+/g, ' ')
+      setQuery(newQuery)
+    },
+    [activeOperators, query, setQuery]
+  )
+
   // Handle selecting a recent search
   const handleRecentSearchClick = useCallback(
     (searchQuery: string) => {
       setQuery(searchQuery)
     },
     [setQuery]
+  )
+
+  // Handle selecting an operator hint (Story 2.22: Task 4.2/4.3)
+  const handleHintClick = useCallback(
+    (hintValue: string) => {
+      if (!hintValue) return
+      // Replace the partial operator prefix with the full hint value
+      const newQuery = query.replace(/(\w+):$/, hintValue)
+      setQuery(newQuery)
+      inputRef.current?.focus()
+    },
+    [query, setQuery]
   )
 
   // Keyboard navigation - handles both search and actions modes
@@ -505,6 +549,49 @@ export const CommandPalette = memo(function CommandPalette({
           {/* SEARCH MODE CONTENT */}
           {mode === 'search' && (
             <>
+              {/* Active operator chips (Story 2.22: AC 11) */}
+              {activeOperators.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 px-3 py-2 border-b border-slate-200">
+                  {activeOperators.map((op, index) => (
+                    <span
+                      key={`${op.type}-${op.value}-${index}`}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 bg-cyan-50 text-cyan-700 text-xs rounded-full border border-cyan-200"
+                    >
+                      {op.type}:{op.value}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveOperator(index)}
+                        className="ml-0.5 hover:text-cyan-900 transition-colors"
+                        aria-label={`Remove ${op.type}:${op.value} filter`}
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* Operator/attribute hints (Story 2.22: Task 4.2/4.3) */}
+              {operatorHints.length > 0 && (
+                <div className="border-b border-slate-200 px-3 py-2">
+                  <div className="text-xs text-slate-500 mb-1.5">Suggestions</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {operatorHints.map((hint) => (
+                      <button
+                        key={hint.label}
+                        type="button"
+                        onClick={() => handleHintClick(hint.value)}
+                        className="inline-flex items-center gap-1.5 px-2 py-1 bg-slate-50 hover:bg-slate-100 text-sm rounded border border-slate-200 transition-colors"
+                        title={hint.description}
+                      >
+                        <span className="font-mono text-cyan-700">{hint.label}</span>
+                        <span className="text-xs text-slate-400">{hint.description}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Search results */}
               {query && (
                 <>
@@ -571,9 +658,7 @@ export const CommandPalette = memo(function CommandPalette({
                 <div className="p-8 text-center text-slate-500 text-sm">
                   <SearchIcon className="w-8 h-8 mx-auto mb-2 text-slate-300" />
                   <p>Type to search emails</p>
-                  <p className="text-xs mt-1">
-                    Use quotes for exact phrases: &quot;budget meeting&quot;
-                  </p>
+                  <p className="text-xs mt-1">Try from:, to:, has:attachment, before:, after:</p>
                 </div>
               )}
             </>

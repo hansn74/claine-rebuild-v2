@@ -49,7 +49,7 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(functi
   {
     value,
     onChange,
-    placeholder = 'Search emails... (use quotes for exact match)',
+    placeholder = 'Search emails... (try from:, has:attachment)',
     isSearching = false,
     showClear = true,
     onClear,

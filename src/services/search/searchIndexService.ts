@@ -242,6 +242,14 @@ export class SearchIndexService {
   }
 
   /**
+   * Get all document IDs in the index
+   * Used for operator-only queries where MiniSearch can't rank results.
+   */
+  getDocumentIds(): string[] {
+    return Array.from(this.documents.keys())
+  }
+
+  /**
    * Get index statistics
    */
   getStats(): SearchIndexStats {

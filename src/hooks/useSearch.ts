@@ -2,10 +2,12 @@
  * useSearch Hook
  *
  * Story 2.21: Replace Lunr.js with MiniSearch
+ * Story 2.22: Search Operators for Structured Queries
  *
  * React hook for performing full-text search with debounced input.
  * Returns enriched results with relevance scores and highlighted snippets.
  * MiniSearch provides built-in prefix search and fuzzy matching.
+ * Supports email operators (from:, to:, has:, before:, after:, in:).
  *
  * Performance Targets:
  * - Search completes in <100ms (FR008)
@@ -24,6 +26,11 @@ import {
 } from '@/utils/searchHighlight'
 import { logger } from '@/services/logger'
 import { searchHistoryService } from '@/services/search'
+import {
+  parseSearchOperators,
+  matchesOperatorFilters,
+} from '@/services/search/searchOperatorParser'
+import type { SearchOperator } from '@/services/search/searchOperatorParser'
 
 /**
  * Return type for useSearch hook
@@ -43,6 +50,8 @@ export interface UseSearchResult {
   error: string | null
   /** Clear search results and query */
   clear: () => void
+  /** Active search operators parsed from query (Story 2.22) */
+  activeOperators: SearchOperator[]
 }
 
 /**
@@ -103,7 +112,7 @@ function generateHighlights(email: EmailDocument, terms: string[]): SearchHighli
  * @example
  * ```tsx
  * function SearchComponent() {
- *   const { query, setQuery, results, isSearching, searchTime } = useSearch()
+ *   const { query, setQuery, results, isSearching, searchTime, activeOperators } = useSearch()
  *
  *   return (
  *     <div>
@@ -114,6 +123,7 @@ function generateHighlights(email: EmailDocument, terms: string[]): SearchHighli
  *       />
  *       {isSearching && <span>Searching...</span>}
  *       {searchTime && <span>{searchTime}ms</span>}
+ *       {activeOperators.map(op => <span key={`${op.type}:${op.value}`}>{op.type}:{op.value}</span>)}
  *       {results.map((result) => (
  *         <SearchResultItem key={result.email.id} result={result} />
  *       ))}
@@ -133,6 +143,7 @@ export function useSearch(options: UseSearchOptions = {}): UseSearchResult {
   const [isSearching, setIsSearching] = useState(false)
   const [searchTime, setSearchTime] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [activeOperators, setActiveOperators] = useState<SearchOperator[]>([])
 
   // Ref to track debounce timeout
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -150,6 +161,7 @@ export function useSearch(options: UseSearchOptions = {}): UseSearchResult {
         setIsSearching(false)
         setSearchTime(null)
         setError(null)
+        setActiveOperators([])
         return
       }
 
@@ -159,31 +171,78 @@ export function useSearch(options: UseSearchOptions = {}): UseSearchResult {
       const startTime = performance.now()
 
       try {
-        // MiniSearch has built-in prefix search and fuzzy matching
-        const searchResults = searchIndexService.search(searchQuery)
+        // Story 2.22: Parse operators FIRST
+        const parsed = parseSearchOperators(searchQuery)
+        setActiveOperators(parsed.operators)
+
+        let enrichedResults: EnrichedSearchResult[]
+
+        // Build highlight terms: text query terms + operator values
+        const highlightTerms = [
+          ...parseSearchTerms(searchQuery),
+          ...parsed.operators.map((op) => op.value),
+        ]
+        // Deduplicate
+        const terms = [...new Set(highlightTerms)]
+
+        if (parsed.textQuery) {
+          // Has text query: search with MiniSearch, then post-filter with operators
+          const searchResults = searchIndexService.search(parsed.textQuery)
+
+          // Check if this is still the latest query (prevent stale results)
+          if (searchQuery !== latestQueryRef.current) {
+            return
+          }
+
+          // Enrich and post-filter results with operator filters
+          enrichedResults = searchResults
+            .slice(0, maxResults)
+            .map((result) => {
+              const email = searchIndexService.getDocument(result.id)
+              if (!email) return null
+              if (!matchesOperatorFilters(email, parsed.operators)) return null
+              return {
+                email,
+                score: result.score,
+                highlights: generateHighlights(email, terms),
+              }
+            })
+            .filter((r): r is EnrichedSearchResult => r !== null)
+        } else if (parsed.hasOperators) {
+          // Operator-only query: iterate all documents, apply filters, sort by timestamp
+          if (searchQuery !== latestQueryRef.current) {
+            return
+          }
+
+          const allIds = searchIndexService.getDocumentIds()
+          const matchingEmails: EmailDocument[] = []
+
+          for (const id of allIds) {
+            const email = searchIndexService.getDocument(id)
+            if (email && matchesOperatorFilters(email, parsed.operators)) {
+              matchingEmails.push(email)
+            }
+          }
+
+          // Sort by timestamp (newest first) since there are no relevance scores
+          matchingEmails.sort((a, b) => b.timestamp - a.timestamp)
+
+          enrichedResults = matchingEmails.slice(0, maxResults).map((email) => ({
+            email,
+            score: 0,
+            highlights: generateHighlights(email, terms),
+          }))
+        } else {
+          // No text and no operators — shouldn't reach here due to early return
+          enrichedResults = []
+        }
+
         const duration = performance.now() - startTime
 
-        // Check if this is still the latest query (prevent stale results)
+        // Check if this is still the latest query
         if (searchQuery !== latestQueryRef.current) {
           return
         }
-
-        // Parse search terms for highlighting
-        const terms = parseSearchTerms(searchQuery)
-
-        // Enrich results with email data and highlights
-        const enrichedResults: EnrichedSearchResult[] = searchResults
-          .slice(0, maxResults)
-          .map((result) => {
-            const email = searchIndexService.getDocument(result.id)
-            if (!email) return null
-            return {
-              email,
-              score: result.score,
-              highlights: generateHighlights(email, terms),
-            }
-          })
-          .filter((r): r is EnrichedSearchResult => r !== null)
 
         setResults(enrichedResults)
         setSearchTime(duration)
@@ -247,6 +306,7 @@ export function useSearch(options: UseSearchOptions = {}): UseSearchResult {
         setIsSearching(false)
         setSearchTime(null)
         setError(null)
+        setActiveOperators([])
         return
       }
 
@@ -274,6 +334,7 @@ export function useSearch(options: UseSearchOptions = {}): UseSearchResult {
     setIsSearching(false)
     setSearchTime(null)
     setError(null)
+    setActiveOperators([])
   }, [])
 
   // Cleanup on unmount
@@ -293,5 +354,6 @@ export function useSearch(options: UseSearchOptions = {}): UseSearchResult {
     searchTime,
     error,
     clear,
+    activeOperators,
   }
 }
