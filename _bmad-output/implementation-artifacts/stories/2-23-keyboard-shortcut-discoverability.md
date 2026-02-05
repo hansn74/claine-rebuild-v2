@@ -1,6 +1,6 @@
 # Story 2.23: Keyboard Shortcut Discoverability & Progressive Learning
 
-Status: review
+Status: done
 
 ## Story
 
@@ -99,6 +99,10 @@ So that I gradually become faster without needing to memorize a reference sheet.
   - [x] 7.8 Create `src/hooks/__tests__/useCommandUsage.test.ts` (9 tests)
   - [x] 7.9 Test: getRecentCommands returns last 10 used commands in order
   - [x] 7.10 Test: Command palette sorts by recent → context → alpha
+  - [x] 7.11 Create `src/components/search/__tests__/CommandPalette.ranking.test.tsx` (6 tests) - Code Review Fix
+  - [x] 7.12 Test: Thread view (reading scope) shows Reply/Forward/Archive at top (AC 15)
+  - [x] 7.13 Test: List view (inbox scope) shows navigation actions at top (AC 16)
+  - [x] 7.14 Test: Recent section header displayed when recent commands exist (AC 6)
 
 ## Dev Notes
 
@@ -206,7 +210,7 @@ Claude Opus 4.5 (claude-opus-4-5-20251101)
 - src/components/common/ShortcutNudgeTooltip.tsx: New nudge tooltip component
 - src/hooks/useCommandUsage.ts: New command usage tracking hook
 - src/hooks/useShortcutNudge.ts: New shortcut nudge tracking hook
-- src/components/search/CommandPalette.tsx: Context-aware ranking
+- src/components/search/CommandPalette.tsx: Context-aware ranking + "Recent" section header (Code Review Fix)
 - src/components/email/EmailActionButton.tsx: Shortcut hint and nudge integration
 - src/hooks/useEmailKeyboardShortcuts.ts: Keyboard action tracking
 
@@ -221,6 +225,7 @@ Claude Opus 4.5 (claude-opus-4-5-20251101)
 - src/components/common/**tests**/ShortcutHint.test.tsx
 - src/hooks/**tests**/useCommandUsage.test.ts
 - src/hooks/**tests**/useShortcutNudge.test.ts
+- src/components/search/**tests**/CommandPalette.ranking.test.tsx (Code Review Fix)
 
 **Modified Files:**
 
