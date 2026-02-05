@@ -1,0 +1,224 @@
+<story-context id="2-15-attribute-based-filtering-search" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>15</storyId>
+    <title>Attribute-Based Filtering &amp; Search</title>
+    <status>drafted</status>
+    <generatedAt>2026-01-02</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/2-15-attribute-based-filtering-search.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>user</asA>
+    <iWant>to filter and search emails by attributes</iWant>
+    <soThat>I can quickly find emails matching specific criteria</soThat>
+    <tasks>
+      <task id="1">Create Attribute Filter Store with Zustand</task>
+      <task id="2">Create Attribute Filter Panel Component with type-specific inputs</task>
+      <task id="3">Create Active Filter Chips Component</task>
+      <task id="4">Extend Email Query with Attribute Filters</task>
+      <task id="5">Integrate Filter Panel into Sidebar</task>
+      <task id="6">Extend Search with Attribute Syntax (attribute:value)</task>
+      <task id="7">Create Empty State for Filtered Results</task>
+      <task id="8">Testing and Performance Validation</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">Filter panel in sidebar showing all available attributes</criterion>
+    <criterion id="2">User can select attribute filters (e.g., Status=To-Do, Priority=High)</criterion>
+    <criterion id="3">Multiple filters combined with AND logic</criterion>
+    <criterion id="4">Filtered results update instantly (&lt;100ms)</criterion>
+    <criterion id="5">Active filters shown as chips with clear/remove option</criterion>
+    <criterion id="6">Filter state persists during session</criterion>
+    <criterion id="7">Search enhanced to include attribute values (e.g., search "Project:Alpha")</criterion>
+    <criterion id="8">RxDB indexes optimized for attribute queries</criterion>
+    <criterion id="9">Empty state when no emails match filters</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/epics/epic-2-offline-first-email-client-with-attributes.md</path>
+        <title>Epic 2: Offline-First Email Client with Attributes</title>
+        <section>Story 2.15</section>
+        <snippet>Acceptance criteria for attribute filtering: filter panel, AND logic, &lt;100ms performance, attribute search syntax support.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Document</title>
+        <section>Decision 1: Database (RxDB + IndexedDB)</section>
+        <snippet>RxDB for reactive queries with IndexedDB storage. Supports indexes on document fields for query optimization.</snippet>
+      </doc>
+      <doc>
+        <path>docs/ux-design-specification.md</path>
+        <title>UX Design Specification</title>
+        <section>Color System - Theme 3</section>
+        <snippet>Cyan #06B6D4 primary color. Use cyan accent for active states, slate for neutral backgrounds.</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <file>
+        <path>src/hooks/useEmails.ts</path>
+        <kind>hook</kind>
+        <symbol>useEmails, UseEmailsOptions</symbol>
+        <lines>1-165</lines>
+        <reason>Primary hook to extend with attributeFilters parameter for filtered queries</reason>
+      </file>
+      <file>
+        <path>src/services/email/emailAttributeService.ts</path>
+        <kind>service</kind>
+        <symbol>emailAttributeService, getEmailsByAttribute</symbol>
+        <reason>Existing service for attribute-based email queries - reuse for filter implementation</reason>
+      </file>
+      <file>
+        <path>src/store/attributeStore.ts</path>
+        <kind>store</kind>
+        <symbol>useAttributeStore, AttributeState</symbol>
+        <lines>1-305</lines>
+        <reason>Zustand store pattern reference - follow same pattern for attributeFilterStore</reason>
+      </file>
+      <file>
+        <path>src/hooks/useAttributes.ts</path>
+        <kind>hook</kind>
+        <symbol>useAttributes</symbol>
+        <reason>Hook for getting attribute definitions - use in filter panel to list available attributes</reason>
+      </file>
+      <file>
+        <path>src/services/search/searchIndexService.ts</path>
+        <kind>service</kind>
+        <symbol>SearchIndexService, search</symbol>
+        <lines>44-351</lines>
+        <reason>Search service to extend with attribute:value syntax parsing</reason>
+      </file>
+      <file>
+        <path>src/components/email/FolderSidebar.tsx</path>
+        <kind>component</kind>
+        <symbol>FolderSidebar</symbol>
+        <reason>Sidebar component to integrate filter panel into</reason>
+      </file>
+      <file>
+        <path>src/components/email/VirtualEmailList.tsx</path>
+        <kind>component</kind>
+        <symbol>VirtualEmailList</symbol>
+        <reason>Email list component to wire filter state from store</reason>
+      </file>
+      <file>
+        <path>src/components/email/attributes/AttributeTag.tsx</path>
+        <kind>component</kind>
+        <symbol>AttributeTag</symbol>
+        <reason>Existing tag component - reuse styling for filter chips</reason>
+      </file>
+      <file>
+        <path>src/components/common/EmptyInbox.tsx</path>
+        <kind>component</kind>
+        <symbol>EmptyInbox</symbol>
+        <reason>Empty state pattern reference for EmptyFilteredResults component</reason>
+      </file>
+      <file>
+        <path>src/components/search/CommandPalette.tsx</path>
+        <kind>component</kind>
+        <symbol>CommandPalette</symbol>
+        <reason>Command palette to add attribute search hints</reason>
+      </file>
+    </code>
+
+    <dependencies>
+      <node>
+        <package>zustand</package>
+        <version>^5.0.8</version>
+        <usage>State management for attributeFilterStore</usage>
+      </node>
+      <node>
+        <package>rxdb</package>
+        <version>^16.20.0</version>
+        <usage>Database queries with attribute filters</usage>
+      </node>
+      <node>
+        <package>lunr</package>
+        <version>^2.3.9</version>
+        <usage>Full-text search to extend with attribute syntax</usage>
+      </node>
+      <node>
+        <package>lucide-react</package>
+        <version>^0.552.0</version>
+        <usage>Icons for filter UI (Filter, X, etc.)</usage>
+      </node>
+      <node>
+        <package>@tanstack/react-virtual</package>
+        <version>^3.13.12</version>
+        <usage>Virtualized list that receives filtered results</usage>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <interfaces>
+    <interface>
+      <name>UseEmailsOptions</name>
+      <kind>TypeScript interface</kind>
+      <signature>interface UseEmailsOptions { accountId?: string; folder?: string; limit?: number; sortOrder?: 'asc' | 'desc'; attributeFilters?: Map&lt;string, string[]&gt;; }</signature>
+      <path>src/hooks/useEmails.ts</path>
+      <note>Extend with attributeFilters parameter</note>
+    </interface>
+    <interface>
+      <name>AttributeFilterState</name>
+      <kind>Zustand store interface</kind>
+      <signature>interface AttributeFilterState { activeFilters: Map&lt;string, string[]&gt;; setFilter(id: string, values: string[]): void; clearFilter(id: string): void; clearAllFilters(): void; getActiveFilterCount(): number; }</signature>
+      <path>src/store/attributeFilterStore.ts (to create)</path>
+      <note>New store following attributeStore pattern</note>
+    </interface>
+    <interface>
+      <name>emailAttributeService.getEmailsByAttribute</name>
+      <kind>Service method</kind>
+      <signature>getEmailsByAttribute(attributeName: string, value: string | number | boolean): Promise&lt;EmailDocument[]&gt;</signature>
+      <path>src/services/email/emailAttributeService.ts</path>
+      <note>Existing method for attribute queries</note>
+    </interface>
+    <interface>
+      <name>SearchIndexService.search</name>
+      <kind>Class method</kind>
+      <signature>search(query: string): SearchResult[]</signature>
+      <path>src/services/search/searchIndexService.ts</path>
+      <note>Extend to parse attribute:value syntax before Lunr query</note>
+    </interface>
+  </interfaces>
+
+  <constraints>
+    <constraint type="performance">Filtered results must update in &lt;100ms for 10,000+ emails</constraint>
+    <constraint type="architecture">Use Zustand for filter state (client-side only, no persistence)</constraint>
+    <constraint type="architecture">Extend existing useEmails hook rather than creating new query layer</constraint>
+    <constraint type="ux">Follow cyan accent color scheme per UX spec (Theme 3: Technical Calm)</constraint>
+    <constraint type="ux">Filter chips: bg-cyan-100 text-cyan-700 for active state</constraint>
+    <constraint type="testing">Unit tests required for filter store and components</constraint>
+    <constraint type="testing">E2E test for complete filter workflow required</constraint>
+    <constraint type="testing">Performance benchmark for &lt;100ms filter response</constraint>
+    <constraint type="accessibility">ARIA labels required on all filter inputs</constraint>
+    <constraint type="accessibility">Keyboard navigation for filter panel</constraint>
+  </constraints>
+
+  <tests>
+    <standards>
+      Unit tests with Vitest (src/**/__tests__/*.test.ts), E2E tests with Playwright (e2e/*.spec.ts).
+      Follow existing test patterns in src/services/email/__tests__/ and src/store/__tests__/.
+      Performance tests in src/utils/performance/__tests__/.
+    </standards>
+    <locations>
+      <location>src/store/__tests__/attributeFilterStore.test.ts</location>
+      <location>src/components/email/filters/__tests__/*.test.tsx</location>
+      <location>src/hooks/__tests__/useEmails.test.ts</location>
+      <location>e2e/attribute-filtering.spec.ts</location>
+    </locations>
+    <ideas>
+      <idea ac="1,2">Test filter panel renders all enabled attributes with correct input types</idea>
+      <idea ac="3">Test AND logic: multiple filters return intersection of results</idea>
+      <idea ac="4">Performance test: filter 10K emails in &lt;100ms</idea>
+      <idea ac="5">Test active filter chips display and removal</idea>
+      <idea ac="6">Test filter state persists during navigation within session</idea>
+      <idea ac="7">Test search with "Status:To-Do" syntax returns correct emails</idea>
+      <idea ac="8">Test RxDB query uses index on attributes field</idea>
+      <idea ac="9">Test empty state displays when no emails match filters</idea>
+    </ideas>
+  </tests>
+</story-context>

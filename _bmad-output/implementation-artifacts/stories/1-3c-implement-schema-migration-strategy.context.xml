@@ -1,0 +1,297 @@
+<story-context id="1-3c-implement-schema-migration-strategy" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>3C</storyId>
+    <title>Implement Schema Migration Strategy</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-13</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/1-3c-implement-schema-migration-strategy.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>developer</asA>
+    <iWant>a schema migration system in place</iWant>
+    <soThat>we can evolve database schemas safely without data loss</soThat>
+    <tasks>
+      <task id="1" ac="1">Implement schema version tracking in RxDB</task>
+      <task id="2" ac="2">Create migration runner system</task>
+      <task id="3" ac="3">Define migration file structure and naming convention</task>
+      <task id="4" ac="4">Create example migration (v0 → v1)</task>
+      <task id="5" ac="5">Implement rollback mechanism</task>
+      <task id="6" ac="6,7">Create migration documentation</task>
+      <task id="7" ac="8">Implement pre-migration backup strategy</task>
+      <task id="8" ac="9">Implement migration logging</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <ac id="1">Schema version tracking implemented in RxDB</ac>
+    <ac id="2">Migration runner created (runs migrations on schema version mismatch)</ac>
+    <ac id="3">Migration files follow naming convention: YYYYMMDD_description.ts</ac>
+    <ac id="4">Example migration created and tested (v1 → v2)</ac>
+    <ac id="5">Rollback mechanism implemented and tested</ac>
+    <ac id="6">Migration documentation created in docs/ folder</ac>
+    <ac id="7">Migration creation process documented</ac>
+    <ac id="8">Pre-migration backup strategy implemented</ac>
+    <ac id="9">Migration status logged (success/failure with details)</ac>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Documentation</title>
+        <section>Decision-1-Database</section>
+        <snippet>RxDB 16.20.0 handles schema migrations automatically. Version bump triggers migration hooks. Migration files in src/db/migrations/. Naming convention: YYYYMMDD-{description}.migration.ts</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics/epic-1-foundation-core-infrastructure.md</path>
+        <title>Epic 1 Story Definitions</title>
+        <section>Story-1.3C</section>
+        <snippet>Implement schema migration system with version tracking, migration runner, rollback mechanism, pre-migration backup, and logging. Prerequisites: Story 1.3B (schemas at version 0). Estimated effort: 6 hours.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/1-3-rxdb-indexeddb-data-layer-setup.md</path>
+        <title>Story 1.3 - RxDB Setup</title>
+        <section>Completion Notes</section>
+        <snippet>Database initialization pattern established. Metadata collection created for version tracking with fields: id, version, lastMigration. Pattern: db.addCollections() method for collection initialization.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/1-3b-design-rxdb-schemas-for-core-entities.md</path>
+        <title>Story 1.3B - Schema Design</title>
+        <section>Completion Notes</section>
+        <snippet>4 schemas created at version 0: email.schema.ts, thread.schema.ts, workflow.schema.ts, aiMetadata.schema.ts. RxDB limitations: array fields cannot be indexed, indexed number fields need min/max. Testing pattern established with wrappedValidateAjvStorage and RxDBDevModePlugin.</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <artifact>
+        <path>src/services/database/init.ts</path>
+        <kind>service</kind>
+        <symbol>initDatabase</symbol>
+        <lines>22-103</lines>
+        <reason>Main database initialization function. Contains metadata collection setup (lines 52-73) for version tracking. DATABASE_VERSION constant (line 13) tracks current schema version. Migration runner must integrate here before collection initialization.</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/database/init.ts</path>
+        <kind>schema</kind>
+        <symbol>metadata collection</symbol>
+        <lines>52-73</lines>
+        <reason>Existing metadata collection with version tracking fields (id, version, lastMigration). Reuse this collection for migration version tracking. Current version stored at id='db-version'.</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/database/schemas/email.schema.ts</path>
+        <kind>schema</kind>
+        <symbol>emailSchema</symbol>
+        <lines>1-all</lines>
+        <reason>Example schema at version 0. Will be used in example migration to demonstrate adding a field. Contains structured types (EmailAddress, EmailBody, Attachment).</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/database/schemas/thread.schema.ts</path>
+        <kind>schema</kind>
+        <symbol>threadSchema</symbol>
+        <lines>1-all</lines>
+        <reason>Thread schema at version 0. Another example for migration testing scenarios.</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/database/schemas/workflow.schema.ts</path>
+        <kind>schema</kind>
+        <symbol>workflowSchema</symbol>
+        <lines>1-all</lines>
+        <reason>Workflow schema at version 0.</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/database/schemas/aiMetadata.schema.ts</path>
+        <kind>schema</kind>
+        <symbol>aiMetadataSchema</symbol>
+        <lines>1-all</lines>
+        <reason>AI metadata schema at version 0.</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/database/__tests__/init.test.ts</path>
+        <kind>test</kind>
+        <symbol>Database initialization tests</symbol>
+        <lines>1-all</lines>
+        <reason>Existing test patterns for database initialization. Use same patterns for migration runner tests: createRxDatabase, wrappedValidateAjvStorage, fake-indexeddb, cleanup with closeDatabase().</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/database/schemas/__tests__/email.schema.test.ts</path>
+        <kind>test</kind>
+        <symbol>Schema validation tests</symbol>
+        <lines>1-all</lines>
+        <reason>Test pattern: Create test database, add collections with schemas, validate operations. Use wrappedValidateAjvStorage for schema validation. Clean up with db.remove() in afterEach.</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/database/crud.ts</path>
+        <kind>service</kind>
+        <symbol>CRUD operations</symbol>
+        <lines>1-all</lines>
+        <reason>Demonstrates RxDB query and update operations. Useful reference for implementing migration operations (find, update, insert patterns).</reason>
+      </artifact>
+    </code>
+
+    <dependencies>
+      <node>
+        <package name="rxdb" version="^16.20.0">RxDB reactive database with built-in migration support</package>
+        <package name="rxjs" version="^7.8.2">Required peer dependency for RxDB observables</package>
+        <package name="vitest" version="^4.0.7">Test framework for unit testing migrations</package>
+        <package name="fake-indexeddb" version="^6.2.4">Mock IndexedDB for testing migrations without real storage</package>
+        <package name="@vitest/coverage-v8" version="^4.0.7">Code coverage for migration tests</package>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="architecture">
+      <rule>Migration runner must integrate into initDatabase() before collection initialization</rule>
+      <reason>Ensures schemas are up-to-date before collections are added. Prevents schema mismatch errors.</reason>
+    </constraint>
+    <constraint type="architecture">
+      <rule>Reuse existing metadata collection for version tracking</rule>
+      <reason>Metadata collection already exists with version tracking pattern. Extend rather than recreate.</reason>
+    </constraint>
+    <constraint type="naming">
+      <rule>Migration files: YYYYMMDD_description.ts (e.g., 20251113_add_sentiment_field.ts)</rule>
+      <reason>Date-based naming ensures chronological ordering and uniqueness. Matches architecture.md convention.</reason>
+    </constraint>
+    <constraint type="testing">
+      <rule>Use fake-indexeddb for migration tests to avoid real storage</rule>
+      <reason>Faster tests, no cleanup issues, consistent test environment across machines.</reason>
+    </constraint>
+    <constraint type="testing">
+      <rule>Follow existing test patterns: wrappedValidateAjvStorage, RxDBDevModePlugin, cleanup in afterEach</rule>
+      <reason>Consistency with existing test suite. Established patterns from Story 1.3 and 1.3B.</reason>
+    </constraint>
+    <constraint type="rxdb">
+      <rule>RxDB auto-handles schema migrations when version number increases</rule>
+      <reason>Don't manually manipulate schemas. Let RxDB migration system handle schema updates through migrationStrategies.</reason>
+    </constraint>
+    <constraint type="backup">
+      <rule>Create backup before each migration execution</rule>
+      <reason>Safety net for rollback. User data protection is critical.</reason>
+    </constraint>
+    <constraint type="logging">
+      <rule>Log all migration events to metadata collection</rule>
+      <reason>Debugging support, audit trail, error recovery information.</reason>
+    </constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>Migration</name>
+      <kind>TypeScript interface</kind>
+      <signature>
+interface Migration {
+  version: number          // Target schema version
+  name: string            // Migration name (from filename)
+  up: (db: RxDatabase) => Promise&lt;void&gt;    // Forward migration
+  down: (db: RxDatabase) => Promise&lt;void&gt;  // Rollback migration
+}
+      </signature>
+      <path>src/services/database/migrations/types.ts</path>
+      <reason>Standard interface for all migration files</reason>
+    </interface>
+
+    <interface>
+      <name>MigrationRunner</name>
+      <kind>Service class</kind>
+      <signature>
+class MigrationRunner {
+  async runMigrations(db: RxDatabase, currentVersion: number, targetVersion: number): Promise&lt;void&gt;
+  async rollbackMigration(db: RxDatabase, targetVersion: number): Promise&lt;void&gt;
+  async discoverMigrations(): Promise&lt;Migration[]&gt;
+}
+      </signature>
+      <path>src/services/database/migrationRunner.ts</path>
+      <reason>Core migration execution service</reason>
+    </interface>
+
+    <interface>
+      <name>VersionTracker</name>
+      <kind>Service class</kind>
+      <signature>
+class VersionTracker {
+  async getCurrentVersion(db: RxDatabase): Promise&lt;number&gt;
+  async setVersion(db: RxDatabase, version: number): Promise&lt;void&gt;
+  async logMigration(db: RxDatabase, migration: string, status: 'start' | 'success' | 'failure', details?: string): Promise&lt;void&gt;
+}
+      </signature>
+      <path>src/services/database/versionTracker.ts</path>
+      <reason>Version tracking and migration logging service</reason>
+    </interface>
+
+    <interface>
+      <name>BackupService</name>
+      <kind>Service class</kind>
+      <signature>
+class BackupService {
+  async createBackup(db: RxDatabase): Promise&lt;string&gt;  // Returns backup path/ID
+  async restoreBackup(db: RxDatabase, backupId: string): Promise&lt;void&gt;
+  async exportToJSON(db: RxDatabase): Promise&lt;object&gt;
+  async importFromJSON(db: RxDatabase, data: object): Promise&lt;void&gt;
+}
+      </signature>
+      <path>src/services/database/backup.ts</path>
+      <reason>Database backup and restore functionality</reason>
+    </interface>
+
+    <interface>
+      <name>Metadata Collection (Existing)</name>
+      <kind>RxDB Collection</kind>
+      <signature>
+{
+  id: string,              // 'db-version' for version, 'migration-{timestamp}' for logs
+  version: number,         // Current schema version
+  lastMigration: string,   // ISO timestamp of last migration
+  migrationName?: string,  // Name of migration
+  status?: string,         // 'success' | 'failure'
+  error?: string          // Error details if failed
+}
+      </signature>
+      <path>src/services/database/init.ts:52-73</path>
+      <reason>Existing collection to reuse for version tracking and migration logging</reason>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+Tests use Vitest 4.0.7 with fake-indexeddb for mocking IndexedDB. Test pattern: Create test database with wrappedValidateAjvStorage, perform operations, validate results, cleanup with db.remove() in afterEach. Use RxDBDevModePlugin for schema validation. All database tests are isolated and independent. Coverage target: 80%+ for migration services.
+    </standards>
+
+    <locations>
+- src/services/database/__tests__/versionTracker.test.ts (new)
+- src/services/database/__tests__/migrationRunner.test.ts (new)
+- src/services/database/__tests__/backup.test.ts (new)
+- src/services/database/migrations/__tests__/example-migration.test.ts (new)
+- Existing pattern: src/services/database/__tests__/*.test.ts
+    </locations>
+
+    <ideas>
+      <idea ac="1">Test: Version tracker initializes to DATABASE_VERSION on first run</idea>
+      <idea ac="1">Test: Version tracker persists version across database sessions</idea>
+      <idea ac="1">Test: Version tracker updates version after migration</idea>
+      <idea ac="2">Test: Migration runner discovers migration files in migrations/ directory</idea>
+      <idea ac="2">Test: Migration runner executes migrations sequentially from current to target version</idea>
+      <idea ac="2">Test: Migration runner skips already-applied migrations</idea>
+      <idea ac="2">Test: Migration runner handles missing migration files gracefully</idea>
+      <idea ac="2">Test: Migration runner integrates into initDatabase() correctly</idea>
+      <idea ac="3">Test: Migration files follow YYYYMMDD_description.ts naming convention</idea>
+      <idea ac="3">Test: Migration discovery sorts files by date/version correctly</idea>
+      <idea ac="4">Test: Example migration (v0→v1) adds field to email schema successfully</idea>
+      <idea ac="4">Test: Example migration sets default values for existing documents</idea>
+      <idea ac="4">Test: Example migration updates schema version</idea>
+      <idea ac="5">Test: Rollback mechanism removes field added by migration</idea>
+      <idea ac="5">Test: Rollback mechanism restores previous schema version</idea>
+      <idea ac="5">Test: Rollback handles errors gracefully</idea>
+      <idea ac="8">Test: Backup service exports full database to JSON</idea>
+      <idea ac="8">Test: Backup service restores database from JSON</idea>
+      <idea ac="8">Test: Backup created automatically before migration execution</idea>
+      <idea ac="8">Test: Backup restoration works after failed migration</idea>
+      <idea ac="9">Test: Migration logging captures start events</idea>
+      <idea ac="9">Test: Migration logging captures success events with duration</idea>
+      <idea ac="9">Test: Migration logging captures failure events with error details</idea>
+      <idea ac="9">Test: Migration history can be queried from metadata collection</idea>
+    </ideas>
+  </tests>
+</story-context>

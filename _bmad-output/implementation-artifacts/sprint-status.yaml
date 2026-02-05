@@ -112,10 +112,10 @@ development_status:
   2-16-implement-lazy-loading-for-email-threads-and-large-lists: done
   2-17-apply-ux-design-system: done
   # Correct-Course: Superhuman Analysis (2026-02-02) — Priority 1
-  2-18-persistent-send-queue-background-sync-api: backlog
-  2-20-pre-render-adjacent-email-thread-views: backlog
+  2-18-persistent-send-queue-background-sync-api: done
+  2-20-pre-render-adjacent-email-thread-views: done
   # Correct-Course: Superhuman Analysis (2026-02-02) — Priority 2
-  2-19-parallel-action-queue-processing: backlog
+  2-19-parallel-action-queue-processing: done
   2-21-replace-lunr-with-minisearch: backlog
   2-22-search-operators-structured-queries: backlog
   # Correct-Course: Superhuman Analysis (2026-02-02) — Priority 3

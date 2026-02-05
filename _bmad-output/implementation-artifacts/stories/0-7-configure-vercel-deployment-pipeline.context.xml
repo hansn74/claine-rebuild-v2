@@ -1,0 +1,186 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>0</epicId>
+    <storyId>7</storyId>
+    <title>Configure Vercel Deployment Pipeline</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-05</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/0-7-configure-vercel-deployment-pipeline.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>a developer</asA>
+    <iWant>automatic deployment to Vercel</iWant>
+    <soThat>every merge to main deploys the latest version automatically</soThat>
+    <tasks>
+      - Create Vercel project and link to GitHub repository
+      - Configure Vercel build settings (Framework: Vite, Build: npm run build, Output: dist)
+      - Configure Vercel deployment branches (Production: main, Preview: all branches)
+      - Configure environment variables in Vercel (prepare for Story 0.8)
+      - Configure Vercel PWA-specific settings (service worker headers, HTTPS)
+      - Test production deployment workflow (merge to main triggers deployment)
+      - Test preview deployment workflow (PR creates preview deployment)
+      - Document Vercel deployment in README.md
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">Vercel project created and linked to GitHub repository</criterion>
+    <criterion id="2">Vercel deployment configured to build with Vite (`npm run build`)</criterion>
+    <criterion id="3">Vercel preview deployments enabled for pull requests</criterion>
+    <criterion id="4">Vercel production deployment configured for main branch</criterion>
+    <criterion id="5">Environment variables configured in Vercel dashboard (if needed for Epic 0)</criterion>
+    <criterion id="6">Build output directory set to `dist/` (Vite default)</criterion>
+    <criterion id="7">Test: Merge to main triggers Vercel production deployment</criterion>
+    <criterion id="8">Test: Pull request creates Vercel preview deployment</criterion>
+    <criterion id="9">Test: Deployed app loads successfully at Vercel URL</criterion>
+    <criterion id="10">Vercel deployment URL documented in README</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Decision Document</title>
+        <section>Decision 6: Deployment Platform (Vercel)</section>
+        <snippet>Vercel selected for PWA-optimized deployment with automatic HTTPS, edge caching, React/Vite integration, and Web Vitals monitoring. Free tier available for development.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics/epic-0-infrastructure-project-setup.md</path>
+        <title>Epic 0: Infrastructure & Project Setup</title>
+        <section>Story 0.7: Configure Vercel Deployment Pipeline</section>
+        <snippet>Story defines automatic deployment to Vercel for production (main branch) and preview deployments for pull requests. Prerequisites: Stories 0.1, 0.2 (buildable project).</snippet>
+      </doc>
+      <doc>
+        <path>docs/PRD.md</path>
+        <title>Product Requirements Document</title>
+        <section>Goals and Background Context</section>
+        <snippet>Claine v2 targets offline-first PWA architecture with sub-50ms UI performance. Deployment infrastructure is prerequisite for all feature development.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/0-6-set-up-github-actions-ci-cd-pipeline.md</path>
+        <title>Story 0.6: GitHub Actions CI/CD Pipeline</title>
+        <section>Dev Agent Record - Completion Notes</section>
+        <snippet>CI/CD pipeline implemented with lint → unit tests → E2E tests → build workflow. Build artifacts (dist/) upload successfully. Production bundle: ~230 KB (under 500 KB budget).</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <artifact>
+        <path>vite.config.ts</path>
+        <kind>config</kind>
+        <symbol>defineConfig</symbol>
+        <lines>1-18</lines>
+        <reason>Vite configuration defines build output (dist/), React plugin, and path aliases. Vercel will use this config to build the project.</reason>
+      </artifact>
+      <artifact>
+        <path>.github/workflows/ci.yml</path>
+        <kind>ci-config</kind>
+        <symbol>GitHub Actions CI workflow</symbol>
+        <lines>1-47</lines>
+        <reason>Existing CI pipeline runs before Vercel deployment. Vercel will run similar build process (npm ci, npm run build) but skip tests.</reason>
+      </artifact>
+      <artifact>
+        <path>package.json</path>
+        <kind>config</kind>
+        <symbol>build script</symbol>
+        <lines>8</lines>
+        <reason>Build script "tsc -b && vite build" is what Vercel will execute. Compiles TypeScript and bundles with Vite to dist/.</reason>
+      </artifact>
+    </code>
+
+    <dependencies>
+      <node>
+        <package name="vite" version="^7.1.12" kind="build-tool" />
+        <package name="@vitejs/plugin-react" version="^4.7.0" kind="build-plugin" />
+        <package name="typescript" version="5.9" kind="compiler" />
+        <package name="react" version="19.2" kind="runtime" />
+        <package name="react-dom" version="19.2" kind="runtime" />
+      </node>
+      <runtime>
+        <requirement>Node.js 20.x (LTS)</requirement>
+        <requirement>npm (latest compatible with Node 20.x)</requirement>
+      </runtime>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="deployment-platform">
+      Must use Vercel as deployment platform per architecture.md Decision 6. Rationale: PWA-optimized, automatic HTTPS, edge caching, Web Vitals monitoring.
+    </constraint>
+    <constraint type="build-config">
+      Build command must be "npm run build" (standard Vite build). Output directory must be "dist/" (Vite default). Framework preset: Vite.
+    </constraint>
+    <constraint type="node-version">
+      Node.js version must be 20.x (LTS) to match project requirements and CI environment.
+    </constraint>
+    <constraint type="pwa-requirements">
+      HTTPS required for PWA service workers (Vercel provides automatically). Service worker headers must be configured correctly. Cache headers for offline-first functionality.
+    </constraint>
+    <constraint type="deployment-workflow">
+      Production deployments: Automatic on merge to main branch. Preview deployments: Automatic for all pull requests. Vercel bot should post deployment URLs as PR comments.
+    </constraint>
+    <constraint type="environment-variables">
+      Epic 0 has no required environment variables yet. Story 0.8 will add env var management. Configure Vercel to prepare for future env vars.
+    </constraint>
+    <constraint type="documentation">
+      README.md must document Vercel deployment URL and process (Story 0.9 will create README). This story prepares deployment for documentation.
+    </constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>Vercel Project API</name>
+      <kind>External Platform</kind>
+      <signature>Vercel dashboard + GitHub integration for project setup and configuration</signature>
+      <path>External: https://vercel.com/dashboard</path>
+    </interface>
+    <interface>
+      <name>Vercel Build Configuration</name>
+      <kind>Platform Config</kind>
+      <signature>
+        Framework: Vite
+        Build Command: npm run build
+        Output Directory: dist
+        Install Command: npm install
+        Node.js Version: 20.x
+      </signature>
+      <path>Configured in Vercel project settings</path>
+    </interface>
+    <interface>
+      <name>GitHub Webhook Integration</name>
+      <kind>Integration</kind>
+      <signature>Automatic webhook setup when linking Vercel to GitHub repository. Triggers deployments on push/PR events.</signature>
+      <path>External: Vercel-GitHub integration</path>
+    </interface>
+    <interface>
+      <name>Vite Build Output</name>
+      <kind>Build Artifact</kind>
+      <signature>
+        Directory: dist/
+        Contents: index.html, assets/*, manifest files
+        Bundle: ~230 KB total (HTML + CSS + JS)
+      </signature>
+      <path>dist/</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Testing for this story focuses on deployment workflow validation rather than code testing. Manual verification required: (1) Vercel project setup and configuration, (2) Production deployment triggers on main push, (3) Preview deployment triggers on PR creation, (4) Deployed app loads successfully at Vercel URL. No automated tests needed for deployment configuration.
+    </standards>
+    <locations>
+      No automated test files for this story. All testing is manual verification through Vercel dashboard and browser testing of deployed URLs.
+    </locations>
+    <ideas>
+      <idea ac="1">Manual test: Verify Vercel project appears in dashboard after creation and GitHub linking</idea>
+      <idea ac="2,6">Manual test: Trigger deployment and verify build uses "npm run build" and outputs to dist/</idea>
+      <idea ac="3,8">Manual test: Create PR and verify Vercel creates preview deployment with unique URL</idea>
+      <idea ac="4,7">Manual test: Merge to main and verify production deployment triggers automatically</idea>
+      <idea ac="5">Manual test: Add test env var in Vercel dashboard and verify accessible in deployment</idea>
+      <idea ac="9">Manual test: Visit production and preview URLs, verify app renders correctly</idea>
+      <idea ac="10">Manual test: Verify README.md updated with Vercel deployment URL (Story 0.9 dependency)</idea>
+    </ideas>
+  </tests>
+</story-context>

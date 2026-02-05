@@ -1,0 +1,340 @@
+<story-context id="1-14-logging-error-tracking-infrastructure" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>14</storyId>
+    <title>Logging & Error Tracking Infrastructure</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-28</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/1-14-logging-error-tracking-infrastructure.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>developer</asA>
+    <iWant>structured logging and error tracking</iWant>
+    <soThat>I can debug issues and monitor production health</soThat>
+    <tasks>
+      <task id="1" title="Create Logger Service">
+        <subtasks>
+          <subtask>1.1: Define LogLevel type (debug, info, warn, error)</subtask>
+          <subtask>1.2: Define LogEntry interface (timestamp, level, category, message, context?)</subtask>
+          <subtask>1.3: Create Logger class with level-based methods</subtask>
+          <subtask>1.4: Implement log level filtering based on VITE_LOG_LEVEL</subtask>
+          <subtask>1.5: Add category support for log filtering (auth, sync, db, ui)</subtask>
+        </subtasks>
+        <files>
+          <file>src/services/logger/logger.ts</file>
+          <file>src/services/logger/types.ts</file>
+          <file>src/services/logger/index.ts</file>
+        </files>
+      </task>
+      <task id="2" title="Implement Log Persistence">
+        <subtasks>
+          <subtask>2.1: Create IndexedDB store for logs (separate from RxDB)</subtask>
+          <subtask>2.2: Implement rolling buffer (max 1000 entries)</subtask>
+          <subtask>2.3: Add log export function (JSON format)</subtask>
+          <subtask>2.4: Add log clear function for debugging</subtask>
+        </subtasks>
+        <files>
+          <file>src/services/logger/logStore.ts</file>
+        </files>
+      </task>
+      <task id="3" title="Integrate Sentry Error Tracking">
+        <subtasks>
+          <subtask>3.1: Install Sentry SDK (@sentry/react)</subtask>
+          <subtask>3.2: Create Sentry initialization with environment detection</subtask>
+          <subtask>3.3: Configure Sentry to ignore development errors</subtask>
+          <subtask>3.4: Add global error handlers for uncaught exceptions</subtask>
+          <subtask>3.5: Add unhandled promise rejection handler</subtask>
+        </subtasks>
+        <files>
+          <file>src/services/logger/sentry.ts</file>
+          <file>src/main.tsx</file>
+          <file>.env.example</file>
+        </files>
+      </task>
+      <task id="4" title="Implement PII Sanitizer">
+        <subtasks>
+          <subtask>4.1: Create sanitizeForLogging function</subtask>
+          <subtask>4.2: Implement email address regex detection and masking</subtask>
+          <subtask>4.3: Implement access token detection and masking</subtask>
+          <subtask>4.4: Implement OAuth credential detection</subtask>
+          <subtask>4.5: Add unit tests for sanitizer with various PII patterns</subtask>
+        </subtasks>
+        <files>
+          <file>src/services/logger/sanitizer.ts</file>
+          <file>src/services/logger/__tests__/sanitizer.test.ts</file>
+        </files>
+      </task>
+      <task id="5" title="Add React Error Boundary">
+        <subtasks>
+          <subtask>5.1: Create ErrorBoundary component with fallback UI</subtask>
+          <subtask>5.2: Integrate with logger service for error capture</subtask>
+          <subtask>5.3: Integrate with Sentry for production reporting</subtask>
+          <subtask>5.4: Add "Report Issue" button in fallback UI</subtask>
+        </subtasks>
+        <files>
+          <file>src/components/ErrorBoundary.tsx</file>
+          <file>src/App.tsx</file>
+        </files>
+      </task>
+      <task id="6" title="Integrate Logger into Existing Services">
+        <subtasks>
+          <subtask>6.1: Add logger import to OAuth services</subtask>
+          <subtask>6.2: Add logger import to sync services</subtask>
+          <subtask>6.3: Add logger import to database initialization</subtask>
+          <subtask>6.4: Replace console.log/error with logger calls</subtask>
+        </subtasks>
+        <files>
+          <file>src/services/auth/*.ts</file>
+          <file>src/services/sync/*.ts</file>
+          <file>src/services/database/*.ts</file>
+        </files>
+      </task>
+      <task id="7" title="Add User Privacy Controls">
+        <subtasks>
+          <subtask>7.1: Add errorTrackingEnabled setting (default: true)</subtask>
+          <subtask>7.2: Check setting before sending to Sentry</subtask>
+          <subtask>7.3: Add UI toggle for error tracking opt-out</subtask>
+        </subtasks>
+        <files>
+          <file>src/store/settingsStore.ts</file>
+        </files>
+      </task>
+      <task id="8" title="Testing and Documentation">
+        <subtasks>
+          <subtask>8.1: Write unit tests for logger service</subtask>
+          <subtask>8.2: Write unit tests for PII sanitizer</subtask>
+          <subtask>8.3: Write integration test for error boundary</subtask>
+          <subtask>8.4: Document logging conventions in testing.md</subtask>
+        </subtasks>
+        <files>
+          <file>src/services/logger/__tests__/logger.test.ts</file>
+          <file>docs/testing.md</file>
+        </files>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <group title="Structured Logging (AC 1-4)">
+      <ac id="1">Logger service created at src/services/logger/logger.ts with log levels (debug, info, warn, error)</ac>
+      <ac id="2">Logs include structured metadata: timestamp, level, category, message, optional context object</ac>
+      <ac id="3">Log level configurable via environment variable (VITE_LOG_LEVEL)</ac>
+      <ac id="4">Development mode shows all logs; production shows warn/error only</ac>
+    </group>
+    <group title="Log Persistence (AC 5-6)">
+      <ac id="5">Logs persisted to IndexedDB for debugging (last 1000 entries, rolling buffer)</ac>
+      <ac id="6">Logs can be exported as JSON from settings/dev tools</ac>
+    </group>
+    <group title="Error Tracking (AC 7-9)">
+      <ac id="7">Sentry SDK integrated for error tracking in production</ac>
+      <ac id="8">Unhandled exceptions and promise rejections caught and reported</ac>
+      <ac id="9">Error tracking respects user privacy opt-out setting</ac>
+    </group>
+    <group title="Privacy and Sanitization (AC 10-12)">
+      <ac id="10">PII sanitizer function strips email addresses, access tokens, and OAuth credentials from logs</ac>
+      <ac id="11">User email content NEVER included in logs (only subject length, email ID)</ac>
+      <ac id="12">Sanitization applied automatically to all error reports</ac>
+    </group>
+    <group title="Integration (AC 13-14)">
+      <ac id="13">Logger integrated into existing services (OAuth, sync, database) via dependency injection</ac>
+      <ac id="14">React error boundary captures component errors and logs them</ac>
+    </group>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Decision Document</title>
+        <section>Error Handling</section>
+        <snippet>Error handling follows Result&lt;T, E&gt; pattern. Toast notifications for user-facing errors. Console logging for development. Error tracking service (Sentry) for production.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Decision Document</title>
+        <section>Cross-Cutting Concerns - Security</section>
+        <snippet>Token security using encryption. HTML sanitization with DOMPurify. Content Security Policy headers configured for PWA.</snippet>
+      </doc>
+      <doc>
+        <path>docs/testing.md</path>
+        <title>Testing Infrastructure</title>
+        <section>Test Tags</section>
+        <snippet>Tests categorized using tags in describe/test names: @oauth, @rxdb, @sync, @perf, @slow. Use @logging for logger-related tests.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics/epic-1-foundation-core-infrastructure.md</path>
+        <title>Epic 1: Foundation and Core Infrastructure</title>
+        <section>Story 1.14</section>
+        <snippet>Configure Winston or Pino for structured logging. Note: PWA requires browser-compatible solution, not Node.js libraries.</snippet>
+      </doc>
+      <doc>
+        <path>docs/PRD.md</path>
+        <title>Product Requirements Document</title>
+        <section>Non-Functional Requirements</section>
+        <snippet>NFR001: Sub-50ms input latency. NFR004: Support 100,000 emails. Logging should not impact performance.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>src/main.tsx</path>
+        <kind>entry-point</kind>
+        <symbol>main</symbol>
+        <lines>1-19</lines>
+        <reason>Application entry point where Sentry should be initialized before rendering</reason>
+      </artifact>
+      <artifact>
+        <path>src/App.tsx</path>
+        <kind>component</kind>
+        <symbol>App</symbol>
+        <lines>all</lines>
+        <reason>Root component where ErrorBoundary should wrap children</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/database/init.ts</path>
+        <kind>service</kind>
+        <symbol>initDatabase</symbol>
+        <lines>31-194</lines>
+        <reason>Database initialization uses console.log/error that should be replaced with logger</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/auth/tokenRefresh.ts</path>
+        <kind>service</kind>
+        <symbol>tokenRefresh</symbol>
+        <reason>OAuth token refresh service needs logging for debugging auth issues</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/sync/syncOrchestrator.ts</path>
+        <kind>service</kind>
+        <symbol>syncOrchestrator</symbol>
+        <reason>Sync orchestrator needs logging for sync status and error tracking</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/sync/retryEngine.ts</path>
+        <kind>service</kind>
+        <symbol>retryEngine</symbol>
+        <reason>Retry engine needs logging for retry attempts and failures</reason>
+      </artifact>
+      <artifact>
+        <path>src/store/accountStore.ts</path>
+        <kind>store</kind>
+        <symbol>useAccountStore</symbol>
+        <reason>Example of Zustand store pattern to follow for settingsStore</reason>
+      </artifact>
+      <artifact>
+        <path>src/lib/env.ts</path>
+        <kind>utility</kind>
+        <symbol>validateEnv</symbol>
+        <reason>Environment variable validation - logger should check VITE_LOG_LEVEL similarly</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <ecosystem name="node">
+        <package name="react" version="19.2">UI framework</package>
+        <package name="react-dom" version="19.2">React DOM renderer</package>
+        <package name="rxdb" version="^16.20.0">Offline-first database (avoid logger dependency on RxDB)</package>
+        <package name="zustand" version="^5.0.8">State management for settings store</package>
+        <package name="vitest" version="^4.0.7">Unit testing framework</package>
+        <package name="@playwright/test" version="^1.56.1">E2E testing</package>
+        <package name="typescript" version="5.9">Type checking</package>
+      </ecosystem>
+      <toInstall>
+        <package name="@sentry/react">Sentry React SDK for error tracking</package>
+      </toInstall>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint source="architecture.md">PWA architecture - use browser-compatible libraries only (no Winston/Pino/Bunyan)</constraint>
+    <constraint source="architecture.md">Services go in src/services/ or src/shared/services/</constraint>
+    <constraint source="architecture.md">Components access data through Zustand store or hooks</constraint>
+    <constraint source="architecture.md">Error handling follows Result&lt;T, E&gt; pattern</constraint>
+    <constraint source="story">Logger must use IndexedDB for persistence (separate from RxDB to avoid circular dependencies)</constraint>
+    <constraint source="story">PII must be sanitized from all logs and error reports</constraint>
+    <constraint source="story">User privacy opt-out must be respected for Sentry</constraint>
+    <constraint source="PRD">Logging operations must be async to avoid impacting sub-50ms UI performance</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>Logger</name>
+      <kind>class</kind>
+      <signature><![CDATA[
+class Logger {
+  debug(category: LogCategory, message: string, context?: Record<string, unknown>): void
+  info(category: LogCategory, message: string, context?: Record<string, unknown>): void
+  warn(category: LogCategory, message: string, context?: Record<string, unknown>): void
+  error(category: LogCategory, message: string, context?: Record<string, unknown>): void
+}
+export const logger: Logger
+      ]]></signature>
+      <path>src/services/logger/logger.ts</path>
+    </interface>
+    <interface>
+      <name>LogEntry</name>
+      <kind>interface</kind>
+      <signature><![CDATA[
+export interface LogEntry {
+  timestamp: number
+  level: LogLevel
+  category: LogCategory
+  message: string
+  context?: Record<string, unknown>
+}
+      ]]></signature>
+      <path>src/services/logger/types.ts</path>
+    </interface>
+    <interface>
+      <name>sanitizeForLogging</name>
+      <kind>function</kind>
+      <signature>export function sanitizeForLogging(obj: unknown): unknown</signature>
+      <path>src/services/logger/sanitizer.ts</path>
+    </interface>
+    <interface>
+      <name>initSentry</name>
+      <kind>function</kind>
+      <signature>export function initSentry(): void</signature>
+      <path>src/services/logger/sentry.ts</path>
+    </interface>
+    <interface>
+      <name>ErrorBoundary</name>
+      <kind>component</kind>
+      <signature><![CDATA[
+interface ErrorBoundaryProps {
+  children: React.ReactNode
+  fallback?: React.ReactNode
+}
+export class ErrorBoundary extends React.Component<ErrorBoundaryProps>
+      ]]></signature>
+      <path>src/components/ErrorBoundary.tsx</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Testing follows Vitest for unit tests and Playwright for E2E tests. Tests are categorized with tags (@oauth, @rxdb, @sync, @perf, @logging). Coverage target is 70% for Epic 1 code, 80% for critical paths. Tests run in CI with fake-indexeddb for database mocking. Use @logging tag for logger-related tests.
+    </standards>
+    <locations>
+      <location>src/services/logger/__tests__/</location>
+      <location>src/components/__tests__/</location>
+      <location>e2e/</location>
+    </locations>
+    <ideas>
+      <idea ac="1">Test logger service creation and log level methods work correctly</idea>
+      <idea ac="2">Test log entries include all required metadata fields</idea>
+      <idea ac="3">Test VITE_LOG_LEVEL environment variable controls log output</idea>
+      <idea ac="4">Test development vs production log level defaults</idea>
+      <idea ac="5">Test IndexedDB log persistence with rolling buffer</idea>
+      <idea ac="6">Test log export produces valid JSON</idea>
+      <idea ac="7">Test Sentry initialization in production mode</idea>
+      <idea ac="8">Test global error handlers catch uncaught exceptions</idea>
+      <idea ac="9">Test privacy opt-out prevents Sentry reporting</idea>
+      <idea ac="10">Test PII sanitizer masks email addresses and tokens</idea>
+      <idea ac="11">Test email body content is never included in logs</idea>
+      <idea ac="12">Test Sentry beforeSend applies sanitization</idea>
+      <idea ac="13">Test existing services use logger instead of console</idea>
+      <idea ac="14">Test ErrorBoundary catches and logs React errors</idea>
+    </ideas>
+  </tests>
+</story-context>

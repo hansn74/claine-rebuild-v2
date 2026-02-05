@@ -126,6 +126,7 @@ export class ModifierFactory {
       entityId: doc.entityId,
       accountId: doc.accountId,
       provider: doc.provider,
+      threadId: doc.threadId,
     }
 
     const modifier = new ModifierClass(params)

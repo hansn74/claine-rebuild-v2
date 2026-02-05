@@ -1,0 +1,543 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context version="1.0">
+  <metadata>
+    <story-id>2.11</story-id>
+    <story-key>2-11-keyboard-shortcuts-power-user-features</story-key>
+    <story-title>Keyboard Shortcuts &amp; Power User Features</story-title>
+    <epic-id>2</epic-id>
+    <generated-at>2025-12-10</generated-at>
+    <status>ready-for-dev</status>
+  </metadata>
+
+  <story-summary>
+    <as-a>power user</as-a>
+    <i-want>comprehensive keyboard shortcuts</i-want>
+    <so-that>I can navigate efficiently without mouse</so-that>
+  </story-summary>
+
+  <acceptance-criteria>
+    <criterion id="AC1">Shortcut cheat sheet accessible (? key)</criterion>
+    <criterion id="AC2">Navigation: j/k (up/down), enter (open), esc (back)</criterion>
+    <criterion id="AC3">Actions: e (archive), # (delete), r (reply), f (forward)</criterion>
+    <criterion id="AC4">Command palette (cmd/ctrl+k) for all actions</criterion>
+    <criterion id="AC5">Vim-style navigation optional (configurable in settings)</criterion>
+    <criterion id="AC6">Search: / to focus search, cmd/ctrl+f for in-email search</criterion>
+  </acceptance-criteria>
+
+  <documentation-references>
+    <doc path="docs/architecture.md" relevance="high">
+      <key-sections>
+        <section name="State Management (Zustand)">Use Zustand v5.x for global state management - shortcut preferences</section>
+        <section name="Implementation Patterns">Naming conventions, lifecycle patterns, hook patterns</section>
+        <section name="Testing Strategy">Vitest + Playwright for unit and E2E tests</section>
+        <section name="Performance Targets">LCP &lt; 2.5s, FID &lt; 100ms, Email list render &lt; 50ms</section>
+      </key-sections>
+    </doc>
+    <doc path="docs/research/keyboard-shortcuts-research.md" relevance="critical">
+      <key-sections>
+        <section name="Recommendation">Use react-hotkeys-hook (~3-4KB gzipped) for shortcut management</section>
+        <section name="Gmail Shortcuts Analysis">Complete reference of Gmail shortcuts to implement</section>
+        <section name="Pattern 1: Global + Context Provider Architecture">
+          Recommended architecture with ShortcutContext, useEmailShortcut hook, scope management
+        </section>
+        <section name="Shortcut Overlay Component">Implementation pattern for ? key overlay</section>
+        <section name="Performance Benchmarks">Target &lt;16ms response time for shortcuts</section>
+        <section name="Accessibility">WCAG compliance, focus management, ARIA attributes</section>
+      </key-sections>
+    </doc>
+    <doc path="docs/stories/2-10-performance-optimization-benchmarking.md" relevance="medium">
+      <key-sections>
+        <section name="Dev Notes">
+          Performance utilities at src/utils/performance/benchmark.ts,
+          Lazy loading patterns at src/utils/lazyPreload.ts,
+          Memoization patterns in EmailListItem.tsx,
+          NFR001 - &lt;50ms input latency target
+        </section>
+      </key-sections>
+    </doc>
+  </documentation-references>
+
+  <existing-code-artifacts>
+    <artifact path="src/App.tsx" relevance="high">
+      <description>Main app component with existing basic shortcuts (/, c, Cmd+K)</description>
+      <integration-points>
+        <point>Lines 132-175: Global keyboard shortcuts handler</point>
+        <point>Needs ShortcutProvider wrapper at root</point>
+        <point>Already has searchOpen/composeOpen state management</point>
+      </integration-points>
+      <key-code>
+        // Global keyboard shortcuts (lines 132-175)
+        useEffect(() => {
+          const handleKeyDown = (e: KeyboardEvent) => {
+            // Cmd+K or Ctrl+K to open search
+            if ((e.metaKey || e.ctrlKey) &amp;&amp; e.key === 'k') {
+              e.preventDefault()
+              openSearch()
+            }
+            // / to open search (when not in input)
+            if (e.key === '/' &amp;&amp; !composeOpen &amp;&amp; !searchOpen) {
+              e.preventDefault()
+              openSearch()
+            }
+            // c to compose
+            if (e.key === 'c' &amp;&amp; !composeOpen &amp;&amp; !searchOpen) {
+              e.preventDefault()
+              openCompose()
+            }
+          }
+          window.addEventListener('keydown', handleKeyDown)
+          return () => window.removeEventListener('keydown', handleKeyDown)
+        }, [initialized, composeOpen, searchOpen])
+      </key-code>
+    </artifact>
+
+    <artifact path="src/hooks/useEmailKeyboardShortcuts.ts" relevance="critical">
+      <description>Existing hook for email action shortcuts (e, #, u, ?)</description>
+      <integration-points>
+        <point>EMAIL_SHORTCUTS constant defines e, #, u, ? shortcuts</point>
+        <point>shouldHandleShortcut() checks for input focus</point>
+        <point>getTargetIds() works with selection store</point>
+        <point>Need to extend with j/k navigation, r/a/f actions</point>
+      </integration-points>
+      <key-code>
+        export const EMAIL_SHORTCUTS = {
+          archive: { key: 'e', description: 'Archive email', action: 'archive' },
+          delete: { key: '#', description: 'Delete email', action: 'delete' },
+          toggleRead: { key: 'u', description: 'Toggle read/unread', action: 'toggleRead' },
+          help: { key: '?', description: 'Show keyboard shortcuts', action: 'help' },
+        }
+
+        export function getEmailShortcutsForHelp() {
+          return [
+            { key: 'e', description: 'Archive email' },
+            { key: '#', description: 'Delete email' },
+            { key: 'u', description: 'Toggle read/unread' },
+            { key: '?', description: 'Show keyboard shortcuts' },
+            { key: '/', description: 'Open search' },
+            { key: 'c', description: 'Compose new email' },
+            { key: '⌘K', description: 'Quick search' },
+          ]
+        }
+      </key-code>
+    </artifact>
+
+    <artifact path="src/components/search/CommandPalette.tsx" relevance="high">
+      <description>Existing command palette component (lazy-loaded)</description>
+      <integration-points>
+        <point>Already has keyboard navigation (up/down/enter/escape)</point>
+        <point>Already has search functionality</point>
+        <point>Need to extend with all action commands</point>
+        <point>Add shortcut hints next to each command</point>
+      </integration-points>
+      <key-code>
+        // Keyboard navigation handler (lines 148-178)
+        const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+          switch (e.key) {
+            case 'ArrowDown':
+              setSelectedIndex((prev) => Math.min(prev + 1, maxIndex))
+              break
+            case 'ArrowUp':
+              setSelectedIndex((prev) => Math.max(prev - 1, 0))
+              break
+            case 'Enter':
+              if (results[selectedIndex]) {
+                handleSelectEmail(results[selectedIndex].email.id)
+              }
+              break
+            case 'Escape':
+              if (query) { clear() } else { onClose() }
+              break
+          }
+        }, [...])
+      </key-code>
+    </artifact>
+
+    <artifact path="src/components/email/ThreadDetailView.tsx" relevance="high">
+      <description>Thread detail view - needs reading scope shortcuts</description>
+      <integration-points>
+        <point>Has handleArchive, handleDelete, handleToggleRead actions</point>
+        <point>Need to add r (reply), a (reply-all), f (forward) shortcuts</point>
+        <point>Need to set 'reading' scope when component mounts</point>
+      </integration-points>
+    </artifact>
+
+    <artifact path="src/components/email/EmailList.tsx" relevance="high">
+      <description>Email list with virtual scrolling</description>
+      <integration-points>
+        <point>Need to add j/k navigation for up/down selection</point>
+        <point>Need to integrate with useSelectionStore</point>
+        <point>Need to set 'inbox' scope when mounted</point>
+      </integration-points>
+    </artifact>
+
+    <artifact path="src/components/compose/ComposeDialog.tsx" relevance="medium">
+      <description>Compose dialog - needs compose scope shortcuts</description>
+      <integration-points>
+        <point>Need Cmd+Enter to send</point>
+        <point>Need to set 'compose' scope when open</point>
+        <point>Escape should close dialog</point>
+      </integration-points>
+    </artifact>
+
+    <artifact path="src/utils/lazyPreload.ts" relevance="medium">
+      <description>Lazy loading utilities for components</description>
+      <integration-points>
+        <point>Use for ShortcutOverlay lazy loading</point>
+        <point>Pattern already used for ComposeDialog and CommandPalette</point>
+      </integration-points>
+    </artifact>
+
+    <artifact path="src/utils/performance/benchmark.ts" relevance="medium">
+      <description>Performance benchmarking utilities</description>
+      <integration-points>
+        <point>Use measureAsync for shortcut response time validation</point>
+        <point>Target: &lt;16ms (1 frame at 60fps)</point>
+      </integration-points>
+    </artifact>
+
+    <artifact path="src/store/emailStore.ts" relevance="high">
+      <description>Email Zustand store with actions</description>
+      <integration-points>
+        <point>Has archiveEmail, deleteEmail, toggleReadStatus</point>
+        <point>Has selectedEmailId for current selection</point>
+        <point>Need to add navigation state for j/k</point>
+      </integration-points>
+    </artifact>
+
+    <artifact path="src/store/selectionStore.ts" relevance="high">
+      <description>Selection store for multi-select</description>
+      <integration-points>
+        <point>Has selectedIds Set for multi-selection</point>
+        <point>Used by useEmailKeyboardShortcuts for bulk actions</point>
+      </integration-points>
+    </artifact>
+  </existing-code-artifacts>
+
+  <dependencies>
+    <dependency name="react-hotkeys-hook" version="^4.5.0" status="to-install" priority="critical">
+      <purpose>Primary keyboard shortcut library - hook-based API, scope management, TypeScript native</purpose>
+      <installation>npm install react-hotkeys-hook</installation>
+      <size>~3-4KB gzipped</size>
+    </dependency>
+    <dependency name="focus-trap-react" version="^10.2.3" status="to-install" priority="high">
+      <purpose>Focus trap for shortcut overlay and modals (accessibility)</purpose>
+      <installation>npm install focus-trap-react</installation>
+      <size>~5KB gzipped</size>
+    </dependency>
+    <dependency name="zustand" version="5.0.8" status="installed">
+      <purpose>State management for shortcut preferences and Vim mode toggle</purpose>
+    </dependency>
+    <dependency name="lucide-react" version="0.552.0" status="installed">
+      <purpose>Icons for shortcut overlay UI</purpose>
+    </dependency>
+  </dependencies>
+
+  <files-to-create>
+    <file path="src/context/ShortcutContext.tsx">
+      <purpose>Centralized shortcut state management with scope switching</purpose>
+      <exports>ShortcutProvider, useShortcuts</exports>
+    </file>
+    <file path="src/hooks/useEmailShortcut.ts">
+      <purpose>Custom hook wrapping react-hotkeys-hook with scope awareness</purpose>
+      <exports>useEmailShortcut</exports>
+    </file>
+    <file path="src/hooks/useShortcuts.ts">
+      <purpose>Context consumer hook for accessing shortcut state</purpose>
+      <exports>useShortcuts</exports>
+    </file>
+    <file path="src/types/shortcuts.ts">
+      <purpose>TypeScript interfaces for shortcut scopes and configs</purpose>
+      <exports>ShortcutScope, ShortcutConfig, ShortcutContextType</exports>
+    </file>
+    <file path="src/components/ShortcutOverlay/ShortcutOverlay.tsx">
+      <purpose>? key overlay showing all shortcuts grouped by scope</purpose>
+      <exports>ShortcutOverlay</exports>
+    </file>
+    <file path="src/services/shortcutPreferences.ts">
+      <purpose>LocalStorage service for Vim mode and custom bindings</purpose>
+      <exports>shortcutPreferencesService</exports>
+    </file>
+  </files-to-create>
+
+  <files-to-modify>
+    <file path="src/App.tsx">
+      <changes>
+        <change>Wrap with ShortcutProvider at root</change>
+        <change>Replace inline keyboard handler with useEmailShortcut hooks</change>
+        <change>Add ShortcutOverlay component (lazy-loaded)</change>
+      </changes>
+    </file>
+    <file path="src/hooks/useEmailKeyboardShortcuts.ts">
+      <changes>
+        <change>Refactor to use react-hotkeys-hook internally</change>
+        <change>Add j/k navigation shortcuts</change>
+        <change>Add r/a/f action shortcuts</change>
+        <change>Add scope awareness (inbox vs reading)</change>
+      </changes>
+    </file>
+    <file path="src/components/email/ThreadDetailView.tsx">
+      <changes>
+        <change>Add useShortcuts() to set 'reading' scope on mount</change>
+        <change>Add r/a/f shortcuts for reply/reply-all/forward</change>
+      </changes>
+    </file>
+    <file path="src/components/email/EmailList.tsx">
+      <changes>
+        <change>Add useShortcuts() to set 'inbox' scope on mount</change>
+        <change>Add j/k navigation with VirtualEmailList integration</change>
+        <change>Add Enter to open selected email</change>
+        <change>Add Escape to deselect</change>
+      </changes>
+    </file>
+    <file path="src/components/compose/ComposeDialog.tsx">
+      <changes>
+        <change>Add useShortcuts() to set 'compose' scope when open</change>
+        <change>Add Cmd+Enter to send shortcut</change>
+      </changes>
+    </file>
+    <file path="src/components/search/CommandPalette.tsx">
+      <changes>
+        <change>Add all action commands (archive, delete, reply, etc.)</change>
+        <change>Display shortcut hints next to each command</change>
+      </changes>
+    </file>
+  </files-to-modify>
+
+  <testing-approach>
+    <unit-tests framework="Vitest">
+      <test-file path="src/context/__tests__/ShortcutContext.test.tsx">
+        <scenarios>
+          <scenario>Provider initializes with default scope</scenario>
+          <scenario>Scope switching works correctly</scenario>
+          <scenario>Custom bindings persist to localStorage</scenario>
+        </scenarios>
+      </test-file>
+      <test-file path="src/hooks/__tests__/useEmailShortcut.test.ts">
+        <scenarios>
+          <scenario>Shortcut only fires in correct scope</scenario>
+          <scenario>Shortcuts disabled in input fields</scenario>
+          <scenario>Custom bindings override defaults</scenario>
+        </scenarios>
+      </test-file>
+      <test-file path="src/components/ShortcutOverlay/__tests__/ShortcutOverlay.test.tsx">
+        <scenarios>
+          <scenario>Opens with ? key</scenario>
+          <scenario>Closes with Escape</scenario>
+          <scenario>Shows shortcuts grouped by scope</scenario>
+          <scenario>Search filters shortcuts</scenario>
+          <scenario>Focus trap works correctly</scenario>
+        </scenarios>
+      </test-file>
+    </unit-tests>
+    <integration-tests framework="Vitest">
+      <test-file path="src/hooks/__tests__/useEmailKeyboardShortcuts.integration.test.ts">
+        <scenarios>
+          <scenario>j/k navigation moves selection</scenario>
+          <scenario>e archives selected email</scenario>
+          <scenario>r opens reply compose</scenario>
+          <scenario>Scope transitions work (inbox -> reading -> compose)</scenario>
+        </scenarios>
+      </test-file>
+    </integration-tests>
+    <e2e-tests framework="Playwright">
+      <test-file path="e2e/keyboard-shortcuts.spec.ts">
+        <scenarios>
+          <scenario>Navigate email list with j/k</scenario>
+          <scenario>Open email with Enter, back with Escape</scenario>
+          <scenario>Archive with e, verify undo toast</scenario>
+          <scenario>Open command palette with Cmd+K</scenario>
+          <scenario>Show overlay with ?, close with Escape</scenario>
+          <scenario>Vim mode toggle in settings</scenario>
+        </scenarios>
+      </test-file>
+    </e2e-tests>
+    <performance-tests>
+      <test-file path="src/hooks/__tests__/shortcuts.perf.test.ts">
+        <scenarios>
+          <scenario>Shortcut response time &lt;16ms</scenario>
+          <scenario>No memory leaks over 1000 mount/unmount cycles</scenario>
+        </scenarios>
+      </test-file>
+    </performance-tests>
+    <accessibility-tests>
+      <test-file path="src/components/ShortcutOverlay/__tests__/ShortcutOverlay.a11y.test.tsx">
+        <scenarios>
+          <scenario>Focus trap keeps focus within overlay</scenario>
+          <scenario>ARIA labels on all interactive elements</scenario>
+          <scenario>Screen reader announces shortcut actions</scenario>
+        </scenarios>
+      </test-file>
+    </accessibility-tests>
+  </testing-approach>
+
+  <implementation-constraints>
+    <constraint type="performance">
+      <description>Shortcut response time must be &lt;16ms (1 frame at 60fps)</description>
+      <validation>Use src/utils/performance/benchmark.ts to measure</validation>
+    </constraint>
+    <constraint type="accessibility">
+      <description>WCAG AA compliance required</description>
+      <requirements>
+        <req>Focus trap for overlay (WCAG 2.4.3)</req>
+        <req>Visible focus indicators (WCAG 2.4.7)</req>
+        <req>ARIA labels for shortcuts (WCAG 2.4.6)</req>
+        <req>Skip links for keyboard users (WCAG 2.4.1)</req>
+      </requirements>
+    </constraint>
+    <constraint type="bundle-size">
+      <description>Total shortcut system overhead &lt;15KB gzipped</description>
+      <breakdown>
+        <item>react-hotkeys-hook: ~3-4KB</item>
+        <item>focus-trap-react: ~5KB</item>
+        <item>Custom code: ~2-3KB</item>
+      </breakdown>
+    </constraint>
+    <constraint type="compatibility">
+      <description>Must not conflict with browser shortcuts</description>
+      <examples>
+        <example>Cmd+C/V/X for copy/paste/cut</example>
+        <example>Cmd+F for browser find (use cmd+f for in-email only)</example>
+        <example>Cmd+W for close tab</example>
+      </examples>
+    </constraint>
+  </implementation-constraints>
+
+  <scope-definitions>
+    <scope name="global" priority="1">
+      <description>Always active shortcuts</description>
+      <shortcuts>
+        <shortcut key="?" action="Show shortcuts overlay" />
+        <shortcut key="/" action="Focus search" />
+        <shortcut key="cmd+k" action="Open command palette" />
+        <shortcut key="c" action="Compose new email" />
+      </shortcuts>
+    </scope>
+    <scope name="inbox" priority="2">
+      <description>Active when email list is focused</description>
+      <shortcuts>
+        <shortcut key="j" action="Select next email" />
+        <shortcut key="k" action="Select previous email" />
+        <shortcut key="x" action="Toggle selection" />
+        <shortcut key="enter" action="Open selected email" />
+        <shortcut key="e" action="Archive" />
+        <shortcut key="#" action="Delete" />
+        <shortcut key="s" action="Star/unstar" />
+        <shortcut key="g+i" action="Go to Inbox" />
+        <shortcut key="g+s" action="Go to Starred" />
+        <shortcut key="g+t" action="Go to Sent" />
+        <shortcut key="g+d" action="Go to Drafts" />
+      </shortcuts>
+    </scope>
+    <scope name="reading" priority="3">
+      <description>Active when viewing email/thread</description>
+      <shortcuts>
+        <shortcut key="escape" action="Back to inbox" />
+        <shortcut key="r" action="Reply" />
+        <shortcut key="a" action="Reply all" />
+        <shortcut key="f" action="Forward" />
+        <shortcut key="e" action="Archive" />
+        <shortcut key="#" action="Delete" />
+        <shortcut key="shift+i" action="Mark read" />
+        <shortcut key="shift+u" action="Mark unread" />
+        <shortcut key="n" action="Next message in thread" />
+        <shortcut key="p" action="Previous message in thread" />
+      </shortcuts>
+    </scope>
+    <scope name="compose" priority="4">
+      <description>Active when compose dialog is open (highest priority)</description>
+      <shortcuts>
+        <shortcut key="cmd+enter" action="Send email" />
+        <shortcut key="cmd+shift+c" action="Add CC" />
+        <shortcut key="cmd+shift+b" action="Add BCC" />
+        <shortcut key="escape" action="Close compose (with confirmation)" />
+      </shortcuts>
+    </scope>
+    <scope name="search" priority="3">
+      <description>Active when search/command palette is open</description>
+      <shortcuts>
+        <shortcut key="escape" action="Close search" />
+        <shortcut key="up" action="Previous result" />
+        <shortcut key="down" action="Next result" />
+        <shortcut key="enter" action="Select result" />
+      </shortcuts>
+    </scope>
+  </scope-definitions>
+
+  <vim-mode-extensions>
+    <description>Optional Vim-style shortcuts when enabled in settings</description>
+    <shortcuts>
+      <shortcut key="h" action="Collapse thread/go back" />
+      <shortcut key="l" action="Expand thread/open" />
+      <shortcut key="gg" action="Go to top of list" />
+      <shortcut key="G" action="Go to bottom of list" />
+      <shortcut key="ctrl+d" action="Page down" />
+      <shortcut key="ctrl+u" action="Page up" />
+    </shortcuts>
+    <storage>localStorage key: claine_vim_mode_enabled</storage>
+  </vim-mode-extensions>
+
+  <related-stories>
+    <story id="2.5" status="done" relevance="high">
+      <title>Local Full-Text Search</title>
+      <learnings>CommandPalette already exists with keyboard navigation</learnings>
+    </story>
+    <story id="2.6" status="done" relevance="high">
+      <title>Email Actions (Archive, Delete, Mark Read/Unread)</title>
+      <learnings>useEmailKeyboardShortcuts hook exists with e/#/u shortcuts</learnings>
+    </story>
+    <story id="2.10" status="done" relevance="high">
+      <title>Performance Optimization Benchmarking</title>
+      <learnings>
+        Performance utilities available at src/utils/performance/benchmark.ts.
+        Lazy loading patterns at src/utils/lazyPreload.ts.
+        Memoization patterns in EmailListItem.tsx.
+        NFR001 target: &lt;50ms input latency.
+      </learnings>
+    </story>
+  </related-stories>
+
+  <dev-agent-guidance>
+    <priority-order>
+      <step order="1">Install react-hotkeys-hook and focus-trap-react</step>
+      <step order="2">Create ShortcutContext and types (Task 1)</step>
+      <step order="3">Implement scope management (Task 2)</step>
+      <step order="4">Refactor existing shortcuts to use new system</step>
+      <step order="5">Add navigation shortcuts j/k (Task 3)</step>
+      <step order="6">Add action shortcuts r/a/f (Task 4)</step>
+      <step order="7">Build command palette enhancements (Task 5)</step>
+      <step order="8">Create ShortcutOverlay (Task 6)</step>
+      <step order="9">Implement search shortcuts (Task 7)</step>
+      <step order="10">Add Vim mode option (Task 8)</step>
+      <step order="11">Accessibility audit and fixes (Task 9)</step>
+      <step order="12">Write tests and benchmark (Task 10)</step>
+    </priority-order>
+
+    <critical-patterns>
+      <pattern name="Scope Priority">
+        compose (4) > reading (3) / search (3) > inbox (2) > global (1).
+        Higher priority scope shortcuts override lower priority.
+      </pattern>
+      <pattern name="Input Field Detection">
+        Use enableOnFormTags: false in react-hotkeys-hook options.
+        Check target instanceof HTMLInputElement/HTMLTextAreaElement/isContentEditable.
+      </pattern>
+      <pattern name="Cleanup">
+        All hooks must return cleanup functions.
+        Use useEffect return for event listener removal.
+      </pattern>
+      <pattern name="Performance">
+        Memoize callbacks with useCallback.
+        Use refs for callback storage to avoid re-registration.
+        Measure with performance.now() and warn if >16ms.
+      </pattern>
+    </critical-patterns>
+
+    <avoid-pitfalls>
+      <pitfall>Do NOT use useHotkeys in render - only in useEffect or custom hooks</pitfall>
+      <pitfall>Do NOT block browser shortcuts like Cmd+C/V/X</pitfall>
+      <pitfall>Do NOT forget to clean up event listeners on unmount</pitfall>
+      <pitfall>Do NOT ignore scope context when registering shortcuts</pitfall>
+      <pitfall>Do NOT fire shortcuts when user is typing in input fields</pitfall>
+    </avoid-pitfalls>
+  </dev-agent-guidance>
+</story-context>

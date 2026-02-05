@@ -3,13 +3,17 @@
  *
  * Epic 3: Offline-First Modifier Architecture
  * Story 3.1: Core Modifier Infrastructure
+ * Story 2.19: Parallel Action Queue Processing
  *
  * Processes pending modifiers when online with retry logic.
  *
  * Key Features:
  * - Online/offline detection
  * - Exponential backoff retry (1s, 5s, 30s, 60s)
- * - Per-entity queue processing (maintains ordering)
+ * - Per-thread queue processing (maintains ordering within thread)
+ * - Configurable parallel processing across independent threads (default: 4)
+ * - Rate limiter integration with dynamic concurrency reduction
+ * - Error isolation — failures in one worker don't affect others
  * - Automatic retry on network recovery
  * - Rollback on permanent failure
  *
@@ -26,7 +30,13 @@ import { logger } from '@/services/logger'
 import { modifierQueue } from './modifierQueue'
 import { modifierFactory } from './modifierFactory'
 import type { ModifierDocument, ModifierQueueEvent } from './types'
-import { RETRY_DELAYS, MAX_ATTEMPTS } from './types'
+import { RETRY_DELAYS, MAX_ATTEMPTS, PARALLEL_ACTION_CONCURRENCY } from './types'
+import { circuitBreaker } from '@/services/sync/circuitBreaker'
+import {
+  createGmailRateLimiter,
+  createOutlookRateLimiter,
+  type RateLimiter,
+} from '@/services/sync/rateLimiter'
 
 /**
  * Processor event types
@@ -38,12 +48,14 @@ export type ProcessorEvent =
   | { type: 'processing-completed'; successful: number; failed: number }
   | { type: 'modifier-synced'; modifierId: string }
   | { type: 'modifier-failed'; modifierId: string; error: string }
+  | { type: 'throttle-change'; concurrency: number; reason: string }
 
 /**
  * Modifier Processor Service
  *
  * Singleton service that processes modifiers when online.
  * Handles retry logic with exponential backoff.
+ * Story 2.19: Supports configurable parallel processing with thread-level grouping.
  */
 export class ModifierProcessor {
   private static instance: ModifierProcessor
@@ -54,6 +66,15 @@ export class ModifierProcessor {
   private retryTimers = new Map<string, ReturnType<typeof setTimeout>>()
   private queueSubscription: Subscription | null = null
   private initialized = false
+
+  /** Configurable max concurrency (Story 2.19) */
+  private _maxConcurrency: number = PARALLEL_ACTION_CONCURRENCY
+
+  /** Current effective concurrency (may be reduced by rate limiter) */
+  private _effectiveConcurrency: number = PARALLEL_ACTION_CONCURRENCY
+
+  /** Per-provider rate limiters (Story 2.19 Task 4) */
+  private rateLimiters: Map<string, RateLimiter> = new Map()
 
   private constructor() {
     // Set up network listeners
@@ -92,6 +113,67 @@ export class ModifierProcessor {
   }
 
   /**
+   * Get the current concurrency level (Story 2.19 Task 1.5)
+   */
+  get concurrencyLevel(): number {
+    return this._effectiveConcurrency
+  }
+
+  /**
+   * Get the number of currently active processing operations
+   */
+  get activeCount(): number {
+    return this.processingIds.size
+  }
+
+  /**
+   * Get the rate limiter for a provider (Task 4.1)
+   * Creates one lazily if it doesn't exist.
+   */
+  private getRateLimiter(provider: string): RateLimiter {
+    let limiter = this.rateLimiters.get(provider)
+    if (!limiter) {
+      limiter = provider === 'outlook' ? createOutlookRateLimiter() : createGmailRateLimiter()
+      this.rateLimiters.set(provider, limiter)
+    }
+    return limiter
+  }
+
+  /**
+   * Check and adjust concurrency based on rate limiter usage (Task 4.2, 4.3)
+   */
+  private adjustConcurrencyForRateLimit(provider: string): void {
+    const limiter = this.getRateLimiter(provider)
+    const usage = limiter.getCurrentUsage()
+
+    if (usage > 80 && this._effectiveConcurrency === this._maxConcurrency) {
+      // Reduce concurrency when rate limit is high
+      this._effectiveConcurrency = Math.max(2, Math.floor(this._maxConcurrency / 2))
+      this.events$.next({
+        type: 'throttle-change',
+        concurrency: this._effectiveConcurrency,
+        reason: `Rate limit at ${usage.toFixed(0)}%, reducing concurrency`,
+      })
+      logger.warn('modifier-processor', 'Reducing concurrency due to rate limit', {
+        usage,
+        newConcurrency: this._effectiveConcurrency,
+      })
+    } else if (usage < 60 && this._effectiveConcurrency < this._maxConcurrency) {
+      // Restore concurrency when usage drops
+      this._effectiveConcurrency = this._maxConcurrency
+      this.events$.next({
+        type: 'throttle-change',
+        concurrency: this._effectiveConcurrency,
+        reason: `Rate limit at ${usage.toFixed(0)}%, restoring concurrency`,
+      })
+      logger.info('modifier-processor', 'Restoring concurrency', {
+        usage,
+        restoredConcurrency: this._effectiveConcurrency,
+      })
+    }
+  }
+
+  /**
    * Initialize the processor
    * Call this on app startup after database is initialized
    */
@@ -118,9 +200,12 @@ export class ModifierProcessor {
   /**
    * Process all pending modifiers
    *
-   * @param maxConcurrent - Maximum number of concurrent syncs per entity
+   * Story 2.19: Groups by threadId (falling back to entityId) and processes
+   * independent groups in parallel up to maxConcurrency.
+   *
+   * @param maxConcurrency - Maximum number of concurrent group processing (default: PARALLEL_ACTION_CONCURRENCY)
    */
-  async processQueue(maxConcurrent = 1): Promise<void> {
+  async processQueue(maxConcurrency?: number): Promise<void> {
     if (!this.online) {
       logger.debug('modifier-processor', 'Skipping processing - offline')
       return
@@ -131,6 +216,12 @@ export class ModifierProcessor {
       return
     }
 
+    // Apply provided concurrency or use configured value
+    if (maxConcurrency !== undefined) {
+      this._maxConcurrency = maxConcurrency
+      this._effectiveConcurrency = maxConcurrency
+    }
+
     this.processing = true
     const pending = modifierQueue.getAllPendingModifiers()
 
@@ -139,49 +230,73 @@ export class ModifierProcessor {
       return
     }
 
-    logger.info('modifier-processor', 'Processing queue', { count: pending.length })
+    logger.info('modifier-processor', 'Processing queue', {
+      count: pending.length,
+      concurrency: this._effectiveConcurrency,
+    })
     this.events$.next({ type: 'processing-started', count: pending.length })
 
     let successful = 0
     let failed = 0
 
-    // Group modifiers by entity to maintain per-entity ordering
-    const byEntity = new Map<string, ModifierDocument[]>()
+    // Group modifiers by thread (Story 2.19 Task 2.3, 2.4)
+    // Use threadId for grouping; fall back to entityId if threadId is not set
+    const byGroup = new Map<string, ModifierDocument[]>()
     for (const mod of pending) {
-      const existing = byEntity.get(mod.entityId) || []
+      const groupKey = mod.threadId ?? mod.entityId
+      const existing = byGroup.get(groupKey) || []
       existing.push(mod)
-      byEntity.set(mod.entityId, existing)
+      byGroup.set(groupKey, existing)
     }
 
-    // Process each entity's queue
-    const processingPromises: Promise<void>[] = []
+    // Process groups with bounded concurrency using a semaphore pattern (Task 1.3)
+    const groupEntries = Array.from(byGroup.values())
+    let groupIndex = 0
 
-    for (const modifiers of byEntity.values()) {
-      // Process modifiers for this entity sequentially (to maintain order)
-      const entityPromise = (async () => {
+    const worker = async () => {
+      while (groupIndex < groupEntries.length) {
+        const idx = groupIndex++
+        const modifiers = groupEntries[idx]
+
+        // Process modifiers for this group sequentially (Task 1.4 — FIFO within group)
         for (const modifier of modifiers) {
           // Skip if already processing
           if (this.processingIds.has(modifier.id)) continue
 
+          // Check rate limit and adjust concurrency (Task 4.2, 4.3)
+          this.adjustConcurrencyForRateLimit(modifier.provider)
+
+          // Check circuit breaker before processing (Task 5.4)
+          if (!circuitBreaker.canExecute(modifier.provider)) {
+            logger.warn('modifier-processor', 'Circuit breaker open, skipping modifier', {
+              id: modifier.id,
+              provider: modifier.provider,
+            })
+            failed++
+            continue
+          }
+
           try {
+            // Acquire rate limiter token before persist (Task 4.1)
+            const limiter = this.getRateLimiter(modifier.provider)
+            await limiter.acquireAndWait(1)
+
             await this.processModifier(modifier)
+            circuitBreaker.recordSuccess(modifier.provider)
             successful++
           } catch {
+            circuitBreaker.recordFailure(modifier.provider)
             failed++
+            // Error is handled inside processModifier — do not propagate (Task 5.1)
           }
         }
-      })()
-
-      processingPromises.push(entityPromise)
-
-      // Limit concurrent entity processing
-      if (processingPromises.length >= maxConcurrent * 5) {
-        await Promise.race(processingPromises)
       }
     }
 
-    // Wait for all processing to complete
-    await Promise.all(processingPromises)
+    // Spawn workers up to effective concurrency (Task 1.3)
+    const workerCount = Math.min(this._effectiveConcurrency, groupEntries.length)
+    const workers = Array.from({ length: workerCount }, () => worker())
+    await Promise.all(workers)
 
     this.processing = false
     this.events$.next({ type: 'processing-completed', successful, failed })
@@ -383,6 +498,22 @@ export class ModifierProcessor {
       ModifierProcessor.instance.events$.complete()
     }
     ModifierProcessor.instance = null as unknown as ModifierProcessor
+  }
+
+  /**
+   * Expose internals for testing and dev mode (Story 2.19 Task 7.2)
+   * @internal
+   */
+  __getTestState(): {
+    concurrency: number
+    activeCount: number
+    queueLength: number
+  } {
+    return {
+      concurrency: this._effectiveConcurrency,
+      activeCount: this.processingIds.size,
+      queueLength: modifierQueue.getPendingCount(),
+    }
   }
 }
 

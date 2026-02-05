@@ -1,0 +1,211 @@
+<story-context id="2-9-email-folders-labels" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>9</storyId>
+    <title>Email Folders &amp; Labels</title>
+    <status>drafted</status>
+    <generatedAt>2025-12-08</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/2-9-email-folders-labels.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>user</asA>
+    <iWant>to organize emails with folders or labels</iWant>
+    <soThat>I can categorize my messages</soThat>
+    <tasks>
+      <task id="1" title="Folder Sidebar Component" ac="1,5">
+        <subtask id="1.1">Create FolderSidebar.tsx component in src/components/email/</subtask>
+        <subtask id="1.2">Implement standard folder list (Inbox, Sent, Drafts, Archive, Trash)</subtask>
+        <subtask id="1.3">Display unread count badge for each folder</subtask>
+        <subtask id="1.4">Add folder selection state with active folder highlighting</subtask>
+        <subtask id="1.5">Persist selected folder to localStorage/Zustand on app restart</subtask>
+        <subtask id="1.6">Add folder icons using lucide-react</subtask>
+      </task>
+      <task id="2" title="Gmail Labels Sync" ac="2">
+        <subtask id="2.1">Create labelService.ts in src/services/email/</subtask>
+        <subtask id="2.2">Implement Gmail API labels.list() to fetch user labels</subtask>
+        <subtask id="2.3">Map Gmail system labels to standard folders (INBOX, SENT, DRAFT, TRASH)</subtask>
+        <subtask id="2.4">Store labels in RxDB (extend sync state or create labels collection)</subtask>
+        <subtask id="2.5">Display user-created Gmail labels in sidebar below standard folders</subtask>
+        <subtask id="2.6">Handle label colors from Gmail API</subtask>
+      </task>
+      <task id="3" title="Outlook Folders Sync" ac="3">
+        <subtask id="3.1">Implement Outlook Graph API /mailFolders endpoint fetch</subtask>
+        <subtask id="3.2">Map Outlook well-known folders to standard folders</subtask>
+        <subtask id="3.3">Store Outlook folders in same structure as Gmail labels</subtask>
+        <subtask id="3.4">Display Outlook folders in sidebar with proper hierarchy</subtask>
+      </task>
+      <task id="4" title="Move Emails Between Folders/Labels" ac="4">
+        <subtask id="4.1">Create useMoveToFolder hook for managing move operations</subtask>
+        <subtask id="4.2">Add Move to dropdown/menu to email list and thread view</subtask>
+        <subtask id="4.3">Implement Gmail API messages.modify() to add/remove labels</subtask>
+        <subtask id="4.4">Implement Outlook Graph API move endpoint</subtask>
+        <subtask id="4.5">Update local RxDB email records with new folder/label</subtask>
+        <subtask id="4.6">Show optimistic UI update while API call in progress</subtask>
+        <subtask id="4.7">Queue move operations for offline mode</subtask>
+      </task>
+      <task id="5" title="Filter Emails by Folder/Label" ac="1,2,3,5">
+        <subtask id="5.1">Update email list query to filter by selected folder/label</subtask>
+        <subtask id="5.2">Update useEmailList hook to accept folder filter parameter</subtask>
+        <subtask id="5.3">Calculate unread counts per folder from RxDB queries</subtask>
+        <subtask id="5.4">Implement reactive unread count updates when emails change</subtask>
+      </task>
+      <task id="6" title="Testing" ac="1-6">
+        <subtask id="6.1">Unit tests for labelService (Gmail and Outlook)</subtask>
+        <subtask id="6.2">Component tests for FolderSidebar</subtask>
+        <subtask id="6.3">Hook tests for useMoveToFolder</subtask>
+        <subtask id="6.4">Integration tests for folder filtering</subtask>
+        <subtask id="6.5">E2E test for folder navigation and email move</subtask>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">Sidebar shows standard folders (Inbox, Sent, Drafts, Archive, Trash)</criterion>
+    <criterion id="2">Gmail labels synced and displayed</criterion>
+    <criterion id="3">Outlook folders synced and displayed</criterion>
+    <criterion id="4">User can move emails between folders/labels</criterion>
+    <criterion id="5">Unread count displayed per folder</criterion>
+    <criterion id="6">Folder selection persists across app restarts</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/architecture.md" title="Architecture Document" section="Email Schema">
+        Email schema has folder (string) and labels (string[]) fields. Indexes on [accountId+timestamp] exist. RxDB reactive queries enable auto-updating unread counts.
+      </doc>
+      <doc path="docs/PRD.md" title="Product Requirements Document" section="FR006-FR010">
+        FR006: Store all email data locally in persistent queryable store. FR007: Full read/write functionality offline. FR008: Local full-text search under 100ms.
+      </doc>
+      <doc path="docs/epics/epic-2-offline-first-email-client-with-attributes.md" title="Epic 2" section="Story 2.9">
+        Story acceptance criteria, prerequisites (Story 2.6), and value delivery for folder/label organization.
+      </doc>
+      <doc path="docs/testing.md" title="Testing Infrastructure" section="Test Structure">
+        Test tags (@oauth, @rxdb, @sync), mock servers, performance thresholds. Unit tests in __tests__ folders, E2E in e2e/ folder.
+      </doc>
+    </docs>
+
+    <code>
+      <file path="src/services/database/schemas/email.schema.ts" kind="schema" symbol="EmailDocument, emailSchema">
+        <lines>65-66, 268-279, 369-374</lines>
+        <reason>Email schema defines folder (string) and labels (string[]) fields. Index on folder exists at line 373. Core schema for folder filtering.</reason>
+      </file>
+      <file path="src/services/email/gmailActionsService.ts" kind="service" symbol="GmailActionsService">
+        <lines>159-179, 248-268</lines>
+        <reason>Gmail API patterns for messages.modify() with addLabelIds/removeLabelIds. Token refresh pattern. Use for move operations (Task 4.3).</reason>
+      </file>
+      <file path="src/services/email/attachmentService.ts" kind="service" symbol="AttachmentService">
+        <lines>90-114, 127-206</lines>
+        <reason>Singleton service pattern with provider-agnostic interface. Token refresh on 401 pattern. Reference for labelService.ts structure.</reason>
+      </file>
+      <file path="src/hooks/useEmails.ts" kind="hook" symbol="useEmails, UseEmailsOptions">
+        <lines>11-16, 29-101</lines>
+        <reason>Existing hook accepts folder filter parameter. RxDB reactive query pattern. Extend for folder filtering (Task 5.2).</reason>
+      </file>
+      <file path="src/store/emailStore.ts" kind="store" symbol="useEmailStore">
+        <reason>Zustand store for email state. Pattern reference for folder selection state persistence.</reason>
+      </file>
+      <file path="src/store/settingsStore.ts" kind="store" symbol="useSettingsStore">
+        <reason>Settings persistence pattern using Zustand with localStorage. Reference for folder selection persistence (Task 1.5).</reason>
+      </file>
+      <file path="src/components/email/EmailList.tsx" kind="component" symbol="EmailList">
+        <reason>Email list component. Add folder filter integration and Move to menu (Task 4.2).</reason>
+      </file>
+      <file path="src/components/email/ThreadDetailView.tsx" kind="component" symbol="ThreadDetailView">
+        <reason>Thread view component. Add Move to action button (Task 4.2).</reason>
+      </file>
+      <file path="src/components/email/EmailActionBar.tsx" kind="component" symbol="EmailActionBar">
+        <reason>Action bar with archive/delete buttons. Add Move to dropdown here (Task 4.2).</reason>
+      </file>
+      <file path="src/services/email/emailActionQueue.ts" kind="service" symbol="IActionSyncProvider, emailActionQueue">
+        <reason>Action queue pattern for offline operations. Reference for queueing move operations (Task 4.7).</reason>
+      </file>
+      <file path="src/services/sync/gmailSync.ts" kind="service" symbol="GmailSyncService">
+        <reason>Gmail sync patterns. May need to sync labels during initial sync.</reason>
+      </file>
+      <file path="src/services/sync/outlookSync.ts" kind="service" symbol="OutlookSyncService">
+        <reason>Outlook sync patterns. May need to sync folders during initial sync.</reason>
+      </file>
+    </code>
+
+    <dependencies>
+      <npm>
+        <package name="rxdb" version="^16.20.0">Local-first database with reactive queries</package>
+        <package name="rxjs" version="^7.8.2">Reactive extensions for RxDB subscriptions</package>
+        <package name="zustand" version="^5.0.8">State management for folder selection persistence</package>
+        <package name="lucide-react" version="^0.552.0">Icons for folder sidebar (Inbox, Folder, Send, etc.)</package>
+        <package name="@tanstack/react-virtual" version="^3.13.12">Virtualization if label list grows large</package>
+      </npm>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="pattern">Follow singleton service pattern from attachmentService.ts for labelService.ts</constraint>
+    <constraint type="pattern">Use IActionSyncProvider interface pattern for move operations</constraint>
+    <constraint type="pattern">Token refresh with 401 retry pattern from gmailActionsService</constraint>
+    <constraint type="architecture">Services in src/services/email/, hooks in src/hooks/, components in src/components/email/</constraint>
+    <constraint type="architecture">Store state with Zustand, persist to localStorage for folder selection</constraint>
+    <constraint type="testing">Unit tests colocated in __tests__ folders, E2E tests in e2e/ folder</constraint>
+    <constraint type="performance">RxDB queries should use existing indexes. folder field is already indexed.</constraint>
+    <constraint type="offline">Queue move operations for offline mode using emailActionQueue pattern</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface name="Gmail Labels API" kind="REST">
+      <signature>GET https://gmail.googleapis.com/gmail/v1/users/me/labels</signature>
+      <response>{ labels: [{ id, name, type, labelListVisibility, messageListVisibility, color }] }</response>
+      <path>Reference: https://developers.google.com/gmail/api/reference/rest/v1/users.labels</path>
+    </interface>
+    <interface name="Gmail Modify Labels" kind="REST">
+      <signature>POST https://gmail.googleapis.com/gmail/v1/users/me/messages/{id}/modify</signature>
+      <body>{ addLabelIds: string[], removeLabelIds: string[] }</body>
+      <path>src/services/email/gmailActionsService.ts:159-179</path>
+    </interface>
+    <interface name="Outlook Mail Folders API" kind="REST">
+      <signature>GET https://graph.microsoft.com/v1.0/me/mailFolders</signature>
+      <response>{ value: [{ id, displayName, parentFolderId, childFolderCount, unreadItemCount, totalItemCount }] }</response>
+      <path>Reference: https://learn.microsoft.com/en-us/graph/api/resources/mailfolder</path>
+    </interface>
+    <interface name="Outlook Move Message" kind="REST">
+      <signature>POST https://graph.microsoft.com/v1.0/me/messages/{id}/move</signature>
+      <body>{ destinationId: string }</body>
+      <path>Reference: https://learn.microsoft.com/en-us/graph/api/message-move</path>
+    </interface>
+    <interface name="UseEmailsOptions" kind="TypeScript">
+      <signature>interface UseEmailsOptions { accountId?: string; folder?: string; limit?: number; sortOrder?: 'asc' | 'desc' }</signature>
+      <path>src/hooks/useEmails.ts:11-16</path>
+    </interface>
+    <interface name="EmailDocument.folder" kind="TypeScript">
+      <signature>folder: string // Primary folder/label - indexed in RxDB</signature>
+      <path>src/services/database/schemas/email.schema.ts:66</path>
+    </interface>
+    <interface name="EmailDocument.labels" kind="TypeScript">
+      <signature>labels: string[] // Gmail labels or folder names</signature>
+      <path>src/services/database/schemas/email.schema.ts:65</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Unit tests use Vitest with @testing-library/react for components. E2E tests use Playwright. Test tags: @oauth, @rxdb, @sync for filtering. Mock servers available for OAuth and sync APIs. Performance thresholds: queries under 100ms (NFR001), single operations under 10ms.
+    </standards>
+    <locations>
+      <location>src/services/email/__tests__/labelService.test.ts (new)</location>
+      <location>src/hooks/__tests__/useMoveToFolder.test.ts (new)</location>
+      <location>src/components/email/__tests__/FolderSidebar.test.tsx (new)</location>
+      <location>e2e/folder-navigation.spec.ts (new)</location>
+    </locations>
+    <ideas>
+      <idea ac="1">Test FolderSidebar renders all 5 standard folders with correct icons</idea>
+      <idea ac="2">Test Gmail labels.list() returns labels and maps system labels correctly</idea>
+      <idea ac="3">Test Outlook mailFolders returns folders with hierarchy</idea>
+      <idea ac="4">Test useMoveToFolder updates local RxDB and queues API call</idea>
+      <idea ac="4">Test move operation shows optimistic UI then confirms</idea>
+      <idea ac="4">Test move operation queues when offline</idea>
+      <idea ac="5">Test unread counts update reactively when emails change</idea>
+      <idea ac="6">Test selected folder persists to localStorage and restores on mount</idea>
+      <idea ac="1-6">E2E: Navigate folders, move email, verify counts update</idea>
+    </ideas>
+  </tests>
+</story-context>

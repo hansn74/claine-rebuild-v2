@@ -27,7 +27,7 @@ export class ArchiveModifier extends BaseEmailModifier {
   private readonly currentFolder: string
 
   constructor(params: ArchiveModifierParams) {
-    super(params.entityId, params.accountId, params.provider)
+    super(params.entityId, params.accountId, params.provider, undefined, undefined, params.threadId)
     this.currentLabels = params.currentLabels
     this.currentFolder = params.currentFolder
   }
@@ -41,7 +41,8 @@ export class ArchiveModifier extends BaseEmailModifier {
     provider: ProviderType,
     payload: { currentLabels: string[]; currentFolder: string },
     id?: string,
-    createdAt?: number
+    createdAt?: number,
+    threadId?: string
   ): ArchiveModifier {
     const modifier = new ArchiveModifier({
       entityId,
@@ -49,6 +50,7 @@ export class ArchiveModifier extends BaseEmailModifier {
       provider,
       currentLabels: payload.currentLabels,
       currentFolder: payload.currentFolder,
+      threadId,
     })
     if (id) Object.assign(modifier, { id })
     if (createdAt) Object.assign(modifier, { createdAt })
@@ -140,7 +142,7 @@ export class UnarchiveModifier extends BaseEmailModifier {
   private readonly currentFolder: string
 
   constructor(params: ArchiveModifierParams) {
-    super(params.entityId, params.accountId, params.provider)
+    super(params.entityId, params.accountId, params.provider, undefined, undefined, params.threadId)
     this.currentLabels = params.currentLabels
     this.currentFolder = params.currentFolder
   }
@@ -154,7 +156,8 @@ export class UnarchiveModifier extends BaseEmailModifier {
     provider: ProviderType,
     payload: { currentLabels: string[]; currentFolder: string },
     id?: string,
-    createdAt?: number
+    createdAt?: number,
+    threadId?: string
   ): UnarchiveModifier {
     const modifier = new UnarchiveModifier({
       entityId,
@@ -162,6 +165,7 @@ export class UnarchiveModifier extends BaseEmailModifier {
       provider,
       currentLabels: payload.currentLabels,
       currentFolder: payload.currentFolder,
+      threadId,
     })
     if (id) Object.assign(modifier, { id })
     if (createdAt) Object.assign(modifier, { createdAt })

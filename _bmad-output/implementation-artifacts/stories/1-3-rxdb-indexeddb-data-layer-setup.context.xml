@@ -1,0 +1,215 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>3</storyId>
+    <title>RxDB + IndexedDB Data Layer Setup</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-07</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/1-3-rxdb-indexeddb-data-layer-setup.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>developer</asA>
+    <iWant>RxDB integrated with IndexedDB storage</iWant>
+    <soThat>we have offline-first local database capability</soThat>
+    <tasks>
+      - Install and configure RxDB with IndexedDB adapter (AC: 1)
+        - Install RxDB 16.20.0 and RxJS dependencies
+        - Install IndexedDB adapter package
+        - Configure TypeScript types for RxDB
+        - Test: Verify packages installed correctly
+      - Create database initialization service (AC: 2)
+        - Create src/services/database/init.ts for database setup
+        - Implement database creation with IndexedDB storage
+        - Add error handling for initialization failures
+        - Add database versioning for future migrations
+        - Test: Database initializes on first app launch
+      - Implement basic CRUD operations (AC: 3)
+        - Create src/services/database/crud.ts with CRUD methods
+        - Implement create() method with validation
+        - Implement read() method with query support
+        - Implement update() method with conflict detection
+        - Implement delete() method with soft delete option
+        - Test: All CRUD operations work correctly
+      - Implement reactive queries (AC: 4)
+        - Create src/services/database/reactive.ts for reactive query utilities
+        - Implement reactive query wrapper using RxDB observables
+        - Create React hook for subscribing to database changes
+        - Add automatic UI updates on data changes
+        - Test: UI updates when database changes occur
+      - Add database initialization on app launch (AC: 5)
+        - Integrate database initialization into app entry point (main.tsx/App.tsx)
+        - Add loading state during initialization
+        - Add error boundary for initialization failures
+        - Add initialization status to app state (Zustand)
+        - Test: Database initializes correctly on app startup
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    1. RxDB 16.20.0 installed and configured with IndexedDB adapter
+    2. Basic database initialization working
+    3. Basic CRUD operations working (create, read, update, delete)
+    4. Reactive queries functional (data changes trigger UI updates)
+    5. Database initialization on first app launch
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Decision Document</title>
+        <section>Executive Summary - Database Decision</section>
+        <snippet>RxDB 16.20.0 + IndexedDB for offline-first reactive database. Must handle 100K emails (~1.5GB) within browser quota with automatic migrations.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Decision Document</title>
+        <section>Starter Template Decision - Database Installation</section>
+        <snippet>Install rxdb@16.20.0 rxjs@latest. RxDB 16.20.0 published October 2025 with improved performance and migration support.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Decision Document</title>
+        <section>Executive Summary - State Management</section>
+        <snippet>Zustand 5.0.8 for app-level state (simpler than Redux, no boilerplate, excellent TypeScript support, 3KB bundle). RxDB handles data-layer reactivity via observables.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics/epic-1-foundation-core-infrastructure.md</path>
+        <title>Epic 1: Foundation & Core Infrastructure</title>
+        <section>Story 1.3: RxDB + IndexedDB Data Layer Setup</section>
+        <snippet>Establishes the offline-first data layer for email storage. Prerequisites: Epic 0 (PWA foundation). Estimated effort: 4 hours.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/0-10-configure-bundle-analysis-and-size-budgets.md</path>
+        <title>Story 0.10: Bundle Analysis</title>
+        <section>Learnings from Previous Story</section>
+        <snippet>RxDB + RxJS will add ~100-150 KB to bundle. Current bundle 212.67 KB (well under 500 KB budget). Monitor with npm run analyze after installation.</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <artifact>
+        <path>src/main.tsx</path>
+        <kind>entry-point</kind>
+        <symbol>main</symbol>
+        <lines>1-15</lines>
+        <reason>App entry point where database initialization should be integrated</reason>
+      </artifact>
+      <artifact>
+        <path>src/App.tsx</path>
+        <kind>component</kind>
+        <symbol>App</symbol>
+        <lines>1-30</lines>
+        <reason>Root component where database initialization status and error boundaries should be added</reason>
+      </artifact>
+      <artifact>
+        <path>vite.config.ts</path>
+        <kind>config</kind>
+        <symbol>vite-config</symbol>
+        <lines>26-36</lines>
+        <reason>Manual chunks configuration for code splitting - database should be added to appropriate chunk</reason>
+      </artifact>
+    </code>
+
+    <dependencies>
+      <node>
+        <existing>
+          <package name="react" version="19.2" />
+          <package name="react-dom" version="19.2" />
+          <package name="typescript" version="5.9" />
+          <package name="vite" version="^7.1.12" />
+          <package name="vitest" version="^4.0.7" />
+          <package name="@playwright/test" version="^1.56.1" />
+        </existing>
+        <required>
+          <package name="rxdb" version="16.20.0" notes="Offline-first reactive database" />
+          <package name="rxjs" version="latest" notes="Peer dependency for RxDB observables" />
+        </required>
+        <optional>
+          <package name="zustand" version="5.0.8" notes="App-level state management for database initialization status (may already be installed)" />
+        </optional>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    - Database name must be: claine-v2
+    - Use IndexedDB adapter for browser storage (no other adapters)
+    - Enable reactive queries for UI updates via RxDB observables
+    - Configure database versioning for future schema migrations (Story 1.3C depends on this)
+    - Lazy-load database initialization to avoid blocking app startup
+    - Handle QuotaExceededError and InvalidStateError gracefully
+    - Use Zustand for app-level database initialization status (loading, ready, error)
+    - Follow Epic 0 quality standards: Run Prettier, verify TypeScript types, write unit tests
+    - Bundle size: RxDB should add ~100-150 KB, monitor with npm run analyze
+    - Testing: Unit tests with Vitest, E2E tests with Playwright
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>DatabaseService</name>
+      <kind>service-class</kind>
+      <signature>
+        class DatabaseService {
+          static init(): Promise&lt;void&gt;
+          static create(collection: string, data: object): Promise&lt;object&gt;
+          static read(collection: string, query: object): Promise&lt;object[]&gt;
+          static update(collection: string, id: string, data: object): Promise&lt;object&gt;
+          static delete(collection: string, id: string): Promise&lt;boolean&gt;
+        }
+      </signature>
+      <path>src/services/database/init.ts, src/services/database/crud.ts</path>
+    </interface>
+    <interface>
+      <name>useDatabase</name>
+      <kind>react-hook</kind>
+      <signature>
+        function useDatabase&lt;T&gt;(collection: string, query?: object): {
+          data: T[];
+          loading: boolean;
+          error: Error | null;
+          refetch: () =&gt; void;
+        }
+      </signature>
+      <path>src/hooks/useDatabase.ts</path>
+    </interface>
+    <interface>
+      <name>DatabaseState</name>
+      <kind>zustand-store</kind>
+      <signature>
+        interface DatabaseState {
+          initialized: boolean;
+          loading: boolean;
+          error: Error | null;
+          setInitialized: (value: boolean) =&gt; void;
+          setLoading: (value: boolean) =&gt; void;
+          setError: (error: Error | null) =&gt; void;
+        }
+      </signature>
+      <path>src/store/database.ts</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Unit tests using Vitest 4.0 (Vite-native testing framework). E2E tests using Playwright 1.56 (PWA testing with visual regression support). Tests should be co-located with source files in __tests__ directories. Follow Epic 0 quality standards: comprehensive coverage, no false completions, verify all edge cases.
+    </standards>
+
+    <locations>
+      - src/services/database/__tests__/*.test.ts (unit tests for database services)
+      - src/hooks/__tests__/*.test.ts (unit tests for React hooks)
+      - e2e/database-init.spec.ts (E2E test for database initialization flow)
+    </locations>
+
+    <ideas>
+      AC1: Test RxDB 16.20.0 installation (verify package.json, verify TypeScript types resolve)
+      AC2: Test database initialization success, test initialization failure handling, test database versioning configuration
+      AC3: Test create() with valid/invalid data, test read() with various queries, test update() with conflict detection, test delete() with soft delete option
+      AC4: Test reactive query subscription, test UI updates on data changes, test unsubscribe on component unmount
+      AC5: Test database initialization on app startup, test loading state during init, test error boundary on init failure, test Zustand state updates
+      E2E: Test full app startup with database initialization, test data persistence across page reloads
+    </ideas>
+  </tests>
+</story-context>

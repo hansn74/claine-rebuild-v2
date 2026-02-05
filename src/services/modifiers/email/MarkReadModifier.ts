@@ -26,7 +26,7 @@ export class MarkReadModifier extends BaseEmailModifier {
   private readonly currentLabels: string[]
 
   constructor(params: MarkReadModifierParams) {
-    super(params.entityId, params.accountId, params.provider)
+    super(params.entityId, params.accountId, params.provider, undefined, undefined, params.threadId)
     this.currentLabels = params.currentLabels
   }
 
@@ -39,7 +39,8 @@ export class MarkReadModifier extends BaseEmailModifier {
     provider: ProviderType,
     payload: { currentLabels: string[] },
     id?: string,
-    createdAt?: number
+    createdAt?: number,
+    threadId?: string
   ): MarkReadModifier {
     const modifier = new MarkReadModifier({
       entityId,
@@ -47,6 +48,7 @@ export class MarkReadModifier extends BaseEmailModifier {
       provider,
       currentLabels: payload.currentLabels,
       markAsRead: true,
+      threadId,
     })
     if (id) Object.assign(modifier, { id })
     if (createdAt) Object.assign(modifier, { createdAt })
@@ -136,7 +138,7 @@ export class MarkUnreadModifier extends BaseEmailModifier {
   private readonly currentLabels: string[]
 
   constructor(params: MarkReadModifierParams) {
-    super(params.entityId, params.accountId, params.provider)
+    super(params.entityId, params.accountId, params.provider, undefined, undefined, params.threadId)
     this.currentLabels = params.currentLabels
   }
 
@@ -149,7 +151,8 @@ export class MarkUnreadModifier extends BaseEmailModifier {
     provider: ProviderType,
     payload: { currentLabels: string[] },
     id?: string,
-    createdAt?: number
+    createdAt?: number,
+    threadId?: string
   ): MarkUnreadModifier {
     const modifier = new MarkUnreadModifier({
       entityId,
@@ -157,6 +160,7 @@ export class MarkUnreadModifier extends BaseEmailModifier {
       provider,
       currentLabels: payload.currentLabels,
       markAsRead: false,
+      threadId,
     })
     if (id) Object.assign(modifier, { id })
     if (createdAt) Object.assign(modifier, { createdAt })

@@ -34,8 +34,15 @@ import type { ModifierDocument, ModifierQueueEvent, ModifierStatus, Modifier } f
 import { MAX_ATTEMPTS } from './types'
 
 /**
- * In-memory cache of pending modifiers grouped by entity ID
- * Used for fast lookups when deriving state
+ * In-memory cache of pending modifiers grouped by entity ID.
+ * Used for fast lookups when deriving state.
+ *
+ * Note: Cache is keyed by entityId (individual email/draft ID), not threadId.
+ * The modifierProcessor does its own thread-level grouping via threadId when
+ * processing the queue. If thread-level state derivation is needed (e.g.,
+ * "are there pending modifiers for any email in this thread?"), callers
+ * must aggregate across entityIds themselves or a thread-level index
+ * should be added here.
  */
 type ModifierCache = Map<string, ModifierDocument[]>
 

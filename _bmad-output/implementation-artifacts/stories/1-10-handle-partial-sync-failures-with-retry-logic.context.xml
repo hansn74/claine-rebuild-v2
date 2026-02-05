@@ -1,0 +1,655 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Story Context XML for: 1-10-handle-partial-sync-failures-with-retry-logic
+  Generated: 2025-11-27
+  Epic: Epic 1 - Foundation & Core Infrastructure
+
+  Purpose: Provides dev agent with comprehensive context for implementing
+  partial sync failure handling with exponential backoff retry logic.
+-->
+<story-context xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <metadata>
+    <story-id>1-10-handle-partial-sync-failures-with-retry-logic</story-id>
+    <story-title>Handle Partial Sync Failures with Retry Logic</story-title>
+    <epic-id>1</epic-id>
+    <status>ready-for-dev</status>
+    <generated-at>2025-11-27</generated-at>
+    <acceptance-criteria-count>20</acceptance-criteria-count>
+  </metadata>
+
+  <!--
+    SECTION 1: DOCUMENTATION CONTEXT
+    Key PRD and architecture references for this story
+  -->
+  <documentation>
+    <prd-references>
+      <reference id="FR005">
+        <title>Incremental Sync</title>
+        <content>System shall perform incremental sync every 2-5 minutes when online to fetch new messages and sync local actions</content>
+        <relevance>Core sync functionality that needs retry logic for partial failures</relevance>
+      </reference>
+      <reference id="FR009">
+        <title>Conflict Resolution During Sync</title>
+        <content>System shall handle conflict resolution during sync with deterministic strategy for user actions</content>
+        <relevance>Related to sync failure handling - conflicts are a type of sync issue</relevance>
+      </reference>
+      <reference id="NFR002">
+        <title>Reliability</title>
+        <content>System shall maintain ≥99.5% crash-free session rate and gracefully handle network interruptions without data loss or user-visible errors</content>
+        <relevance>Primary driver for retry logic implementation</relevance>
+      </reference>
+    </prd-references>
+
+    <architecture-references>
+      <reference id="Decision-1">
+        <title>Database - RxDB + IndexedDB</title>
+        <content>Use RxDB v16.20.0 with IndexedDB adapter for offline data storage. Supports offline-first architecture with reactive queries.</content>
+        <relevance>SyncFailure documents will be stored in RxDB for persistence across app restarts</relevance>
+      </reference>
+      <reference id="Decision-2">
+        <title>State Management - Zustand</title>
+        <content>Zustand 5.0.8 for client state management - simpler than Redux, excellent TypeScript support</content>
+        <relevance>Sync progress state tracked in Zustand store (syncStore.ts)</relevance>
+      </reference>
+      <reference id="Sync-Strategy">
+        <title>Email Sync Strategy</title>
+        <content>Initial sync: Last 90 days. Incremental sync: Every 2-5 minutes using Gmail History API / Outlook Delta Query. Rate limiting implemented via token bucket algorithm.</content>
+        <relevance>Retry logic must integrate with existing sync flow and rate limiting</relevance>
+      </reference>
+    </architecture-references>
+  </documentation>
+
+  <!--
+    SECTION 2: EXISTING CODE CONTEXT
+    Key files and interfaces the dev agent needs to understand
+  -->
+  <existing-code>
+    <!-- Sync Services -->
+    <file path="src/services/sync/gmailSync.ts">
+      <purpose>Gmail sync engine - performs initial and incremental sync via Gmail API</purpose>
+      <key-patterns>
+        <pattern>Network resilience with online/offline detection (navigator.onLine)</pattern>
+        <pattern>Token refresh on 401 errors</pattern>
+        <pattern>Rate limiting via RateLimiter.acquireAndWait()</pattern>
+        <pattern>Progress tracking via SyncProgressService</pattern>
+        <pattern>Paused syncs Set for offline recovery</pattern>
+      </key-patterns>
+      <integration-points>
+        <point>performInitialSync() - needs try/catch per email with failure tracking</point>
+        <point>performIncrementalSync() - needs try/catch per email with failure tracking</point>
+        <point>fetchMessage() - individual message fetch that can fail</point>
+        <point>storeEmail() - storage operation that needs error handling</point>
+      </integration-points>
+      <error-handling-current>
+        <handling>Generic catch at sync level saves error to progress state</handling>
+        <handling>401 triggers token refresh</handling>
+        <handling>404 on History API triggers full sync fallback</handling>
+        <gap>No per-email failure tracking</gap>
+        <gap>No retry logic for transient failures</gap>
+      </error-handling-current>
+    </file>
+
+    <file path="src/services/sync/outlookSync.ts">
+      <purpose>Outlook sync engine - performs initial and delta sync via Microsoft Graph</purpose>
+      <key-patterns>
+        <pattern>Same patterns as gmailSync.ts</pattern>
+        <pattern>429 rate limit handling with Retry-After header</pattern>
+        <pattern>410 deltaLink expiry triggers full sync</pattern>
+      </key-patterns>
+      <integration-points>
+        <point>Same integration points as Gmail sync</point>
+      </integration-points>
+    </file>
+
+    <file path="src/services/sync/rateLimiter.ts">
+      <purpose>Token bucket rate limiter for API calls</purpose>
+      <key-interfaces>
+        <interface>
+          <name>RateLimiter</name>
+          <methods>
+            <method>acquire(tokensNeeded): Promise&lt;number&gt; - returns wait time in ms</method>
+            <method>acquireAndWait(tokensNeeded): Promise&lt;void&gt; - waits and acquires</method>
+          </methods>
+        </interface>
+      </key-interfaces>
+      <relevance>Retry logic should respect rate limits; 429 responses should trigger extended wait</relevance>
+    </file>
+
+    <file path="src/services/sync/syncProgress.ts">
+      <purpose>Tracks sync progress in RxDB for persistence and UI display</purpose>
+      <key-interfaces>
+        <interface>
+          <name>SyncProgressUpdate</name>
+          <fields>emailsSynced, totalEmailsToSync, status, syncToken, pageToken, error</fields>
+        </interface>
+        <interface>
+          <name>SyncProgress</name>
+          <fields>accountId, provider, status, progressPercentage, emailsSynced, totalEmailsToSync, estimatedTimeRemaining, lastSyncAt, nextSyncAt, error, syncToken, pageToken</fields>
+        </interface>
+      </key-interfaces>
+      <extension-needed>Add failedCount, retryingCount, successCount fields for partial failure tracking</extension-needed>
+    </file>
+
+    <file path="src/services/sync/conflictDetection.ts">
+      <purpose>Detects sync conflicts between local and server versions</purpose>
+      <relevance>Pattern reference for creating errorClassification.ts service</relevance>
+      <pattern>Service class with static methods for different classification types</pattern>
+    </file>
+
+    <!-- Database -->
+    <file path="src/services/database/schemas/syncState.schema.ts">
+      <purpose>RxDB schema for sync state persistence</purpose>
+      <fields>id, provider, status, lastSyncAt, nextSyncAt, initialSyncComplete, totalEmailsToSync, emailsSynced, progressPercentage, estimatedTimeRemaining, syncToken, pageToken, errorCount, lastError, lastErrorAt, lastRequestAt, requestCount, averageSyncRate</fields>
+      <indexes>status, nextSyncAt</indexes>
+    </file>
+
+    <file path="src/services/database/schemas/conflictAudit.schema.ts">
+      <purpose>RxDB schema for conflict audit logging - pattern reference for syncFailure schema</purpose>
+      <pattern>UUID primary key, accountId scoping, timestamp indexes, enum status fields</pattern>
+    </file>
+
+    <file path="src/services/database/types.ts">
+      <purpose>TypeScript types for database collections</purpose>
+      <current-collections>metadata, emails, _threads, _workflows, _aiMetadata, authTokens, syncState, conflictAudit</current-collections>
+      <extension-needed>Add syncFailures collection type</extension-needed>
+    </file>
+
+    <file path="src/services/database/init.ts">
+      <purpose>Database initialization and migration runner</purpose>
+      <pattern>Collections added via migrations, not in init.ts directly</pattern>
+    </file>
+
+    <file path="src/services/database/migrations/index.ts">
+      <purpose>Migration registry - exports LATEST_SCHEMA_VERSION and allMigrations</purpose>
+      <current-version>3</current-version>
+      <next-version>4 (for syncFailure collection)</next-version>
+    </file>
+
+    <!-- Store -->
+    <file path="src/store/conflictStore.ts">
+      <purpose>Zustand store for conflict state management</purpose>
+      <relevance>Pattern reference for extending syncStore or creating separate failure store</relevance>
+      <patterns>
+        <pattern>Zustand create() with typed state interface</pattern>
+        <pattern>localStorage persistence for preferences</pattern>
+        <pattern>Actions: add, remove, resolve, clear</pattern>
+        <pattern>Getters: getPendingCount, getByAccount</pattern>
+      </patterns>
+    </file>
+
+    <!-- Components -->
+    <file path="src/components/settings/ConflictHistoryPanel.tsx">
+      <purpose>UI for viewing conflict history in settings</purpose>
+      <relevance>Pattern reference for SyncIssuesPanel.tsx</relevance>
+    </file>
+
+    <file path="src/components/conflicts/ConflictResolutionModal.tsx">
+      <purpose>Modal for manual conflict resolution</purpose>
+      <relevance>Pattern reference for retry confirmation dialogs</relevance>
+    </file>
+  </existing-code>
+
+  <!--
+    SECTION 3: TECHNICAL SPECIFICATIONS
+    Implementation details and patterns for this story
+  -->
+  <technical-specs>
+    <new-files>
+      <file path="src/services/sync/errorClassification.ts">
+        <purpose>Classify API errors as transient, permanent, or unknown</purpose>
+        <interface>
+          <![CDATA[
+export type ErrorType = 'transient' | 'permanent' | 'unknown'
+
+export interface ClassifiedError {
+  type: ErrorType
+  httpStatus?: number
+  retryAfterMs?: number  // From Retry-After header
+  message: string
+}
+
+// Error type mappings
+const TRANSIENT_CODES = [408, 429, 500, 502, 503, 504]  // Timeout, rate limit, server errors
+const PERMANENT_CODES = [400, 401, 403, 404, 410]      // Bad request, auth, not found, gone
+
+export function classifyError(error: unknown): ClassifiedError
+export function classifyHttpError(status: number, headers?: Headers): ClassifiedError
+export function shouldRetry(classification: ClassifiedError, retryCount: number, maxRetries: number): boolean
+          ]]>
+        </interface>
+      </file>
+
+      <file path="src/services/sync/retryEngine.ts">
+        <purpose>Exponential backoff retry logic for failed syncs</purpose>
+        <interface>
+          <![CDATA[
+export interface RetryConfig {
+  maxRetries: number        // Default: 3
+  baseDelayMs: number       // Default: 1000 (1 second)
+  maxDelayMs: number        // Default: 30000 (30 seconds)
+  multiplier: number        // Default: 2
+}
+
+export function calculateRetryDelay(retryCount: number, config?: Partial<RetryConfig>): number
+export function getNextRetryAt(retryCount: number, config?: Partial<RetryConfig>): number  // Unix timestamp
+export function isRetryExhausted(retryCount: number, maxRetries: number): boolean
+          ]]>
+        </interface>
+        <algorithm>
+          <![CDATA[
+// Exponential backoff: delay = baseDelay * (multiplier ^ retryCount)
+// Example with defaults: 1s -> 2s -> 4s -> 8s (capped at maxDelay)
+function calculateRetryDelay(retryCount: number, config: RetryConfig): number {
+  const delay = config.baseDelayMs * Math.pow(config.multiplier, retryCount)
+  return Math.min(delay, config.maxDelayMs)
+}
+          ]]>
+        </algorithm>
+      </file>
+
+      <file path="src/services/database/schemas/syncFailure.schema.ts">
+        <purpose>RxDB schema for tracking failed sync operations</purpose>
+        <interface>
+          <![CDATA[
+export interface SyncFailureDocument {
+  id: string                 // UUID
+  emailId: string            // Gmail/Outlook message ID that failed
+  accountId: string          // Account context
+  provider: 'gmail' | 'outlook'
+
+  // Error details
+  errorType: 'transient' | 'permanent' | 'unknown'
+  errorCode: number          // HTTP status code
+  errorMessage: string       // Error description
+
+  // Retry tracking
+  retryCount: number         // Current retry attempt (0 = first failure)
+  maxRetries: number         // Max allowed (default: 3)
+  lastAttemptAt: number      // Unix timestamp ms
+  nextRetryAt: number | null // Unix timestamp ms (null if exhausted or permanent)
+
+  // Lifecycle
+  status: 'pending' | 'retrying' | 'resolved' | 'exhausted' | 'permanent'
+  createdAt: number          // Unix timestamp ms
+  resolvedAt?: number        // Unix timestamp ms (when resolved)
+}
+          ]]>
+        </interface>
+        <indexes>
+          <index>accountId</index>
+          <index>status</index>
+          <index>nextRetryAt</index>
+          <index>[accountId, status]</index>
+        </indexes>
+      </file>
+
+      <file path="src/services/database/migrations/20251127_add_sync_failure_collection.ts">
+        <purpose>Migration to add syncFailures collection (version 4)</purpose>
+        <pattern>Follow pattern from 20251126_add_conflict_audit_collection.ts</pattern>
+      </file>
+
+      <file path="src/components/settings/SyncIssuesPanel.tsx">
+        <purpose>UI panel showing failed syncs with retry actions</purpose>
+        <features>
+          <feature>List of failed syncs with error details</feature>
+          <feature>"Retry All Failed" button</feature>
+          <feature>"Dismiss" option for acknowledged failures</feature>
+          <feature>Status badges: pending, retrying, exhausted, permanent</feature>
+        </features>
+        <pattern>Follow ConflictHistoryPanel.tsx structure</pattern>
+      </file>
+    </new-files>
+
+    <modified-files>
+      <file path="src/services/sync/gmailSync.ts">
+        <changes>
+          <change>Import errorClassification and retryEngine services</change>
+          <change>Wrap fetchMessage() calls with try/catch</change>
+          <change>On failure: classify error, queue for retry if transient</change>
+          <change>Track successful vs failed counts</change>
+          <change>Add method: processPendingRetries()</change>
+        </changes>
+      </file>
+
+      <file path="src/services/sync/outlookSync.ts">
+        <changes>Same changes as gmailSync.ts</changes>
+      </file>
+
+      <file path="src/services/sync/syncProgress.ts">
+        <changes>
+          <change>Add failedCount, retryingCount, successCount to SyncProgressUpdate</change>
+          <change>Add SyncProgress.failures count</change>
+        </changes>
+      </file>
+
+      <file path="src/services/database/types.ts">
+        <changes>
+          <change>Import SyncFailureDocument from schemas</change>
+          <change>Add syncFailures?: RxCollection&lt;SyncFailureDocument&gt; to DatabaseCollections</change>
+        </changes>
+      </file>
+
+      <file path="src/services/database/schemas/index.ts">
+        <changes>
+          <change>Export syncFailureSchema and SyncFailureDocument</change>
+        </changes>
+      </file>
+
+      <file path="src/services/database/migrations/index.ts">
+        <changes>
+          <change>Import migration_20251127_add_sync_failure_collection</change>
+          <change>Add to allMigrations array</change>
+          <change>Update LATEST_SCHEMA_VERSION to 4</change>
+        </changes>
+      </file>
+    </modified-files>
+  </technical-specs>
+
+  <!--
+    SECTION 4: API ERROR REFERENCE
+    HTTP status codes and error patterns for Gmail and Outlook APIs
+  -->
+  <api-error-reference>
+    <gmail-api>
+      <transient-errors>
+        <error code="429" description="Too Many Requests - Rate limit exceeded">
+          <handling>Honor Retry-After header, fallback to exponential backoff</handling>
+          <header>Retry-After: seconds</header>
+        </error>
+        <error code="500" description="Internal Server Error">
+          <handling>Retry with exponential backoff</handling>
+        </error>
+        <error code="502" description="Bad Gateway">
+          <handling>Retry with exponential backoff</handling>
+        </error>
+        <error code="503" description="Service Unavailable">
+          <handling>Retry with exponential backoff, may have Retry-After header</handling>
+        </error>
+        <error code="504" description="Gateway Timeout">
+          <handling>Retry with exponential backoff</handling>
+        </error>
+      </transient-errors>
+      <permanent-errors>
+        <error code="400" description="Bad Request - Invalid request">
+          <handling>Do not retry, log error details</handling>
+        </error>
+        <error code="401" description="Unauthorized - Token expired">
+          <handling>Attempt token refresh, if fails mark as permanent</handling>
+          <note>Token refresh is handled separately in sync engine</note>
+        </error>
+        <error code="403" description="Forbidden - Access denied">
+          <handling>Do not retry, may need re-auth</handling>
+        </error>
+        <error code="404" description="Not Found - Email deleted">
+          <handling>Do not retry, remove from local if exists</handling>
+        </error>
+        <error code="410" description="Gone - Resource deleted">
+          <handling>Do not retry, clean up local reference</handling>
+        </error>
+      </permanent-errors>
+      <quota-info>
+        <limit>250 quota units per user per second</limit>
+        <costs>
+          <cost operation="messages.list">1 unit</cost>
+          <cost operation="messages.get">5 units (full format)</cost>
+          <cost operation="history.list">1 unit</cost>
+        </costs>
+      </quota-info>
+    </gmail-api>
+
+    <outlook-graph-api>
+      <transient-errors>
+        <error code="429" description="Too Many Requests">
+          <handling>Honor Retry-After header</handling>
+          <header>Retry-After: seconds</header>
+        </error>
+        <error code="503" description="Service Unavailable">
+          <handling>Retry with exponential backoff</handling>
+        </error>
+        <error code="504" description="Gateway Timeout">
+          <handling>Retry with exponential backoff</handling>
+        </error>
+      </transient-errors>
+      <permanent-errors>
+        <error code="400" description="Bad Request">
+          <handling>Do not retry</handling>
+        </error>
+        <error code="401" description="Unauthorized">
+          <handling>Attempt token refresh</handling>
+        </error>
+        <error code="403" description="Forbidden">
+          <handling>Do not retry</handling>
+        </error>
+        <error code="404" description="Not Found">
+          <handling>Do not retry</handling>
+        </error>
+        <error code="410" description="Gone - Delta link expired">
+          <handling>Trigger full sync fallback (handled in sync engine)</handling>
+        </error>
+      </permanent-errors>
+    </outlook-graph-api>
+  </api-error-reference>
+
+  <!--
+    SECTION 5: TESTING REQUIREMENTS
+    Test coverage expectations and patterns
+  -->
+  <testing>
+    <framework>
+      <unit-testing>Vitest 4.0</unit-testing>
+      <e2e-testing>Playwright 1.56</e2e-testing>
+      <test-utils>@testing-library/react, fake-indexeddb</test-utils>
+    </framework>
+
+    <test-files-required>
+      <file path="src/services/sync/__tests__/errorClassification.test.ts">
+        <coverage>
+          <test>classifyHttpError returns transient for 429, 5xx codes</test>
+          <test>classifyHttpError returns permanent for 400, 403, 404 codes</test>
+          <test>classifyHttpError extracts Retry-After header value</test>
+          <test>classifyError handles various error types (Error, Response, unknown)</test>
+          <test>shouldRetry returns true for transient with retries remaining</test>
+          <test>shouldRetry returns false for permanent errors</test>
+          <test>shouldRetry returns false when max retries exhausted</test>
+        </coverage>
+      </file>
+
+      <file path="src/services/sync/__tests__/retryEngine.test.ts">
+        <coverage>
+          <test>calculateRetryDelay returns exponential delays (1s, 2s, 4s)</test>
+          <test>calculateRetryDelay respects maxDelayMs cap</test>
+          <test>calculateRetryDelay uses custom config values</test>
+          <test>getNextRetryAt returns future timestamp</test>
+          <test>isRetryExhausted returns true when count >= max</test>
+        </coverage>
+      </file>
+
+      <file path="src/services/database/__tests__/syncFailure.schema.test.ts">
+        <coverage>
+          <test>Schema validates required fields</test>
+          <test>Schema accepts valid SyncFailureDocument</test>
+          <test>Schema rejects invalid status values</test>
+          <test>Indexes are correctly defined</test>
+        </coverage>
+        <pattern>Follow src/services/database/schemas/__tests__/*.test.ts patterns</pattern>
+      </file>
+
+      <file path="src/components/settings/__tests__/SyncIssuesPanel.test.tsx">
+        <coverage>
+          <test>Renders list of failed syncs</test>
+          <test>Shows error type and message for each failure</test>
+          <test>"Retry All" button triggers retry action</test>
+          <test>Individual retry button works</test>
+          <test>"Dismiss" removes failure from list</test>
+          <test>Empty state when no failures</test>
+        </coverage>
+        <pattern>Follow ConflictResolutionModal.test.tsx patterns</pattern>
+      </file>
+
+      <file path="src/services/sync/__tests__/gmailSync.retry.test.ts">
+        <coverage>
+          <test>Network timeout triggers retry queue</test>
+          <test>429 rate limit honors Retry-After header</test>
+          <test>404 not found marked as permanent, no retry</test>
+          <test>Partial sync tracks successful and failed counts</test>
+          <test>Pending retries processed on startup</test>
+        </coverage>
+      </file>
+    </test-files-required>
+
+    <test-patterns>
+      <pattern name="Mock fetch responses">
+        <![CDATA[
+vi.mock('global', () => ({
+  fetch: vi.fn().mockImplementation((url) => {
+    if (url.includes('error-email-id')) {
+      return Promise.resolve({
+        ok: false,
+        status: 429,
+        headers: new Headers({ 'Retry-After': '5' }),
+      })
+    }
+    return Promise.resolve({ ok: true, json: () => mockEmailData })
+  })
+}))
+        ]]>
+      </pattern>
+      <pattern name="RxDB test setup">
+        <![CDATA[
+import 'fake-indexeddb/auto'
+import { createRxDatabase } from 'rxdb'
+
+let db: AppDatabase
+
+beforeEach(async () => {
+  db = await createRxDatabase({ name: 'test-db', storage: getRxStorageMemory() })
+  await db.addCollections({ syncFailures: { schema: syncFailureSchema } })
+})
+
+afterEach(async () => {
+  await db.destroy()
+})
+        ]]>
+      </pattern>
+    </test-patterns>
+  </testing>
+
+  <!--
+    SECTION 6: DEPENDENCIES
+    Package versions and import references
+  -->
+  <dependencies>
+    <runtime>
+      <package name="rxdb" version="16.20.0">Database for syncFailure persistence</package>
+      <package name="rxjs" version="7.8.2">Reactive queries for failure monitoring</package>
+      <package name="zustand" version="5.0.8">State management for sync progress</package>
+      <package name="react" version="19.2">UI components</package>
+    </runtime>
+    <dev>
+      <package name="vitest" version="4.0.7">Unit testing</package>
+      <package name="@testing-library/react" version="16.3.0">Component testing</package>
+      <package name="fake-indexeddb" version="6.2.4">RxDB testing</package>
+      <package name="playwright" version="1.56.1">E2E testing</package>
+    </dev>
+  </dependencies>
+
+  <!--
+    SECTION 7: IMPLEMENTATION CHECKLIST
+    Ordered tasks from story file with dependencies
+  -->
+  <implementation-checklist>
+    <phase name="1. Core Services" description="Backend logic for error handling and retry">
+      <task id="1.1" ac="8,9,10">Create errorClassification.ts service</task>
+      <task id="1.2" ac="4,5,6,7">Create retryEngine.ts with exponential backoff</task>
+    </phase>
+
+    <phase name="2. Database Layer" description="Persistence for failure tracking">
+      <task id="2.1" ac="1,2,14">Create syncFailure.schema.ts</task>
+      <task id="2.2" ac="14">Create migration 20251127_add_sync_failure_collection</task>
+      <task id="2.3" ac="14">Update database types and schema exports</task>
+    </phase>
+
+    <phase name="3. Sync Engine Integration" description="Wire retry logic into sync">
+      <task id="3.1" ac="1,2,3">Integrate failure tracking into gmailSync.ts</task>
+      <task id="3.2" ac="1,2,3">Integrate failure tracking into outlookSync.ts</task>
+      <task id="3.3" ac="3,11,12">Enhance syncProgress.ts with failure counts</task>
+    </phase>
+
+    <phase name="4. Startup Recovery" description="Resume retries on app start">
+      <task id="4.1" ac="15">Implement startup retry check and scheduling</task>
+    </phase>
+
+    <phase name="5. UI Components" description="User-facing failure management">
+      <task id="5.1" ac="13,16">Create SyncIssuesPanel.tsx</task>
+      <task id="5.2" ac="11">Update sync progress UI with failure indicators</task>
+    </phase>
+
+    <phase name="6. Testing" description="Comprehensive test coverage">
+      <task id="6.1" ac="17,18,19">Unit tests for errorClassification</task>
+      <task id="6.2">Unit tests for retryEngine</task>
+      <task id="6.3" ac="20">Integration tests for sync failure flow</task>
+      <task id="6.4">Component tests for SyncIssuesPanel</task>
+    </phase>
+  </implementation-checklist>
+
+  <!--
+    SECTION 8: CONSTRAINTS AND NOTES
+    Important implementation constraints and gotchas
+  -->
+  <constraints>
+    <constraint type="timing">
+      <title>Retry Timing</title>
+      <details>
+        <item>Base delay: 1 second</item>
+        <item>Multiplier: 2x per retry</item>
+        <item>Max delay cap: 30 seconds</item>
+        <item>Max retries: 3 (configurable)</item>
+        <item>Progression: 1s -> 2s -> 4s (then exhausted)</item>
+      </details>
+    </constraint>
+
+    <constraint type="rate-limits">
+      <title>API Rate Limits</title>
+      <details>
+        <item>Gmail: 250 quota units/user/second</item>
+        <item>Outlook: 10 requests/second</item>
+        <item>429 responses include Retry-After header - MUST honor</item>
+        <item>Retry logic should not circumvent rate limiter</item>
+      </details>
+    </constraint>
+
+    <constraint type="state-lifecycle">
+      <title>Failure State Lifecycle</title>
+      <details>
+        <item>pending: Queued for retry, waiting for nextRetryAt</item>
+        <item>retrying: Currently being retried</item>
+        <item>resolved: Successfully synced on retry</item>
+        <item>exhausted: Max retries reached, needs manual intervention</item>
+        <item>permanent: Permanent error (404, 403), will never succeed</item>
+      </details>
+    </constraint>
+
+    <constraint type="persistence">
+      <title>State Persistence</title>
+      <details>
+        <item>SyncFailure documents persist across app restarts</item>
+        <item>On startup: query pending/retrying failures where nextRetryAt &lt;= now</item>
+        <item>Resume immediately overdue retries</item>
+        <item>Respect nextRetryAt for scheduled retries</item>
+      </details>
+    </constraint>
+  </constraints>
+
+  <!--
+    SECTION 9: REFERENCE FROM PREVIOUS STORY
+    Learnings and patterns from Story 1-9
+  -->
+  <previous-story-learnings source="1-9-implement-sync-conflict-detection-and-resolution">
+    <learning>Service pattern: conflictDetection.ts has detect() and detectBatch() methods - use similar pattern for errorClassification</learning>
+    <learning>Schema pattern: conflictAudit.schema.ts uses UUID primary key, accountId scoping, status enums - replicate for syncFailure</learning>
+    <learning>Store pattern: conflictStore.ts uses Zustand with typed state, localStorage persistence, and get() actions</learning>
+    <learning>Migration pattern: Version bump, idempotent up/down methods, check for existing collection</learning>
+    <learning>Test count: 81 tests across service, store, and component layers - aim for similar coverage</learning>
+    <learning>Component pattern: ConflictHistoryPanel queries RxDB, displays statistics, lists recent items</learning>
+  </previous-story-learnings>
+</story-context>

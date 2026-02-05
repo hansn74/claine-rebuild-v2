@@ -26,7 +26,7 @@ export class StarModifier extends BaseEmailModifier {
   private readonly currentLabels: string[]
 
   constructor(params: StarModifierParams) {
-    super(params.entityId, params.accountId, params.provider)
+    super(params.entityId, params.accountId, params.provider, undefined, undefined, params.threadId)
     this.currentLabels = params.currentLabels
   }
 
@@ -39,7 +39,8 @@ export class StarModifier extends BaseEmailModifier {
     provider: ProviderType,
     payload: { currentLabels: string[] },
     id?: string,
-    createdAt?: number
+    createdAt?: number,
+    threadId?: string
   ): StarModifier {
     const modifier = new StarModifier({
       entityId,
@@ -47,6 +48,7 @@ export class StarModifier extends BaseEmailModifier {
       provider,
       currentLabels: payload.currentLabels,
       star: true,
+      threadId,
     })
     if (id) Object.assign(modifier, { id })
     if (createdAt) Object.assign(modifier, { createdAt })
@@ -138,7 +140,7 @@ export class UnstarModifier extends BaseEmailModifier {
   private readonly currentLabels: string[]
 
   constructor(params: StarModifierParams) {
-    super(params.entityId, params.accountId, params.provider)
+    super(params.entityId, params.accountId, params.provider, undefined, undefined, params.threadId)
     this.currentLabels = params.currentLabels
   }
 
@@ -151,7 +153,8 @@ export class UnstarModifier extends BaseEmailModifier {
     provider: ProviderType,
     payload: { currentLabels: string[] },
     id?: string,
-    createdAt?: number
+    createdAt?: number,
+    threadId?: string
   ): UnstarModifier {
     const modifier = new UnstarModifier({
       entityId,
@@ -159,6 +162,7 @@ export class UnstarModifier extends BaseEmailModifier {
       provider,
       currentLabels: payload.currentLabels,
       star: false,
+      threadId,
     })
     if (id) Object.assign(modifier, { id })
     if (createdAt) Object.assign(modifier, { createdAt })

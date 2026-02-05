@@ -1,0 +1,324 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>2.4</storyId>
+    <title>Offline-First Send Queue</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-12-02</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/2-4-offline-first-send-queue.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>user</asA>
+    <iWant>to send emails even when offline</iWant>
+    <soThat>I can continue working without network connectivity</soThat>
+    <tasks>
+      <task id="1" title="Create Send Queue Schema">
+        <subtask>1.1: Create SendQueueItem interface with id, draftId, accountId, to, cc, bcc, subject, body, attachments, status, attempts, lastAttempt, error, createdAt</subtask>
+        <subtask>1.2: Create RxDB schema for sendQueue collection with status enum (pending/sending/sent/failed/cancelled)</subtask>
+        <subtask>1.3: Add sendQueue collection to database initialization</subtask>
+        <subtask>1.4: Add indexes for accountId, status, createdAt</subtask>
+      </task>
+      <task id="2" title="Create Send Queue Service">
+        <subtask>2.1: Create SendQueueService class with singleton pattern</subtask>
+        <subtask>2.2: Implement queueEmail(draft) method to add email to queue</subtask>
+        <subtask>2.3: Implement processQueue() method to send pending emails</subtask>
+        <subtask>2.4: Implement retryFailed() method with exponential backoff (1s, 5s, 30s)</subtask>
+        <subtask>2.5: Implement cancelQueuedEmail(id) method</subtask>
+        <subtask>2.6: Implement getQueueStatus() reactive observable</subtask>
+      </task>
+      <task id="3" title="Implement Network Status Detection">
+        <subtask>3.1: Create useNetworkStatus hook using navigator.onLine and online/offline events</subtask>
+        <subtask>3.2: Implement connectivity check with actual API ping (not just browser state)</subtask>
+        <subtask>3.3: Add debounce to avoid rapid state changes</subtask>
+        <subtask>3.4: Return { isOnline, lastChecked } state</subtask>
+      </task>
+      <task id="4" title="Implement Gmail Send Integration">
+        <subtask>4.1: Create GmailSendService implementing ISendProvider interface</subtask>
+        <subtask>4.2: Implement sendEmail(email) method using Gmail API messages.send</subtask>
+        <subtask>4.3: Handle RFC 2822 email formatting (encode base64url)</subtask>
+        <subtask>4.4: Handle auth token refresh before send</subtask>
+        <subtask>4.5: Return sent message ID for tracking</subtask>
+      </task>
+      <task id="5" title="Implement Outlook Send Integration">
+        <subtask>5.1: Create OutlookSendService implementing ISendProvider interface</subtask>
+        <subtask>5.2: Implement sendEmail(email) method using Microsoft Graph API</subtask>
+        <subtask>5.3: Handle MIME message formatting</subtask>
+        <subtask>5.4: Handle auth token refresh before send</subtask>
+        <subtask>5.5: Return sent message ID for tracking</subtask>
+      </task>
+      <task id="6" title="Integrate Send Queue with Compose Dialog">
+        <subtask>6.1: Replace direct send with queue-first approach</subtask>
+        <subtask>6.2: Show "Sent" confirmation immediately (optimistic UI)</subtask>
+        <subtask>6.3: Show "Queued - Will send when online" when offline</subtask>
+        <subtask>6.4: Delete draft from drafts collection after queueing</subtask>
+        <subtask>6.5: Show send progress indicator for active send</subtask>
+      </task>
+      <task id="7" title="Create Outbox View Component">
+        <subtask>7.1: Create OutboxView component showing all queued emails</subtask>
+        <subtask>7.2: Create OutboxItem component with status indicator (pending/sending/sent/failed)</subtask>
+        <subtask>7.3: Show retry button for failed items</subtask>
+        <subtask>7.4: Show cancel button for pending items</subtask>
+        <subtask>7.5: Show error message for failed items</subtask>
+        <subtask>7.6: Auto-remove sent items after 5 minutes (or keep with "sent" status)</subtask>
+      </task>
+      <task id="8" title="Background Queue Processing">
+        <subtask>8.1: Create QueueProcessor service that runs on app startup</subtask>
+        <subtask>8.2: Process queue when network status changes to online</subtask>
+        <subtask>8.3: Process queue on interval (every 30 seconds when online)</subtask>
+        <subtask>8.4: Handle concurrent send limit (max 2 parallel sends)</subtask>
+        <subtask>8.5: Emit events for queue status changes (for UI updates)</subtask>
+      </task>
+      <task id="9" title="Add Outbox to Navigation">
+        <subtask>9.1: Add "Outbox" link to sidebar navigation</subtask>
+        <subtask>9.2: Show badge with pending count on Outbox link</subtask>
+        <subtask>9.3: Route /outbox to OutboxView component</subtask>
+        <subtask>9.4: Highlight Outbox when items are pending/failed</subtask>
+      </task>
+      <task id="10" title="Testing">
+        <subtask>10.1: Write unit tests for SendQueueService (queue, process, retry, cancel)</subtask>
+        <subtask>10.2: Write unit tests for useNetworkStatus hook</subtask>
+        <subtask>10.3: Write unit tests for OutboxView component</subtask>
+        <subtask>10.4: Write E2E test for offline send flow</subtask>
+        <subtask>10.5: Write E2E test for retry logic</subtask>
+        <subtask>10.6: Write E2E test for cancel queued email</subtask>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC1">Emails sent while offline are queued locally and sent automatically when online</criterion>
+    <criterion id="AC2">Send queue persists across app restarts</criterion>
+    <criterion id="AC3">Visual indicator shows queue status (pending/sending/sent/failed) for each queued email</criterion>
+    <criterion id="AC4">User can view all queued emails in dedicated "Outbox" view</criterion>
+    <criterion id="AC5">Failed sends retry automatically with exponential backoff (max 3 retries)</criterion>
+    <criterion id="AC6">User can cancel queued email before it's sent</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/PRD.md</path>
+        <title>Product Requirements Document</title>
+        <section>Functional Requirements FR007, FR032, NFR002</section>
+        <snippet>FR007: Full read/write functionality when offline, queueing actions for later sync. FR032: Immediate visual feedback for offline actions with optimistic UI patterns. NFR002: Gracefully handle network interruptions without data loss.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Decision Document</title>
+        <section>Decision 1: Database (RxDB + IndexedDB)</section>
+        <snippet>Use RxDB v16.20.0 with IndexedDB adapter for offline data storage. Supports 100K emails locally with reactive queries for real-time UI updates. Schema migrations handled automatically.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Decision Document</title>
+        <section>Service Worker Strategy</section>
+        <snippet>Static assets: Cache-first. Gmail API: Network-first with fallback. Service Workers required for offline support and background sync.</snippet>
+      </doc>
+      <doc>
+        <path>docs/research/optimistic-ui-patterns-research.md</path>
+        <title>Optimistic UI Patterns Research</title>
+        <section>Core Patterns</section>
+        <snippet>React 19's useOptimistic hook for simple actions. Combine React Query mutations + RxDB for complex offline-first operations. Gmail-style undo with 5-second snackbar for destructive actions.</snippet>
+      </doc>
+      <doc>
+        <path>docs/research/background-sync-push-research.md</path>
+        <title>Background Sync Research</title>
+        <section>Offline Queue Patterns</section>
+        <snippet>Background Sync API for queue retry (Chrome only initially). Adaptive polling with exponential backoff as fallback. Push-based architecture: Push → Service Worker → IndexedDB → React UI.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>src/services/database/schemas/draft.schema.ts</path>
+        <kind>schema</kind>
+        <symbol>DraftDocument, DraftType</symbol>
+        <lines>24-172</lines>
+        <reason>Primary schema for composing emails; send queue items reference drafts and use same body structure {html, text}</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/database/schemas/email.schema.ts</path>
+        <kind>schema</kind>
+        <symbol>EmailDocument, EmailAddress, EmailBody</symbol>
+        <lines>47-94</lines>
+        <reason>Email format and structure definitions; send queue produces EmailDocument records</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/database/schemas/syncFailure.schema.ts</path>
+        <kind>schema</kind>
+        <symbol>SyncFailureDocument</symbol>
+        <lines>41-60</lines>
+        <reason>Retry/failure tracking pattern with exponential backoff; reuse pattern for send queue failures</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/auth/gmailOAuth.ts</path>
+        <kind>service</kind>
+        <symbol>GmailOAuthService</symbol>
+        <lines>35-68</lines>
+        <reason>OAuth 2.0 for Gmail; provides access tokens for Gmail send API (messages.send)</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/auth/outlookOAuth.ts</path>
+        <kind>service</kind>
+        <symbol>OutlookOAuthService</symbol>
+        <lines>38-73</lines>
+        <reason>OAuth 2.0 for Outlook; provides access tokens for Microsoft Graph sendMail API</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/auth/tokenStorage.ts</path>
+        <kind>service</kind>
+        <symbol>TokenStorageService</symbol>
+        <lines>26-80</lines>
+        <reason>Secure token storage and retrieval; send queue must retrieve tokens for authentication</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/logger/index.ts</path>
+        <kind>service</kind>
+        <symbol>logger, logStore</symbol>
+        <lines>1-34</lines>
+        <reason>Main logging service with structured categories; send queue should log all operations with 'sendQueue' category</reason>
+      </artifact>
+      <artifact>
+        <path>src/store/composeStore.ts</path>
+        <kind>store</kind>
+        <symbol>useComposeStore</symbol>
+        <lines>35-71</lines>
+        <reason>Zustand store pattern for compose dialog state; send queue store should follow similar patterns</reason>
+      </artifact>
+      <artifact>
+        <path>src/components/compose/ComposeDialog.tsx</path>
+        <kind>component</kind>
+        <symbol>ComposeDialog, ComposeContext</symbol>
+        <lines>76-100</lines>
+        <reason>Main compose UI component; will integrate with send queue for send action (Task 6)</reason>
+      </artifact>
+      <artifact>
+        <path>src/hooks/useDraft.ts</path>
+        <kind>hook</kind>
+        <symbol>useDraft, DraftData</symbol>
+        <lines>77-339</lines>
+        <reason>Draft lifecycle management with auto-save; send queue will operate on draft documents</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/database/init.ts</path>
+        <kind>service</kind>
+        <symbol>initDatabase, getDatabase</symbol>
+        <lines>31-62</lines>
+        <reason>Database initialization and access; send queue must use getDatabase() for collection access</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/database/migrations/20251201_add_drafts_collection.ts</path>
+        <kind>migration</kind>
+        <symbol>migration_20251201_add_drafts_collection</symbol>
+        <lines>16-59</lines>
+        <reason>Migration pattern for adding new collections; follow this pattern for send queue migration</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/sync/retryEngine.ts</path>
+        <kind>service</kind>
+        <symbol>executeWithRetry, calculateRetryDelay</symbol>
+        <reason>Retry logic implementation with exponential backoff; send queue needs similar retry pattern</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/sync/errorClassification.ts</path>
+        <kind>service</kind>
+        <symbol>classifyHttpError, shouldRetry</symbol>
+        <reason>Error classification for transient vs permanent failures; determine if send should retry</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <package>rxdb</package>
+        <version>^16.20.0</version>
+        <purpose>Offline-first database for send queue storage</purpose>
+      </node>
+      <node>
+        <package>rxjs</package>
+        <version>^7.8.2</version>
+        <purpose>Reactive observables for queue status subscriptions</purpose>
+      </node>
+      <node>
+        <package>zustand</package>
+        <version>^5.0.8</version>
+        <purpose>State management for outbox UI state</purpose>
+      </node>
+      <node>
+        <package>@azure/msal-browser</package>
+        <version>^4.26.2</version>
+        <purpose>Microsoft authentication for Outlook send</purpose>
+      </node>
+      <node>
+        <package>@microsoft/microsoft-graph-client</package>
+        <version>^3.0.7</version>
+        <purpose>Microsoft Graph API client for Outlook sendMail</purpose>
+      </node>
+      <node>
+        <package>lucide-react</package>
+        <version>^0.552.0</version>
+        <purpose>Icons for queue status indicators</purpose>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="pattern">Follow singleton service pattern as used in existing services (SendQueueService.getInstance())</constraint>
+    <constraint type="pattern">Use 'sendQueue' logger category for all queue-related logs</constraint>
+    <constraint type="pattern">Service files: {domain}-{purpose}.service.ts naming convention</constraint>
+    <constraint type="pattern">Store hooks: use{Domain}Store naming convention</constraint>
+    <constraint type="pattern">Custom hooks: use{Purpose} naming convention</constraint>
+    <constraint type="performance">Queue operation must complete in &lt;50ms (NFR001)</constraint>
+    <constraint type="reliability">Handle network interruptions without data loss (NFR002)</constraint>
+    <constraint type="architecture">Services access RxDB directly; components access via hooks/store</constraint>
+    <constraint type="architecture">Cross-feature communication only through Zustand store or events</constraint>
+    <constraint type="testing">Unit tests with Vitest; E2E tests with Playwright</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>Gmail API messages.send</name>
+      <kind>REST endpoint</kind>
+      <signature>POST https://gmail.googleapis.com/gmail/v1/users/me/messages/send - Body: { raw: base64url-encoded-RFC2822 }</signature>
+      <path>https://developers.google.com/gmail/api/reference/rest/v1/users.messages/send</path>
+    </interface>
+    <interface>
+      <name>Microsoft Graph sendMail</name>
+      <kind>REST endpoint</kind>
+      <signature>POST https://graph.microsoft.com/v1.0/me/sendMail - Body: { message: { subject, body, toRecipients } }</signature>
+      <path>https://learn.microsoft.com/en-us/graph/api/user-sendmail</path>
+    </interface>
+    <interface>
+      <name>ISendProvider</name>
+      <kind>TypeScript interface</kind>
+      <signature>interface ISendProvider { sendEmail(email: SendQueueItem): Promise&lt;string&gt; }</signature>
+      <path>src/services/email/providers/index.ts (to create)</path>
+    </interface>
+    <interface>
+      <name>getDatabase()</name>
+      <kind>function</kind>
+      <signature>getDatabase(): Promise&lt;AppDatabase&gt;</signature>
+      <path>src/services/database/init.ts</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>Unit tests use Vitest 4.0 with jsdom environment. E2E tests use Playwright 1.56. Coverage target: 80% for core logic. Mock RxDB with fake-indexeddb for unit tests. Mock network status for offline scenarios.</standards>
+    <locations>
+      <location>src/services/email/__tests__/</location>
+      <location>src/hooks/__tests__/</location>
+      <location>src/components/email/__tests__/</location>
+      <location>e2e/</location>
+    </locations>
+    <ideas>
+      <idea ac="AC1">Test that queueEmail() creates pending item in RxDB when navigator.onLine is false</idea>
+      <idea ac="AC1">Test that processQueue() sends pending items when online and updates status to 'sent'</idea>
+      <idea ac="AC2">Test that queue items persist by inserting, reloading database, and verifying presence</idea>
+      <idea ac="AC3">Test OutboxItem renders correct status icon for each status value</idea>
+      <idea ac="AC4">Test OutboxView displays all queued items from sendQueue collection</idea>
+      <idea ac="AC5">Test retry logic: failed send triggers retry after RETRY_DELAYS[attempts-1] delay</idea>
+      <idea ac="AC5">Test max retries: status changes to 'failed' after MAX_ATTEMPTS</idea>
+      <idea ac="AC6">Test cancelQueuedEmail() changes status to 'cancelled' for pending items only</idea>
+      <idea ac="E2E">E2E: Toggle offline mode, compose and send email, verify queued, go online, verify sent</idea>
+    </ideas>
+  </tests>
+</story-context>

@@ -1,0 +1,263 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>0</epicId>
+    <storyId>8</storyId>
+    <title>Set Up Environment Variable Management</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-05</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/0-8-set-up-environment-variable-management.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>developer</asA>
+    <iWant>secure environment variable management</iWant>
+    <soThat>sensitive configuration is not committed to the repository</soThat>
+    <tasks>
+      <task id="1">Create .env.example file with placeholder environment variables
+        <subtask>Identify required environment variables for Epic 0 (if any)</subtask>
+        <subtask>Add VITE_APP_NAME placeholder</subtask>
+        <subtask>Add VITE_API_URL placeholder (for future Gmail API)</subtask>
+        <subtask>Add development vs production examples</subtask>
+        <subtask>Document each variable with inline comments</subtask>
+      </task>
+      <task id="2">Ensure .env is in .gitignore
+        <subtask>Check if .gitignore already includes .env</subtask>
+        <subtask>Add .env entry to .gitignore if missing</subtask>
+        <subtask>Add .env.local to .gitignore (local overrides)</subtask>
+        <subtask>Test: Verify git status doesn't show .env files</subtask>
+      </task>
+      <task id="3">Create environment variable validation module
+        <subtask>Create src/lib/env.ts file</subtask>
+        <subtask>Define TypeScript interface for environment variables</subtask>
+        <subtask>Implement validateEnv() function with clear error messages</subtask>
+        <subtask>Add runtime validation on app initialization</subtask>
+        <subtask>Export type-safe accessor functions</subtask>
+        <subtask>Test: Missing required variable throws descriptive error</subtask>
+      </task>
+      <task id="4">Configure Vite environment variable loading
+        <subtask>Review Vite environment variable documentation</subtask>
+        <subtask>Ensure import.meta.env is properly typed</subtask>
+        <subtask>Update vite-env.d.ts with custom env var types</subtask>
+        <subtask>Configure Vite to load .env files correctly</subtask>
+        <subtask>Test: Environment variables accessible in dev mode</subtask>
+      </task>
+      <task id="5">Implement type-safe environment variable access
+        <subtask>Create getEnv() helper function in src/lib/env.ts</subtask>
+        <subtask>Add TypeScript type guards for required vs optional variables</subtask>
+        <subtask>Provide autocomplete support for environment variable names</subtask>
+        <subtask>Add default value support for optional variables</subtask>
+        <subtask>Test: Type errors when accessing undefined variables</subtask>
+      </task>
+      <task id="6">Configure GitHub Actions secrets
+        <subtask>Review .github/workflows/ci.yml</subtask>
+        <subtask>Add environment variables to GitHub Actions workflow (if needed for Epic 0)</subtask>
+        <subtask>Document required GitHub secrets in README</subtask>
+        <subtask>Test: CI runs successfully with environment variables</subtask>
+      </task>
+      <task id="7">Document environment variable setup
+        <subtask>Add environment setup section to README.md (deferred to Story 0.9)</subtask>
+        <subtask>Document .env.example → .env copy process</subtask>
+        <subtask>Document required variables for local development</subtask>
+        <subtask>Document Vercel environment variable configuration</subtask>
+        <subtask>Include troubleshooting tips for missing variables</subtask>
+        <subtask>Note: Comprehensive README documentation happens in Story 0.9</subtask>
+      </task>
+      <task id="8">Write tests for environment variable validation
+        <subtask>Create unit test: src/lib/env.test.ts</subtask>
+        <subtask>Test: Missing required variable throws error</subtask>
+        <subtask>Test: Valid environment loads successfully</subtask>
+        <subtask>Test: Type-safe accessors return correct values</subtask>
+        <subtask>Test: Optional variables return defaults</subtask>
+        <subtask>Run all tests and verify they pass</subtask>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC1">.env.example file created with all required environment variables (placeholders)</criterion>
+    <criterion id="AC2">.env added to .gitignore (prevents accidental commit)</criterion>
+    <criterion id="AC3">Environment variable validation created (src/lib/env.ts)</criterion>
+    <criterion id="AC4">Vite environment variable loading configured (import.meta.env)</criterion>
+    <criterion id="AC5">Type-safe environment variable access implemented</criterion>
+    <criterion id="AC6">README documents how to set up .env from .env.example</criterion>
+    <criterion id="AC7">GitHub Actions uses secrets for environment variables</criterion>
+    <criterion id="AC8">Vercel environment variables documented in README</criterion>
+    <criterion id="AC9">Test: Missing required environment variable throws clear error</criterion>
+    <criterion id="AC10">Test: Environment variables accessible in app code</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Decision Document</title>
+        <section>Starter Template Decision</section>
+        <snippet>Vite environment variables section defines VITE_ prefix requirement for client-side variables, import.meta.env access pattern, and type safety requirements via vite-env.d.ts. Node.js 22.x standardized across all environments.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics/epic-0-infrastructure-project-setup.md</path>
+        <title>Epic 0: Infrastructure & Project Setup</title>
+        <section>Story 0.8: Set Up Environment Variable Management</section>
+        <snippet>Story definition specifies .env.example creation, .gitignore configuration, type-safe validation module (src/lib/env.ts), GitHub Actions secrets, and Vercel environment variable documentation.</snippet>
+      </doc>
+      <doc>
+        <path>docs/technical-decisions/adr-007-secrets-key-management.md</path>
+        <title>ADR-007: Secrets & Key Management</title>
+        <section>Implementation Details</section>
+        <snippet>OAuth 2.0 PKCE token flow with Web Crypto API encryption. No client secrets in browser. Defines security model for sensitive configuration including token storage, encryption keys, and browser-native security patterns.</snippet>
+      </doc>
+      <doc>
+        <path>docs/technical-decisions/adr-012-test-strategy-benchmark-harness.md</path>
+        <title>ADR-012: Test Strategy & Benchmark Harness</title>
+        <section>Test Coverage Targets</section>
+        <snippet>Unit test coverage >80% line coverage using Vitest 4.0. Environment variable validation should be tested with missing/invalid variable scenarios.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/0-7-configure-vercel-deployment-pipeline.md</path>
+        <title>Story 0.7: Configure Vercel Deployment Pipeline</title>
+        <section>Dev Notes - Learnings</section>
+        <snippet>Vercel deployment pipeline fully configured. Node.js 22.x standardized. Environment variables can be configured in Vercel dashboard per environment (Production, Preview, Development). No env vars required for Epic 0 yet.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/0-4-configure-vitest-4-0-unit-testing-infrastructure.md</path>
+        <title>Story 0.4: Configure Vitest 4.0 Unit Testing Infrastructure</title>
+        <section>Dev Notes - Testing Strategy</section>
+        <snippet>Vitest 4.0 with jsdom for component testing, v8 coverage provider, @testing-library/react for components. Test file convention: *.test.ts, *.test.tsx. Coverage target >80%.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>src/vite-env.d.ts</path>
+        <kind>type-definition</kind>
+        <symbol>ImportMetaEnv</symbol>
+        <lines>1-2</lines>
+        <reason>Existing type definition file that needs to be extended with custom environment variable types for type-safe access</reason>
+      </artifact>
+      <artifact>
+        <path>vite.config.ts</path>
+        <kind>config</kind>
+        <symbol>defineConfig</symbol>
+        <lines>1-17</lines>
+        <reason>Vite configuration file that automatically loads .env files. May need env-specific configuration if required.</reason>
+      </artifact>
+      <artifact>
+        <path>vitest.config.ts</path>
+        <kind>config</kind>
+        <symbol>defineConfig</symbol>
+        <lines>1-37</lines>
+        <reason>Test configuration that may need environment variable mocking for unit tests validating env var behavior</reason>
+      </artifact>
+      <artifact>
+        <path>.gitignore</path>
+        <kind>config</kind>
+        <symbol>N/A</symbol>
+        <lines>20-23</lines>
+        <reason>Already contains .env entries (lines 21-23). Confirms .env, .env.local, and .env.*.local are gitignored to prevent secret commits.</reason>
+      </artifact>
+      <artifact>
+        <path>.github/workflows/ci.yml</path>
+        <kind>config</kind>
+        <symbol>test-and-build</symbol>
+        <lines>10-46</lines>
+        <reason>GitHub Actions CI pipeline where environment variables from secrets can be injected. Currently no env vars configured - placeholder for future secrets.</reason>
+      </artifact>
+      <artifact>
+        <path>package.json</path>
+        <kind>config</kind>
+        <symbol>scripts</symbol>
+        <lines>10-26</lines>
+        <reason>NPM scripts for dev, build, test commands that will use environment variables. No env-specific scripts needed for Story 0.8.</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <package name="vite" version="^7.1.12">Vite 7.0 bundler with built-in .env file loading. Automatically loads .env, .env.local, .env.[mode], .env.[mode].local files. Requires Node.js 22.12+</package>
+        <package name="typescript" version="5.9">TypeScript 5.9 for type-safe environment variable access via ImportMetaEnv interface</package>
+        <package name="@types/node" version="^24.10.0">Node.js type definitions for process.env access patterns</package>
+        <package name="vitest" version="^4.0.7">Vitest 4.0 unit testing framework for testing environment variable validation logic</package>
+      </node>
+      <frameworks>
+        <framework name="Vite Environment Variables">
+          Built-in Vite feature for loading .env files. Variables prefixed with VITE_ are exposed to client. Access via import.meta.env.VITE_*. Files loaded in order: .env (base), .env.local (local overrides), .env.[mode] (mode-specific), .env.[mode].local (local mode overrides).
+        </framework>
+        <framework name="TypeScript Declaration Files">
+          vite-env.d.ts provides type definitions for environment variables via ImportMetaEnv interface extension. Enables autocomplete and compile-time type checking for env vars.
+        </framework>
+      </frameworks>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Vite environment variables MUST use VITE_ prefix for client-side exposure (import.meta.env.VITE_*)</constraint>
+    <constraint>Server-side/build-time variables must NOT use VITE_ prefix (not exposed to browser)</constraint>
+    <constraint>All .env files (.env, .env.local, .env.*.local) MUST be in .gitignore to prevent secret commits</constraint>
+    <constraint>Environment variable validation MUST run early in app initialization (before React renders)</constraint>
+    <constraint>Type safety required: All environment variables MUST be typed in vite-env.d.ts via ImportMetaEnv interface</constraint>
+    <constraint>Node.js 22.x standardized across local/CI/deployment (Vite 7.0 requires Node.js 22.12+)</constraint>
+    <constraint>GitHub Actions: Use repository secrets for CI environment variables (not hardcoded in workflow files)</constraint>
+    <constraint>Vercel: Configure environment variables per environment (Production, Preview, Development) via dashboard</constraint>
+    <constraint>Epic 0 focus: Establish pattern and validation infrastructure (actual API keys deferred to Epic 1)</constraint>
+    <constraint>Security: Never commit sensitive values, use clear error messages for missing variables</constraint>
+    <constraint>Testing: Unit tests MUST validate missing/invalid environment variable scenarios (>80% coverage target)</constraint>
+  </constraints>
+  <interfaces>
+    <interface>
+      <name>ImportMetaEnv</name>
+      <kind>TypeScript interface</kind>
+      <signature>interface ImportMetaEnv { readonly VITE_APP_NAME: string; readonly VITE_API_URL: string; }</signature>
+      <path>src/vite-env.d.ts</path>
+    </interface>
+    <interface>
+      <name>import.meta.env</name>
+      <kind>Vite environment variable access</kind>
+      <signature>import.meta.env.VITE_* - Vite-provided global for accessing client-side environment variables</signature>
+      <path>N/A (Vite built-in)</path>
+    </interface>
+    <interface>
+      <name>validateEnv()</name>
+      <kind>Function signature</kind>
+      <signature>function validateEnv(): void - Validates required environment variables are present and throws descriptive errors if missing</signature>
+      <path>src/lib/env.ts (to be created)</path>
+    </interface>
+    <interface>
+      <name>getEnv()</name>
+      <kind>Function signature</kind>
+      <signature>function getEnv&lt;K extends keyof ImportMetaEnv&gt;(key: K, defaultValue?: string): string - Type-safe accessor for environment variables with optional defaults</signature>
+      <path>src/lib/env.ts (to be created)</path>
+    </interface>
+  </interfaces>
+  <tests>
+    <standards>
+      Vitest 4.0 unit testing framework with jsdom environment for component testing. v8 coverage provider targeting >80% line coverage. Test files use *.test.ts or *.test.tsx convention. Tests located alongside source files or in src/test/ directory. Use @testing-library/react for component testing and @testing-library/jest-dom for DOM assertions. Environment variable tests should mock import.meta.env and validate error handling for missing/invalid values.
+    </standards>
+    <locations>
+      <location>src/lib/env.test.ts - Unit tests for environment variable validation module</location>
+      <location>src/test/ - General test utilities and setup files</location>
+      <location>coverage/ - Test coverage reports (gitignored)</location>
+    </locations>
+    <ideas>
+      <test criterion="AC9" priority="high">
+        Test: validateEnv() throws clear error when required environment variable is missing. Mock import.meta.env with missing VITE_APP_NAME, call validateEnv(), expect error with message "Missing required environment variable: VITE_APP_NAME".
+      </test>
+      <test criterion="AC10" priority="high">
+        Test: Environment variables accessible in app code. Mock import.meta.env with VITE_APP_NAME="Claine", call getEnv('VITE_APP_NAME'), expect return value "Claine".
+      </test>
+      <test criterion="AC3,AC5" priority="high">
+        Test: getEnv() provides type-safe access with autocomplete. Verify TypeScript compilation succeeds for valid keys, fails for invalid keys. Test optional variables with defaults return default when undefined.
+      </test>
+      <test criterion="AC9" priority="medium">
+        Test: validateEnv() error message includes troubleshooting hint. Expect error message contains instructions like "Copy .env.example to .env and set values".
+      </test>
+      <test criterion="AC3" priority="medium">
+        Test: validateEnv() validates multiple required variables. Mock import.meta.env missing multiple variables, expect error lists all missing variables.
+      </test>
+      <test criterion="AC5" priority="medium">
+        Test: getEnv() with optional variable returns default value. Call getEnv('VITE_OPTIONAL_VAR', 'default'), expect 'default' when variable undefined.
+      </test>
+      <test criterion="AC4" priority="low">
+        Test: import.meta.env types correctly inferred. Verify TypeScript IntelliSense suggests VITE_APP_NAME and VITE_API_URL when typing import.meta.env.
+      </test>
+    </ideas>
+  </tests>
+</story-context>

@@ -1,0 +1,319 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>9</storyId>
+    <title>Implement Sync Conflict Detection and Resolution</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-26</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/1-9-implement-sync-conflict-detection-and-resolution.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>user</asA>
+    <iWant>sync conflicts handled automatically when possible</iWant>
+    <soThat>I don't lose data when local and server changes conflict</soThat>
+    <tasks>
+      <task id="1" ac="1,2">Create conflict detection service
+        <subtask>Create src/services/sync/conflictDetection.ts</subtask>
+        <subtask>Implement detectConflict(localEmail, serverEmail) function</subtask>
+        <subtask>Compare timestamps: local updatedAt vs server internalDate</subtask>
+        <subtask>Return conflict type: 'metadata' | 'content' | 'labels' | 'none'</subtask>
+        <subtask>Integrate into sync engine (Gmail and Outlook)</subtask>
+      </task>
+      <task id="2" ac="3,11">Create conflict audit RxDB schema
+        <subtask>Create src/services/database/schemas/conflictAudit.schema.ts</subtask>
+        <subtask>Fields: id, emailId, accountId, conflictType, localVersion, serverVersion, resolution, resolvedAt, resolvedBy</subtask>
+        <subtask>Add indexes: emailId, accountId, resolvedAt</subtask>
+        <subtask>Create migration for new collection</subtask>
+      </task>
+      <task id="3" ac="4">Implement last-write-wins for metadata
+        <subtask>Create src/services/sync/resolutionStrategies.ts</subtask>
+        <subtask>Implement resolveMetadataConflict(local, server) - use newer timestamp</subtask>
+        <subtask>Apply to: read, starred, archived, importance</subtask>
+      </task>
+      <task id="4" ac="5">Implement merge strategy for labels/attributes
+        <subtask>Implement resolveLabelConflict(local, server) - union of sets</subtask>
+        <subtask>Implement resolveAttributeConflict(local, server) - merge with last-write-wins per key</subtask>
+      </task>
+      <task id="5" ac="6,7,8">Create conflict resolution modal
+        <subtask>Create src/components/conflicts/ConflictResolutionModal.tsx</subtask>
+        <subtask>Display side-by-side diff (local vs server)</subtask>
+        <subtask>Highlight differences using diff algorithm</subtask>
+        <subtask>Three buttons: Keep Local, Keep Server, Merge</subtask>
+        <subtask>Merge editor for manual resolution</subtask>
+      </task>
+      <task id="6" ac="6,7,8">Create conflict notification system
+        <subtask>Create src/store/conflictStore.ts (Zustand)</subtask>
+        <subtask>Track pending conflicts requiring user action</subtask>
+        <subtask>Show badge/indicator when conflicts exist</subtask>
+      </task>
+      <task id="7" ac="9">Implement preference storage
+        <subtask>Store user preferences per conflict type in localStorage</subtask>
+        <subtask>Options: Always keep local, Always keep server, Always ask</subtask>
+        <subtask>Apply saved preference on future conflicts</subtask>
+      </task>
+      <task id="8" ac="10,12">Create conflict history UI
+        <subtask>Create src/components/settings/ConflictHistoryPanel.tsx</subtask>
+        <subtask>Query conflictAudit collection for history</subtask>
+        <subtask>Display: total conflicts, auto-resolved, manual-resolved</subtask>
+        <subtask>List recent conflicts with resolution details</subtask>
+        <subtask>Add to Settings page</subtask>
+      </task>
+      <task id="9" ac="13,14,15,16">Write unit tests for conflict detection service
+        <subtask>Test metadata conflict → last-write-wins applied</subtask>
+        <subtask>Test labels conflict → union merge applied</subtask>
+        <subtask>Test content conflict → returns 'needs_manual'</subtask>
+      </task>
+      <task id="10" ac="13,14,15,16">Write unit tests for resolution strategies</task>
+      <task id="11" ac="13,14,15,16">Write component tests for ConflictResolutionModal</task>
+      <task id="12" ac="13,14,15,16">Write integration tests for full conflict flow</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC1">Conflict detected when local change timestamp > server change timestamp</criterion>
+    <criterion id="AC2">Conflict detection runs on every sync operation</criterion>
+    <criterion id="AC3">Conflicts logged to RxDB audit table with details</criterion>
+    <criterion id="AC4">Last-write-wins applied for metadata (read status, starred, archived)</criterion>
+    <criterion id="AC5">Merge strategy applied for labels/attributes (union of both sets)</criterion>
+    <criterion id="AC6">User prompted with diff view for body/subject conflicts</criterion>
+    <criterion id="AC7">User can choose: Keep Local, Keep Server, or Merge manually</criterion>
+    <criterion id="AC8">Conflict resolution UI shows local version, server version, side-by-side diff</criterion>
+    <criterion id="AC9">Conflict resolution decisions saved for similar future conflicts</criterion>
+    <criterion id="AC10">User can review conflict history in settings</criterion>
+    <criterion id="AC11">All conflicts logged to RxDB with resolution strategy used</criterion>
+    <criterion id="AC12">Conflict statistics displayed in settings (total, auto-resolved, manual)</criterion>
+    <criterion id="AC13">Test: Read status conflict → last-write-wins</criterion>
+    <criterion id="AC14">Test: Labels conflict → merge (union)</criterion>
+    <criterion id="AC15">Test: Body conflict → user prompt shown</criterion>
+    <criterion id="AC16">Test: User resolves conflict → correct version saved</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/epics/epic-1-foundation-core-infrastructure.md</path>
+        <title>Epic 1: Foundation &amp; Core Infrastructure</title>
+        <section>Story 1.9</section>
+        <snippet>Defines conflict detection/resolution acceptance criteria. Last-write-wins for metadata, merge for labels, user prompt for content conflicts.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Decision Document</title>
+        <section>Decision 1: Database (RxDB + IndexedDB)</section>
+        <snippet>RxDB v16.20.0 with IndexedDB adapter. Schema design patterns, index strategies, and migration approach for new collections.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Decision Document</title>
+        <section>Decision 2: State Management (Zustand)</section>
+        <snippet>Zustand v5.x for global state. Feature-based slices pattern. DevTools enabled for debugging.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/1-8-multi-account-management.md</path>
+        <title>Story 1.8: Multi-Account Management</title>
+        <section>Dev Agent Record</section>
+        <snippet>Zustand store pattern example at src/store/accountStore.ts. Modal pattern using shadcn Dialog. 22 store tests + 10 component tests.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <file>
+        <path>src/services/sync/gmailSync.ts</path>
+        <kind>service</kind>
+        <symbol>GmailSyncService</symbol>
+        <lines>1-649</lines>
+        <reason>Main Gmail sync service. storeEmail method at line 508 needs conflict detection integration before updating local email.</reason>
+      </file>
+      <file>
+        <path>src/services/sync/outlookSync.ts</path>
+        <kind>service</kind>
+        <symbol>OutlookSyncService</symbol>
+        <reason>Outlook sync service. Same pattern as Gmail - needs conflict detection integration.</reason>
+      </file>
+      <file>
+        <path>src/services/sync/syncProgress.ts</path>
+        <kind>service</kind>
+        <symbol>SyncProgressService</symbol>
+        <lines>1-284</lines>
+        <reason>Sync progress tracking. Pattern for RxDB document updates. Can extend to track conflict statistics.</reason>
+      </file>
+      <file>
+        <path>src/services/database/schemas/email.schema.ts</path>
+        <kind>schema</kind>
+        <symbol>EmailDocument, emailSchema</symbol>
+        <lines>1-376</lines>
+        <reason>Email document structure. Contains fields for conflict detection: timestamp, labels, read, starred, attributes, body.</reason>
+      </file>
+      <file>
+        <path>src/services/database/schemas/syncState.schema.ts</path>
+        <kind>schema</kind>
+        <symbol>SyncStateDocument</symbol>
+        <reason>Sync state schema pattern. Use as reference for creating conflictAudit schema with same conventions.</reason>
+      </file>
+      <file>
+        <path>src/services/database/types.ts</path>
+        <kind>types</kind>
+        <symbol>DatabaseCollections, AppDatabase</symbol>
+        <lines>1-69</lines>
+        <reason>Database types. Must add conflictAudit collection to DatabaseCollections interface.</reason>
+      </file>
+      <file>
+        <path>src/store/accountStore.ts</path>
+        <kind>store</kind>
+        <symbol>useAccountStore, AccountState</symbol>
+        <lines>1-222</lines>
+        <reason>Zustand store pattern to follow. localStorage persistence pattern for conflict preferences.</reason>
+      </file>
+      <file>
+        <path>src/components/account/AccountSettings.tsx</path>
+        <kind>component</kind>
+        <symbol>AccountSettings</symbol>
+        <reason>Settings page component. ConflictHistoryPanel will be added here alongside account settings.</reason>
+      </file>
+    </code>
+    <dependencies>
+      <node>
+        <package>rxdb</package>
+        <version>^16.20.0</version>
+        <usage>Database for storing emails and conflict audit records</usage>
+      </node>
+      <node>
+        <package>rxjs</package>
+        <version>^7.8.2</version>
+        <usage>Reactive subscriptions for conflict notifications</usage>
+      </node>
+      <node>
+        <package>zustand</package>
+        <version>^5.0.8</version>
+        <usage>State management for conflictStore</usage>
+      </node>
+      <node>
+        <package>lucide-react</package>
+        <version>^0.552.0</version>
+        <usage>Icons for conflict UI (alert, check, merge)</usage>
+      </node>
+      <devNode>
+        <package>vitest</package>
+        <version>^4.0.7</version>
+        <usage>Unit testing for conflict detection and resolution</usage>
+      </devNode>
+      <devNode>
+        <package>@testing-library/react</package>
+        <version>^16.3.0</version>
+        <usage>Component testing for ConflictResolutionModal</usage>
+      </devNode>
+      <devNode>
+        <package>fake-indexeddb</package>
+        <version>^6.2.4</version>
+        <usage>Mock IndexedDB for RxDB tests</usage>
+      </devNode>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="performance">Batch conflict checks during sync - don't check one-by-one</constraint>
+    <constraint type="performance">Audit logging should be async - don't block sync operations</constraint>
+    <constraint type="performance">Cache conflict preferences in memory for fast access</constraint>
+    <constraint type="architecture">Conflict detection must run BEFORE local data is overwritten</constraint>
+    <constraint type="architecture">Compare local updatedAt with server timestamp (Gmail: internalDate, Outlook: receivedDateTime)</constraint>
+    <constraint type="architecture">Follow existing Zustand store pattern from accountStore.ts</constraint>
+    <constraint type="architecture">Follow existing RxDB schema pattern from syncState.schema.ts</constraint>
+    <constraint type="architecture">RxDB collection names cannot start with underscore</constraint>
+    <constraint type="data-scope">All queries must filter by accountId for multi-account support</constraint>
+    <constraint type="edge-case">Handle offline edits: Track local changes with timestamp</constraint>
+    <constraint type="edge-case">Handle multiple conflicting changes: Show diff of most recent local vs server</constraint>
+    <constraint type="edge-case">Handle conflict during conflict resolution: Queue, don't interrupt</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>ConflictDetectionService</name>
+      <kind>service class</kind>
+      <signature>
+class ConflictDetectionService {
+  detect(localEmail: EmailDocument, serverEmail: EmailDocument): ConflictResult
+}
+
+interface ConflictResult {
+  type: 'none' | 'metadata' | 'labels' | 'content'
+  localTimestamp: number
+  serverTimestamp: number
+  conflictingFields?: string[]
+}
+      </signature>
+      <path>src/services/sync/conflictDetection.ts (NEW)</path>
+    </interface>
+    <interface>
+      <name>ResolutionStrategies</name>
+      <kind>module functions</kind>
+      <signature>
+function resolveMetadataConflict(local: EmailDocument, server: EmailDocument): EmailDocument
+function resolveLabelConflict(local: EmailDocument, server: EmailDocument): EmailDocument
+function resolveAttributeConflict(local: EmailDocument, server: EmailDocument): EmailDocument
+      </signature>
+      <path>src/services/sync/resolutionStrategies.ts (NEW)</path>
+    </interface>
+    <interface>
+      <name>ConflictAuditDocument</name>
+      <kind>RxDB document type</kind>
+      <signature>
+interface ConflictAuditDocument {
+  id: string
+  emailId: string
+  accountId: string
+  conflictType: 'metadata' | 'content' | 'labels'
+  localVersion: { timestamp: number; data: Partial&lt;EmailDocument&gt; }
+  serverVersion: { timestamp: number; data: Partial&lt;EmailDocument&gt; }
+  resolution: 'local' | 'server' | 'merged' | 'auto-lww' | 'auto-merge'
+  resolvedAt: string
+  resolvedBy: 'system' | 'user'
+}
+      </signature>
+      <path>src/services/database/schemas/conflictAudit.schema.ts (NEW)</path>
+    </interface>
+    <interface>
+      <name>useConflictStore</name>
+      <kind>Zustand store hook</kind>
+      <signature>
+interface ConflictStore {
+  pendingConflicts: PendingConflict[]
+  addPendingConflict: (conflict: PendingConflict) => void
+  removePendingConflict: (id: string) => void
+  resolveConflict: (id: string, resolution: Resolution) => Promise&lt;void&gt;
+  getPendingCount: () => number
+}
+      </signature>
+      <path>src/store/conflictStore.ts (NEW)</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+Use Vitest for unit tests, @testing-library/react for component tests. Follow existing test patterns in src/services/sync/__tests__/ and src/store/__tests__/. Use fake-indexeddb for RxDB mocking. Test files colocated with source files in __tests__ folders.
+    </standards>
+    <locations>
+      <location>src/services/sync/__tests__/conflictDetection.test.ts</location>
+      <location>src/services/sync/__tests__/resolutionStrategies.test.ts</location>
+      <location>src/store/__tests__/conflictStore.test.ts</location>
+      <location>src/components/conflicts/__tests__/ConflictResolutionModal.test.tsx</location>
+      <location>src/services/database/schemas/__tests__/conflictAudit.schema.test.ts</location>
+    </locations>
+    <ideas>
+      <idea ac="1,2">Test detectConflict returns 'none' when server timestamp > local timestamp</idea>
+      <idea ac="1,2">Test detectConflict returns 'metadata' when only read/starred/archived differ</idea>
+      <idea ac="1,2">Test detectConflict returns 'labels' when only labels differ</idea>
+      <idea ac="1,2">Test detectConflict returns 'content' when subject or body differs</idea>
+      <idea ac="4">Test resolveMetadataConflict picks version with newer timestamp</idea>
+      <idea ac="5">Test resolveLabelConflict returns union of both label sets</idea>
+      <idea ac="5">Test resolveAttributeConflict merges with per-key last-write-wins</idea>
+      <idea ac="6,7,8">Test ConflictResolutionModal displays both versions</idea>
+      <idea ac="6,7,8">Test ConflictResolutionModal 'Keep Local' calls correct handler</idea>
+      <idea ac="6,7,8">Test ConflictResolutionModal 'Keep Server' calls correct handler</idea>
+      <idea ac="9">Test conflict preferences persist to localStorage</idea>
+      <idea ac="9">Test auto-resolution respects saved preferences</idea>
+      <idea ac="3,11">Test conflict audit record created on resolution</idea>
+      <idea ac="10,12">Test conflict history panel shows correct statistics</idea>
+    </ideas>
+  </tests>
+</story-context>

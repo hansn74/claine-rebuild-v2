@@ -1,0 +1,115 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>0</epicId>
+    <storyId>10</storyId>
+    <title>Configure Bundle Analysis and Size Budgets</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-06</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/0-10-configure-bundle-analysis-and-size-budgets.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>a developer</asA>
+    <iWant>bundle size monitoring and budgets</iWant>
+    <soThat>we prevent performance regressions from oversized bundles</soThat>
+    <tasks>
+      - Install and configure bundle visualization plugin (vite-plugin-visualizer)
+      - Configure size budgets and warnings in vite.config.ts
+      - Add NPM script 'npm run analyze' for bundle visualization
+      - Document bundle analysis process in README
+      - Validate bundle size monitoring with tests
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">vite-plugin-visualizer installed for bundle analysis</criterion>
+    <criterion id="2">vite.config.ts configured to generate bundle analysis report</criterion>
+    <criterion id="3">Bundle analysis report generated on build (stats.html)</criterion>
+    <criterion id="4">Size budgets defined in vite.config.ts: Initial bundle &lt;500 KB, Email list chunk &lt;200 KB, AI chunk &lt;3 MB (for ONNX runtime)</criterion>
+    <criterion id="5">Build warnings displayed if budgets exceeded</criterion>
+    <criterion id="6">NPM script added: 'npm run analyze' generates bundle report</criterion>
+    <criterion id="7">README documents how to analyze bundle size</criterion>
+    <criterion id="8">Test: 'npm run build' generates stats.html</criterion>
+    <criterion id="9">Test: 'npm run analyze' opens bundle visualization</criterion>
+    <criterion id="10">Test: Intentionally large import triggers budget warning</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/architecture.md" title="Architecture Decision Document" section="Executive Summary">
+        Technology stack decisions including Vite 7.1+, bundle size requirements. Epic 0 success criteria requires production bundle &lt;500 KB initial size. Build performance target: &lt;10 seconds with Vite 7.0.
+      </doc>
+      <doc path="docs/epics/epic-0-infrastructure-project-setup.md" title="Epic 0: Infrastructure & Project Setup" section="Story 0.10">
+        Complete story definition with 10 acceptance criteria for bundle analysis configuration. Includes size budget specifications and testing requirements.
+      </doc>
+      <doc path="docs/stories/0-9-create-project-readme-with-setup-instructions.md" title="Story 0.9: Create Project README" section="Dev Agent Record">
+        README documentation pattern established. Current bundle size ~224 KB (gzipped), well under 500 KB budget. README includes NPM scripts section and Performance Metrics section where bundle analysis details should be added.
+      </doc>
+      <doc path="README.md" title="Project README" section="Available Scripts">
+        NPM scripts documentation format. New 'npm run analyze' script should be added following existing pattern. Performance Metrics section documents current bundle size.
+      </doc>
+      <doc path="package.json" title="Package Dependencies" section="scripts">
+        Existing NPM scripts follow pattern: 'npm run &lt;action&gt;' or 'npm run &lt;action&gt;:&lt;variant&gt;'. Bundle analysis script should follow this convention.
+      </doc>
+    </docs>
+    <code>
+      <file path="vite.config.ts" kind="config" symbol="defineConfig" lines="1-21" reason="Main Vite configuration file where bundle analysis plugin and size budgets will be configured. Currently has basic setup with React plugin and path aliases."></file>
+      <file path="package.json" kind="manifest" symbol="scripts" lines="10-27" reason="NPM scripts definition. New 'analyze' script will be added here. Current scripts include dev, build, preview, test variants, lint, format."></file>
+      <file path="README.md" kind="documentation" symbol="Available Scripts" lines="99-128" reason="Documentation of NPM scripts. Bundle analysis script documentation will be added here."></file>
+      <file path="README.md" kind="documentation" symbol="Performance Metrics" lines="339-345" reason="Current bundle size documentation (~224 KB gzipped). Will be updated with bundle analysis information."></file>
+    </code>
+    <dependencies>
+      <node>
+        <package name="vite" version="^7.1.12" scope="devDependencies">Build tool with Rollup bundler</package>
+        <package name="@vitejs/plugin-react" version="^4.7.0" scope="devDependencies">React plugin for Vite</package>
+        <package name="typescript" version="5.9" scope="devDependencies">TypeScript compiler</package>
+        <package name="vite-plugin-visualizer" version="to-be-installed" scope="devDependencies">Bundle visualization plugin (NOT YET INSTALLED)</package>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="architecture">Vite 7.x uses Rollup internally for bundling. Configuration must use Rollup options format (build.rollupOptions).</constraint>
+    <constraint type="performance">Epic 0 success criteria mandates production bundle &lt;500 KB initial size. Bundle analysis must enforce this budget.</constraint>
+    <constraint type="structure">Configuration files must maintain existing structure. vite.config.ts already has plugins array and resolve.alias configured.</constraint>
+    <constraint type="documentation">README documentation must follow established pattern from Story 0.9: GitHub-flavored Markdown, code blocks for commands, organized sections.</constraint>
+    <constraint type="testing">Manual validation only - no automated tests required for infrastructure/tooling configuration (follows Epic 0 pattern).</constraint>
+    <constraint type="formatting">All modified files must be Prettier-formatted. Pre-commit hooks will enforce this.</constraint>
+    <constraint type="future">AI chunk budget (3 MB) is placeholder for Epic 3. Actual AI chunk won't exist until Story 3.1 (Local LLM Integration).</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface name="Vite Config API" kind="configuration" signature="export default defineConfig({ plugins: Plugin[], build: { rollupOptions: { plugins: Plugin[], output: { manualChunks: Record&lt;string, string[]&gt;, chunkSizeWarningLimit: number } } } })" path="vite.config.ts">
+      Vite configuration object structure. Plugin configuration goes in plugins array. Build options including Rollup configuration go in build.rollupOptions.
+    </interface>
+    <interface name="vite-plugin-visualizer" kind="plugin" signature="import { visualizer } from 'rollup-plugin-visualizer'; visualizer({ open: boolean, filename: string, gzipSize: boolean })" path="node_modules/rollup-plugin-visualizer">
+      Bundle visualization plugin. Configuration options: open (auto-open browser), filename (output file), gzipSize (show gzipped sizes).
+    </interface>
+    <interface name="NPM Scripts" kind="package-json" signature="{ scripts: { &quot;script-name&quot;: &quot;command&quot; } }" path="package.json">
+      NPM script definition format in package.json. New 'analyze' script will execute build and open visualization.
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Manual validation for infrastructure stories (no automated tests). Testing approach:
+      1) Run npm run build - verify stats.html generated
+      2) Run npm run analyze - verify visualization opens in browser
+      3) Add large import - verify budget warning displayed
+      4) Check bundle sizes match expectations
+      5) Verify README documentation accuracy
+      Pattern follows Epic 0 infrastructure stories (0.1-0.9).
+    </standards>
+    <locations>
+      No test files required for this story. Validation is manual through npm scripts and visual inspection of generated artifacts.
+    </locations>
+    <ideas>
+      <idea ac="1,2,3">Install vite-plugin-visualizer, configure in vite.config.ts rollupOptions.plugins, verify stats.html generated on build</idea>
+      <idea ac="4,5">Add build.chunkSizeWarningLimit: 500 (KB) to vite.config.ts, configure manualChunks for future code splitting, verify build shows size warnings</idea>
+      <idea ac="6">Add 'analyze' script to package.json: 'vite build &amp;&amp; open stats.html' (or platform-specific open command)</idea>
+      <idea ac="7">Update README Performance Metrics section with bundle analysis documentation, add to Available Scripts section</idea>
+      <idea ac="8,9,10">Manual testing: run build/analyze commands, test with intentionally large import (e.g., import entire lodash library)</idea>
+    </ideas>
+  </tests>
+</story-context>

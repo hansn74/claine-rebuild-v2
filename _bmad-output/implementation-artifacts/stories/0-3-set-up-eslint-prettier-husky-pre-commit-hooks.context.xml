@@ -1,0 +1,748 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<storyContext>
+  <metadata>
+    <storyKey>0-3-set-up-eslint-prettier-husky-pre-commit-hooks</storyKey>
+    <storyTitle>Set Up ESLint + Prettier + Husky Pre-commit Hooks</storyTitle>
+    <epicKey>epic-0-infrastructure-project-setup</epicKey>
+    <phase>Phase 1: Planning and Solutioning</phase>
+    <dependencies>
+      <dependency>Story 0.1 (Vite + React + TypeScript project initialized)</dependency>
+      <dependency>Story 0.2 (TailwindCSS 4.0 + shadcn/ui configured)</dependency>
+    </dependencies>
+    <generatedDate>2025-11-04</generatedDate>
+  </metadata>
+
+  <story>
+    <userStory>
+      As a developer,
+      I want automated code quality enforcement,
+      So that all code meets consistent standards before being committed.
+    </userStory>
+
+    <description>
+      This story establishes the code quality infrastructure for the Claine v2 rebuild project by configuring ESLint with TypeScript and React support, Prettier for code formatting, and Husky pre-commit hooks to enforce standards before code is committed to the repository. This ensures all team members (and AI agents) follow consistent coding patterns and prevents low-quality code from entering the codebase.
+    </description>
+
+    <scope>
+      Configure ESLint with TypeScript 5.9 and React 19.2 support, install and configure Prettier for code formatting, integrate ESLint and Prettier to avoid conflicts, set up Husky pre-commit hooks with lint-staged to automatically lint and format staged files, and add NPM scripts for manual linting and formatting operations.
+    </scope>
+
+    <outOfScope>
+      - Setting up Jest or Vitest (covered in Story 0.4)
+      - Setting up Playwright (covered in Story 0.5)
+      - CI/CD pipeline configuration (covered in Story 0.6)
+      - Custom ESLint rules beyond recommended React/TypeScript plugins
+      - IDE-specific integrations (developers configure individually)
+      - Git hooks beyond pre-commit (commit-msg, pre-push, etc.)
+    </outOfScope>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC-1" priority="high">
+      <description>ESLint configured with TypeScript support (@typescript-eslint/parser)</description>
+      <verification>
+        - Package installed: @typescript-eslint/parser, @typescript-eslint/eslint-plugin
+        - ESLint config file exists: .eslintrc.cjs
+        - Parser set to @typescript-eslint/parser
+        - Plugin @typescript-eslint included
+        - TypeScript files (.ts, .tsx) are parsed without errors
+      </verification>
+    </criterion>
+
+    <criterion id="AC-2" priority="high">
+      <description>ESLint rules configured for React 19.2 (eslint-plugin-react)</description>
+      <verification>
+        - Packages installed: eslint-plugin-react, eslint-plugin-react-hooks, eslint-plugin-jsx-a11y
+        - React plugin included in ESLint config
+        - React version auto-detected (settings.react.version: 'detect')
+        - JSX runtime rules enabled (plugin:react/jsx-runtime)
+        - React hooks rules enabled (plugin:react-hooks/recommended)
+        - Accessibility rules enabled (plugin:jsx-a11y/recommended)
+      </verification>
+    </criterion>
+
+    <criterion id="AC-3" priority="high">
+      <description>Prettier installed and configured</description>
+      <verification>
+        - Prettier package installed as dev dependency
+        - .prettierrc config file exists with formatting rules
+        - .prettierignore file exists to exclude build outputs and dependencies
+        - Prettier can format files without errors
+      </verification>
+    </criterion>
+
+    <criterion id="AC-4" priority="high">
+      <description>ESLint + Prettier integration configured (eslint-config-prettier)</description>
+      <verification>
+        - eslint-config-prettier installed
+        - 'prettier' added as last item in ESLint extends array
+        - No rule conflicts between ESLint and Prettier
+        - Both tools work together without conflicts
+      </verification>
+    </criterion>
+
+    <criterion id="AC-5" priority="high">
+      <description>Husky installed and pre-commit hook configured</description>
+      <verification>
+        - Husky and lint-staged packages installed
+        - .husky directory exists with _/husky.sh
+        - .husky/pre-commit hook file exists and is executable
+        - package.json has "prepare": "husky install" script
+        - Husky hooks work on git commit
+      </verification>
+    </criterion>
+
+    <criterion id="AC-6" priority="high">
+      <description>Pre-commit hook runs: ESLint + Prettier on staged files</description>
+      <verification>
+        - lint-staged configured in package.json
+        - TypeScript/JavaScript files run ESLint and Prettier
+        - JSON/CSS/MD files run Prettier only
+        - Pre-commit hook executes npx lint-staged
+        - Only staged files are linted/formatted (not entire codebase)
+      </verification>
+    </criterion>
+
+    <criterion id="AC-7" priority="high">
+      <description>Pre-commit hook blocks commit if linting errors exist</description>
+      <verification>
+        - Intentional ESLint error blocks commit with error message
+        - Fix error allows commit to succeed
+        - Git commit fails with non-zero exit code on lint errors
+      </verification>
+    </criterion>
+
+    <criterion id="AC-8" priority="high">
+      <description>NPM scripts added: npm run lint, npm run format</description>
+      <verification>
+        - npm run lint: runs ESLint on entire codebase with max-warnings 0
+        - npm run lint:fix: runs ESLint with --fix flag
+        - npm run format: runs Prettier --write on src files
+        - npm run format:check: runs Prettier --check on src files
+        - All scripts execute successfully
+      </verification>
+    </criterion>
+
+    <criterion id="AC-9" priority="high">
+      <description>Test: Intentional linting error blocks commit</description>
+      <verification>
+        - Create test file with unused variable
+        - Stage file and attempt commit
+        - Commit is blocked with ESLint error message
+        - Fix error and commit succeeds
+        - Test file cleaned up after verification
+      </verification>
+    </criterion>
+
+    <criterion id="AC-10" priority="high">
+      <description>Test: npm run lint detects and reports issues</description>
+      <verification>
+        - npm run lint on clean codebase passes
+        - Introduce intentional errors (unused var, missing semicolon, hook misuse)
+        - npm run lint detects and reports all issues
+        - npm run lint:fix auto-fixes fixable issues
+        - All issues resolved before story completion
+      </verification>
+    </criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <documentation>
+      <document>
+        <name>Epic 0: Infrastructure &amp; Project Setup</name>
+        <path>docs/epics/epic-0-infrastructure-project-setup.md</path>
+        <relevance>Defines Story 0.3 requirements, acceptance criteria, and prerequisites</relevance>
+        <keyPoints>
+          - Story 0.3 follows Story 0.1 (project initialization)
+          - ESLint must support TypeScript 5.9
+          - ESLint must support React 19.2
+          - Pre-commit hooks must block commits on errors
+          - Estimated effort: 3 hours
+        </keyPoints>
+      </document>
+
+      <document>
+        <name>Architecture Decision Document</name>
+        <path>docs/architecture.md</path>
+        <relevance>Defines technology stack, project structure, and code quality standards</relevance>
+        <keyPoints>
+          - Vite 7.0 + React 19.2 + TypeScript 5.9
+          - Architecture-compliant folder structure: src/shared/, src/features/
+          - Path aliases: @/, @features/*, @shared/*, @db/*, @workers/*
+          - Naming conventions: PascalCase for components, camelCase for services
+          - Code quality enforcement required at commit time
+        </keyPoints>
+      </document>
+
+      <document>
+        <name>Story 0.2 Implementation</name>
+        <path>docs/stories/0-2-configure-tailwindcss-4-0-oxide-engine-shadcn-ui.md</path>
+        <relevance>Previous story provides context on existing files and patterns to maintain</relevance>
+        <keyPoints>
+          - Files created that ESLint must lint: tailwind.config.ts, postcss.config.js, src/shared/components/ui/button.tsx, src/shared/utils/cn.ts, src/App.tsx
+          - Files created that Prettier must format: components.json, src/index.css
+          - Architecture-compliant paths: src/shared/components/ui/ for UI components
+          - Path aliases configured: @shared/*, @/ working in tsconfig and vite.config
+          - TailwindCSS classes in JSX should not trigger ESLint warnings
+        </keyPoints>
+      </document>
+    </documentation>
+
+    <codeArtifacts>
+      <artifact>
+        <name>package.json</name>
+        <path>package.json</path>
+        <type>configuration</type>
+        <description>NPM package configuration with dependencies and scripts</description>
+        <currentState>
+          - Scripts: dev, build, preview
+          - Dependencies: react@19.2, react-dom@19.2
+          - DevDependencies: vite@7.1.12, typescript@5.9, @tailwindcss/postcss@4.1.16, tailwindcss@4.1.16, shadcn/ui components
+          - No lint or format scripts yet (will be added)
+          - No Husky or lint-staged packages yet (will be installed)
+        </currentState>
+        <changes>
+          - Add ESLint and plugins as devDependencies
+          - Add Prettier as devDependency
+          - Add Husky and lint-staged as devDependencies
+          - Add scripts: lint, lint:fix, format, format:check, prepare
+          - Add lint-staged configuration object
+        </changes>
+      </artifact>
+
+      <artifact>
+        <name>tsconfig.json</name>
+        <path>tsconfig.json</path>
+        <type>configuration</type>
+        <description>TypeScript configuration with path aliases</description>
+        <currentState>
+          - TypeScript project references (tsconfig.app.json, tsconfig.node.json)
+          - Path aliases configured: @/* → ./src/*
+        </currentState>
+        <relevance>ESLint parser must respect these TypeScript settings</relevance>
+      </artifact>
+
+      <artifact>
+        <name>tsconfig.app.json</name>
+        <path>tsconfig.app.json</path>
+        <type>configuration</type>
+        <description>TypeScript app configuration with compiler options and path aliases</description>
+        <currentState>
+          - Target: ES2020
+          - Module: ESNext, moduleResolution: bundler
+          - Strict mode enabled, jsx: react-jsx
+          - Path aliases: @/, @features/*, @shared/*, @db/*, @workers/*
+          - Includes: src directory
+        </currentState>
+        <relevance>ESLint must understand these path aliases and TypeScript settings</relevance>
+      </artifact>
+
+      <artifact>
+        <name>vite.config.ts</name>
+        <path>vite.config.ts</path>
+        <type>configuration</type>
+        <description>Vite build configuration with path alias resolution</description>
+        <currentState>
+          - React plugin configured
+          - Path aliases defined matching tsconfig: @/, @features/, @shared/, @db/, @workers/
+        </currentState>
+        <relevance>ESLint should not conflict with Vite's module resolution</relevance>
+      </artifact>
+
+      <artifact>
+        <name>src/App.tsx</name>
+        <path>src/App.tsx</path>
+        <type>component</type>
+        <description>Main React application component using shadcn/ui Button</description>
+        <currentState>
+          - Imports Button from '@shared/components/ui/button' (path alias)
+          - Uses TailwindCSS classes: min-h-screen, flex, bg-blue-500, etc.
+          - JSX with React 19.2 (no React import needed)
+        </currentState>
+        <relevance>ESLint must lint React components, understand path aliases, not flag Tailwind classes</relevance>
+      </artifact>
+
+      <artifact>
+        <name>src/shared/components/ui/button.tsx</name>
+        <path>src/shared/components/ui/button.tsx</path>
+        <type>component</type>
+        <description>shadcn/ui Button component using Radix UI and CVA</description>
+        <currentState>
+          - Architecture-compliant location: src/shared/components/ui/
+          - Uses @shared path alias for cn import
+          - React forwardRef pattern
+          - TypeScript interfaces for props
+        </currentState>
+        <relevance>ESLint must lint architecture-compliant shared components</relevance>
+      </artifact>
+
+      <artifact>
+        <name>src/shared/utils/cn.ts</name>
+        <path>src/shared/utils/cn.ts</path>
+        <type>utility</type>
+        <description>Utility function for merging Tailwind classes</description>
+        <currentState>
+          - Architecture-compliant location: src/shared/utils/
+          - TypeScript utility function
+          - Uses clsx and tailwind-merge
+        </currentState>
+        <relevance>ESLint must lint TypeScript utilities in shared folder</relevance>
+      </artifact>
+
+      <artifact>
+        <name>tailwind.config.ts</name>
+        <path>tailwind.config.ts</path>
+        <type>configuration</type>
+        <description>TailwindCSS 4.0 configuration</description>
+        <currentState>
+          - TypeScript config file
+          - Content array includes ./src/**/*.{js,ts,jsx,tsx}
+          - Plugins: tailwindcss-animate
+        </currentState>
+        <relevance>ESLint should lint config files (TypeScript .ts extension)</relevance>
+      </artifact>
+
+      <artifact>
+        <name>postcss.config.js</name>
+        <path>postcss.config.js</path>
+        <type>configuration</type>
+        <description>PostCSS configuration for TailwindCSS</description>
+        <currentState>
+          - JavaScript config file (.js extension)
+          - Exports PostCSS plugins configuration
+        </currentState>
+        <relevance>ESLint should lint config files (JavaScript .js extension)</relevance>
+      </artifact>
+
+      <artifact>
+        <name>src/index.css</name>
+        <path>src/index.css</path>
+        <type>styles</type>
+        <description>Global CSS with TailwindCSS directives and shadcn/ui variables</description>
+        <currentState>
+          - TailwindCSS directives: @tailwind base, components, utilities
+          - CSS variables for shadcn/ui theme
+          - @layer base rules
+        </currentState>
+        <relevance>Prettier should format CSS files consistently</relevance>
+      </artifact>
+
+      <artifact>
+        <name>components.json</name>
+        <path>components.json</path>
+        <type>configuration</type>
+        <description>shadcn/ui configuration with path aliases</description>
+        <currentState>
+          - JSON configuration file
+          - Aliases using @shared/* pattern
+        </currentState>
+        <relevance>Prettier should format JSON files consistently</relevance>
+      </artifact>
+    </codeArtifacts>
+
+    <interfaces>
+      <interface>
+        <name>ESLint Configuration Interface</name>
+        <description>ESLint expects .eslintrc.cjs config file with specific structure</description>
+        <contract>
+          module.exports = {
+            root: true,
+            env: { browser: true, es2021: true, node: true },
+            extends: [array of config names, 'prettier' must be last],
+            parser: '@typescript-eslint/parser',
+            parserOptions: { ecmaVersion, sourceType, ecmaFeatures },
+            plugins: [array of plugin names],
+            rules: { rule overrides },
+            settings: { react: { version: 'detect' } },
+            ignorePatterns: [array of ignored paths]
+          }
+        </contract>
+      </interface>
+
+      <interface>
+        <name>Prettier Configuration Interface</name>
+        <description>Prettier expects .prettierrc JSON config file with formatting options</description>
+        <contract>
+          {
+            "semi": boolean,
+            "singleQuote": boolean,
+            "tabWidth": number,
+            "trailingComma": string,
+            "printWidth": number,
+            "arrowParens": string,
+            "endOfLine": string
+          }
+        </contract>
+      </interface>
+
+      <interface>
+        <name>Husky Pre-commit Hook Interface</name>
+        <description>Husky expects .husky/pre-commit shell script that exits non-zero on failure</description>
+        <contract>
+          #!/usr/bin/env sh
+          . "$(dirname -- "$0")/_/husky.sh"
+
+          npx lint-staged
+
+          # Exit code from lint-staged determines commit success/failure
+        </contract>
+      </interface>
+
+      <interface>
+        <name>lint-staged Configuration Interface</name>
+        <description>lint-staged expects package.json field with file patterns and commands</description>
+        <contract>
+          "lint-staged": {
+            "*.{ts,tsx,js,jsx}": [
+              "eslint --fix",
+              "prettier --write"
+            ],
+            "*.{json,css,md}": [
+              "prettier --write"
+            ]
+          }
+        </contract>
+      </interface>
+
+      <interface>
+        <name>NPM Scripts Interface</name>
+        <description>Package.json scripts that can be run via npm run {script}</description>
+        <contract>
+          "scripts": {
+            "lint": "eslint . --ext ts,tsx,js,jsx --report-unused-disable-directives --max-warnings 0",
+            "lint:fix": "eslint . --ext ts,tsx,js,jsx --fix",
+            "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,md}\"",
+            "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json,css,md}\"",
+            "prepare": "husky install"
+          }
+        </contract>
+      </interface>
+    </interfaces>
+  </artifacts>
+
+  <constraints>
+    <technical>
+      <constraint>
+        <name>ESLint must support TypeScript 5.9</name>
+        <description>TypeScript compiler version is 5.9, ESLint parser must be compatible</description>
+        <requirement>Use @typescript-eslint/parser and @typescript-eslint/eslint-plugin latest versions</requirement>
+      </constraint>
+
+      <constraint>
+        <name>ESLint must support React 19.2</name>
+        <description>React version is 19.2, ESLint rules must support latest features</description>
+        <requirement>Use eslint-plugin-react, eslint-plugin-react-hooks with React 19.2 compatibility</requirement>
+      </constraint>
+
+      <constraint>
+        <name>No conflicts between ESLint and Prettier</name>
+        <description>ESLint formatting rules must not conflict with Prettier</description>
+        <requirement>Use eslint-config-prettier as last item in extends array to disable conflicting rules</requirement>
+      </constraint>
+
+      <constraint>
+        <name>Pre-commit hook must be fast</name>
+        <description>Pre-commit hook should complete in &lt; 5 seconds for typical commits</description>
+        <requirement>Use lint-staged to only lint/format staged files, not entire codebase</requirement>
+      </constraint>
+
+      <constraint>
+        <name>Pre-commit hook must block bad commits</name>
+        <description>Git commit must fail if linting errors exist</description>
+        <requirement>Husky pre-commit hook must exit with non-zero code if lint-staged fails</requirement>
+      </constraint>
+
+      <constraint>
+        <name>Path alias resolution</name>
+        <description>ESLint must understand TypeScript path aliases (@/, @shared/*, etc.)</description>
+        <requirement>ESLint parser must respect tsconfig.json path mappings, may need eslint-import-resolver-typescript plugin</requirement>
+      </constraint>
+
+      <constraint>
+        <name>Architecture compliance enforcement</name>
+        <description>Linting should ideally encourage architecture-compliant patterns</description>
+        <requirement>While not blocking for Story 0.3, consider rules that enforce src/shared/ patterns in future</requirement>
+      </constraint>
+    </technical>
+
+    <architectural>
+      <constraint>
+        <name>Follow architecture.md folder structure</name>
+        <description>Config files in project root, no linter configs in src/</description>
+        <pattern>
+          - .eslintrc.cjs (project root)
+          - .prettierrc (project root)
+          - .prettierignore (project root)
+          - .husky/ directory (project root)
+          - lint-staged config in package.json
+        </pattern>
+      </constraint>
+
+      <constraint>
+        <name>Architecture-compliant code locations</name>
+        <description>ESLint must lint architecture-compliant paths</description>
+        <pattern>
+          - Shared components: src/shared/components/
+          - Shared utilities: src/shared/utils/
+          - Feature code: src/features/
+          - Database: src/db/
+          - Workers: src/workers/
+        </pattern>
+      </constraint>
+
+      <constraint>
+        <name>Naming conventions</name>
+        <description>Enforce naming patterns defined in architecture.md</description>
+        <pattern>
+          - React components: PascalCase.tsx
+          - Services: kebab-case.service.ts
+          - Utilities: kebab-case.util.ts
+          - Hooks: use-kebab-case.ts
+          - Constants: SCREAMING_SNAKE_CASE
+        </pattern>
+      </constraint>
+    </architectural>
+
+    <testing>
+      <standard>
+        <name>Manual testing required</name>
+        <description>No automated tests for Story 0.3 (testing infrastructure in Story 0.4)</description>
+        <approach>
+          - Test 1: Create intentional ESLint error, verify commit blocked
+          - Test 2: Run npm run lint on clean codebase, verify passes
+          - Test 3: Introduce multiple error types, verify detection
+          - Test 4: Run npm run lint:fix, verify auto-fixable issues resolved
+          - Test 5: Test pre-commit hook with staged files only
+          - Test 6: Verify Prettier formats all file types correctly
+        </approach>
+      </standard>
+
+      <standard>
+        <name>Evidence-based testing</name>
+        <description>All acceptance criteria must have verification evidence</description>
+        <approach>
+          - Capture npm install output showing packages installed
+          - Capture file tree showing config files created
+          - Capture terminal output of blocked commit with error message
+          - Capture npm run lint output showing issues detected
+          - Capture npm run format output showing files formatted
+        </approach>
+      </standard>
+    </testing>
+  </constraints>
+
+  <dependencies>
+    <external>
+      <dependency>
+        <name>ESLint</name>
+        <version>latest</version>
+        <purpose>JavaScript/TypeScript linting engine</purpose>
+        <installation>npm install eslint -D</installation>
+      </dependency>
+
+      <dependency>
+        <name>@typescript-eslint/parser</name>
+        <version>latest</version>
+        <purpose>ESLint parser for TypeScript</purpose>
+        <installation>npm install @typescript-eslint/parser -D</installation>
+      </dependency>
+
+      <dependency>
+        <name>@typescript-eslint/eslint-plugin</name>
+        <version>latest</version>
+        <purpose>TypeScript-specific ESLint rules</purpose>
+        <installation>npm install @typescript-eslint/eslint-plugin -D</installation>
+      </dependency>
+
+      <dependency>
+        <name>eslint-plugin-react</name>
+        <version>latest</version>
+        <purpose>React-specific ESLint rules</purpose>
+        <installation>npm install eslint-plugin-react -D</installation>
+      </dependency>
+
+      <dependency>
+        <name>eslint-plugin-react-hooks</name>
+        <version>latest</version>
+        <purpose>React Hooks ESLint rules</purpose>
+        <installation>npm install eslint-plugin-react-hooks -D</installation>
+      </dependency>
+
+      <dependency>
+        <name>eslint-plugin-jsx-a11y</name>
+        <version>latest</version>
+        <purpose>JSX accessibility ESLint rules</purpose>
+        <installation>npm install eslint-plugin-jsx-a11y -D</installation>
+      </dependency>
+
+      <dependency>
+        <name>Prettier</name>
+        <version>latest</version>
+        <purpose>Code formatter for consistent styling</purpose>
+        <installation>npm install prettier -D</installation>
+      </dependency>
+
+      <dependency>
+        <name>eslint-config-prettier</name>
+        <version>latest</version>
+        <purpose>Disables ESLint rules that conflict with Prettier</purpose>
+        <installation>npm install eslint-config-prettier -D</installation>
+      </dependency>
+
+      <dependency>
+        <name>Husky</name>
+        <version>latest</version>
+        <purpose>Git hooks management</purpose>
+        <installation>npm install husky -D</installation>
+      </dependency>
+
+      <dependency>
+        <name>lint-staged</name>
+        <version>latest</version>
+        <purpose>Run linters on staged git files only</purpose>
+        <installation>npm install lint-staged -D</installation>
+      </dependency>
+    </external>
+
+    <internal>
+      <dependency>
+        <name>Story 0.1: Vite + React + TypeScript project</name>
+        <status>completed</status>
+        <provides>
+          - Vite 7.1.12 build system
+          - React 19.2 framework
+          - TypeScript 5.9 compiler
+          - package.json with dev script
+          - src/ directory structure
+        </provides>
+      </dependency>
+
+      <dependency>
+        <name>Story 0.2: TailwindCSS + shadcn/ui</name>
+        <status>completed</status>
+        <provides>
+          - TailwindCSS 4.0 configuration
+          - shadcn/ui components
+          - Path aliases configured
+          - Architecture-compliant folder structure
+          - Example React components to lint
+        </provides>
+      </dependency>
+    </internal>
+  </dependencies>
+
+  <implementation>
+    <approach>
+      <phase name="Phase 1: ESLint Setup">
+        <step>1. Install ESLint and TypeScript plugins</step>
+        <step>2. Create .eslintrc.cjs configuration file</step>
+        <step>3. Configure TypeScript parser and plugin</step>
+        <step>4. Test: ESLint can parse TypeScript files</step>
+      </phase>
+
+      <phase name="Phase 2: React ESLint Rules">
+        <step>1. Install React ESLint plugins</step>
+        <step>2. Add React plugin to ESLint config</step>
+        <step>3. Configure React version detection</step>
+        <step>4. Enable recommended React, hooks, and a11y rules</step>
+        <step>5. Test: ESLint recognizes React components</step>
+      </phase>
+
+      <phase name="Phase 3: Prettier Setup">
+        <step>1. Install Prettier</step>
+        <step>2. Create .prettierrc configuration</step>
+        <step>3. Create .prettierignore file</step>
+        <step>4. Test: Prettier can format files</step>
+      </phase>
+
+      <phase name="Phase 4: ESLint + Prettier Integration">
+        <step>1. Install eslint-config-prettier</step>
+        <step>2. Add 'prettier' to ESLint extends (must be last)</step>
+        <step>3. Verify no rule conflicts</step>
+        <step>4. Test: Both tools work together</step>
+      </phase>
+
+      <phase name="Phase 5: Husky Pre-commit Hooks">
+        <step>1. Install Husky and lint-staged</step>
+        <step>2. Run npx husky install</step>
+        <step>3. Add prepare script to package.json</step>
+        <step>4. Create .husky/pre-commit hook</step>
+        <step>5. Make hook executable</step>
+        <step>6. Test: Husky hooks installed</step>
+      </phase>
+
+      <phase name="Phase 6: Configure lint-staged">
+        <step>1. Add lint-staged config to package.json</step>
+        <step>2. Configure ESLint for .ts, .tsx, .js, .jsx files</step>
+        <step>3. Configure Prettier for all files</step>
+        <step>4. Update pre-commit hook to run lint-staged</step>
+        <step>5. Test: Pre-commit hook runs on staged files</step>
+      </phase>
+
+      <phase name="Phase 7: NPM Scripts">
+        <step>1. Add lint script to package.json</step>
+        <step>2. Add lint:fix script</step>
+        <step>3. Add format script</step>
+        <step>4. Add format:check script</step>
+        <step>5. Test: All scripts execute successfully</step>
+      </phase>
+
+      <phase name="Phase 8: Testing and Verification">
+        <step>1. Test: npm run lint on clean codebase passes</step>
+        <step>2. Test: Introduce intentional errors and verify detection</step>
+        <step>3. Test: Pre-commit hook blocks bad commits</step>
+        <step>4. Test: npm run lint:fix auto-fixes issues</step>
+        <step>5. Clean up test files</step>
+        <step>6. Final verification of all acceptance criteria</step>
+      </phase>
+    </approach>
+
+    <risks>
+      <risk>
+        <name>ESLint/Prettier rule conflicts</name>
+        <impact>High - Could cause formatting wars or commit failures</impact>
+        <mitigation>Use eslint-config-prettier as last extends item to disable conflicting rules</mitigation>
+      </risk>
+
+      <risk>
+        <name>Path alias resolution issues</name>
+        <impact>Medium - ESLint may not resolve @shared/* imports correctly</impact>
+        <mitigation>May need to install eslint-import-resolver-typescript plugin</mitigation>
+      </risk>
+
+      <risk>
+        <name>Pre-commit hook performance</name>
+        <impact>Low - Slow hooks frustrate developers</impact>
+        <mitigation>Use lint-staged to only process staged files, not entire codebase</mitigation>
+      </risk>
+
+      <risk>
+        <name>Husky installation on Windows</name>
+        <impact>Low - Git hooks may not work correctly on Windows</impact>
+        <mitigation>Husky handles cross-platform compatibility automatically</mitigation>
+      </risk>
+    </risks>
+  </implementation>
+
+  <notes>
+    <note type="architecture">
+      All config files should be placed in project root, not in src/ directory. This follows standard convention and architecture.md patterns.
+    </note>
+
+    <note type="compatibility">
+      ESLint config uses .cjs extension (CommonJS) for compatibility with ESM-only Vite project. This is standard practice for ESLint in ESM projects.
+    </note>
+
+    <note type="performance">
+      lint-staged only processes staged files, which keeps pre-commit hook fast (&lt; 5 seconds). This is critical for developer experience.
+    </note>
+
+    <note type="future">
+      Story 0.4 (Vitest) and 0.5 (Playwright) will add test files. ESLint should automatically lint test files when they are created. No config changes needed.
+    </note>
+
+    <note type="learning">
+      From Story 0.2: Architecture-compliant paths (src/shared/) are important. ESLint should lint all files in architecture-compliant locations. TailwindCSS classes in JSX should not trigger string literal warnings.
+    </note>
+  </notes>
+</storyContext>

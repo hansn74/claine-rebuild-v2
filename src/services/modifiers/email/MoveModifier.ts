@@ -53,7 +53,7 @@ export class MoveModifier extends BaseEmailModifier {
   private readonly currentLabels: string[]
 
   constructor(params: MoveModifierParams) {
-    super(params.entityId, params.accountId, params.provider)
+    super(params.entityId, params.accountId, params.provider, undefined, undefined, params.threadId)
     this.targetFolder = params.targetFolder
     this.sourceFolder = params.sourceFolder
     this.currentLabels = params.currentLabels
@@ -68,7 +68,8 @@ export class MoveModifier extends BaseEmailModifier {
     provider: ProviderType,
     payload: { targetFolder: string; sourceFolder: string; currentLabels: string[] },
     id?: string,
-    createdAt?: number
+    createdAt?: number,
+    threadId?: string
   ): MoveModifier {
     const modifier = new MoveModifier({
       entityId,
@@ -77,6 +78,7 @@ export class MoveModifier extends BaseEmailModifier {
       targetFolder: payload.targetFolder,
       sourceFolder: payload.sourceFolder,
       currentLabels: payload.currentLabels,
+      threadId,
     })
     if (id) Object.assign(modifier, { id })
     if (createdAt) Object.assign(modifier, { createdAt })

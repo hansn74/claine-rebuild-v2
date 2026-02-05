@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context>
+  <meta>
+    <story-id>1.6A</story-id>
+    <story-key>1-6a-gmail-sync-engine-core</story-key>
+    <epic-id>1</epic-id>
+    <title>Gmail Sync Engine (Core)</title>
+    <generated>2025-11-23</generated>
+  </meta>
+
+  <user-story>
+    <as-a>user</as-a>
+    <i-want>my Gmail emails to sync from my connected account to local storage</i-want>
+    <so-that>I can access them offline</so-that>
+  </user-story>
+
+  <acceptance-criteria>
+    <criterion id="AC1">Initial sync downloads last 90 days of emails (configurable via VITE_SYNC_DAYS_INITIAL)</criterion>
+    <criterion id="AC2">Progress indicator shows sync status and estimated time (±10% accuracy)</criterion>
+    <criterion id="AC3">Emails stored in RxDB with proper indexing (timestamp DESC, labels, threadId)</criterion>
+    <criterion id="AC4">Incremental sync fetches new emails every 2-5 minutes when online</criterion>
+    <criterion id="AC5">Sync respects Gmail API rate limits (250 quota units/second)</criterion>
+    <criterion id="AC6">Graceful handling of network interruptions (resume sync when online)</criterion>
+    <criterion id="AC7">Emails associated with correct OAuth account (multi-account support)</criterion>
+  </acceptance-criteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/epics/epic-1-foundation-core-infrastructure.md</path>
+        <title>Epic 1: Foundation & Core Infrastructure</title>
+        <section>Story 1.6A</section>
+        <snippet>Gmail sync engine with initial 90-day sync, progress tracking with ±10% time estimation, rate limiting (250 quota units/s), and network interruption handling.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/1-6-basic-email-sync-engine.md</path>
+        <title>Story 1.6 (Split Parent)</title>
+        <section>Implementation Progress</section>
+        <snippet>Foundation work completed: database migration v2 (email + syncState collections), rate limiter service (token bucket), sync progress service with time estimation, gmail sync service scaffolded.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/1-5-oauth-2-0-integration-for-outlook.md</path>
+        <title>Story 1.5: Outlook OAuth</title>
+        <section>Completion Notes</section>
+        <snippet>OAuth infrastructure ready (tokenStorageService, tokenRefreshService). Token refresh pattern established. Technical debt: OAuth E2E tests and re-auth UI deferred to Story 1.6C.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/1-4-oauth-2-0-pkce-integration-for-gmail.md</path>
+        <title>Story 1.4: Gmail OAuth</title>
+        <section>Completion Notes</section>
+        <snippet>Gmail OAuth service complete with PKCE. Token encryption, storage, and refresh services established. Security headers configured in CSP.</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <artifact>
+        <path>src/services/sync/rateLimiter.ts</path>
+        <kind>service</kind>
+        <symbol>RateLimiter, createGmailRateLimiter</symbol>
+        <lines>1-139</lines>
+        <reason>Token bucket rate limiter ready for Gmail API (250 quota units/s). REUSE in gmail sync service.</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/sync/syncProgress.ts</path>
+        <kind>service</kind>
+        <symbol>SyncProgressService</symbol>
+        <lines>1-262</lines>
+        <reason>Progress tracking with ±10% time estimation. Manages syncState in RxDB. REUSE for progress updates.</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/sync/gmailSync.ts</path>
+        <kind>service</kind>
+        <symbol>GmailSyncService</symbol>
+        <lines>1-361</lines>
+        <reason>Gmail sync service SCAFFOLDED but incomplete. Needs: completion of initial sync, incremental sync, network resilience, testing.</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/auth/gmailOAuth.ts</path>
+        <kind>service</kind>
+        <symbol>GmailOAuthService, gmailOAuthService</symbol>
+        <lines>1-359</lines>
+        <reason>Gmail OAuth service from Story 1.4. Use gmailOAuthService.refreshAccessToken() for 401 errors during sync.</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/auth/tokenStorage.ts</path>
+        <kind>service</kind>
+        <symbol>TokenStorageService, tokenStorageService</symbol>
+        <lines>1-297</lines>
+        <reason>Token storage service. Use tokenStorageService.getTokens(accountId) to retrieve access tokens for API calls.</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/database/schemas/email.schema.ts</path>
+        <kind>schema</kind>
+        <symbol>emailSchema, EmailDocument</symbol>
+        <lines>1-376</lines>
+        <reason>Email schema with all required fields (historyId for delta sync, accountId for multi-account, indexes for queries). Use for parsing Gmail messages.</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/database/schemas/syncState.schema.ts</path>
+        <kind>schema</kind>
+        <symbol>syncStateSchema, SyncStateDocument</symbol>
+        <lines>1-171</lines>
+        <reason>Sync state schema for tracking progress per account. Fields: status, syncToken (historyId), pageToken, progress, errors. Created in Story 1.6.</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/database/migrations/20251123_add_email_and_sync_collections.ts</path>
+        <kind>migration</kind>
+        <symbol>migration_20251123_add_email_and_sync_collections</symbol>
+        <lines>1-60</lines>
+        <reason>Database migration v2 adds _emails and _syncState collections. Already applied in Story 1.6.</reason>
+      </artifact>
+    </code>
+
+    <dependencies>
+      <node>
+        <package name="rxdb" version="^16.20.0">Local-first database with IndexedDB storage</package>
+        <package name="vite" version="^6.0.11">Build tool and dev server</package>
+        <package name="react" version="^18.3.1">UI framework</package>
+        <package name="typescript" version="~5.7.2">Type safety</package>
+        <package name="vitest" version="^3.0.7">Unit testing framework</package>
+        <package name="@playwright/test" version="^1.49.1">E2E testing framework</package>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <interfaces>
+    <interface>
+      <name>SyncProgressService.initializeSyncState</name>
+      <kind>method</kind>
+      <signature>async initializeSyncState(accountId: string, provider: 'gmail' | 'outlook'): Promise&lt;void&gt;</signature>
+      <path>src/services/sync/syncProgress.ts:43-67</path>
+    </interface>
+    <interface>
+      <name>SyncProgressService.updateProgress</name>
+      <kind>method</kind>
+      <signature>async updateProgress(accountId: string, update: SyncProgressUpdate): Promise&lt;SyncProgress&gt;</signature>
+      <path>src/services/sync/syncProgress.ts:78-163</path>
+    </interface>
+    <interface>
+      <name>RateLimiter.acquireAndWait</name>
+      <kind>method</kind>
+      <signature>async acquireAndWait(tokensNeeded: number): Promise&lt;void&gt;</signature>
+      <path>src/services/sync/rateLimiter.ts:66-74</path>
+    </interface>
+    <interface>
+      <name>tokenStorageService.getTokens</name>
+      <kind>method</kind>
+      <signature>async getTokens(accountId: string): Promise&lt;StoredTokens | null&gt;</signature>
+      <path>src/services/auth/tokenStorage.ts:150-185</path>
+    </interface>
+    <interface>
+      <name>gmailOAuthService.refreshAccessToken</name>
+      <kind>method</kind>
+      <signature>async refreshAccessToken(refreshToken: string): Promise&lt;OAuthTokens&gt;</signature>
+      <path>src/services/auth/gmailOAuth.ts:281-329</path>
+    </interface>
+    <interface>
+      <name>Gmail API - messages.list</name>
+      <kind>REST endpoint</kind>
+      <signature>GET https://gmail.googleapis.com/gmail/v1/users/me/messages?q=after:{unix_timestamp}&amp;maxResults=500</signature>
+      <path>External API</path>
+    </interface>
+    <interface>
+      <name>Gmail API - messages.get</name>
+      <kind>REST endpoint</kind>
+      <signature>GET https://gmail.googleapis.com/gmail/v1/users/me/messages/{messageId}?format=full</signature>
+      <path>External API</path>
+    </interface>
+    <interface>
+      <name>Gmail API - users.history.list</name>
+      <kind>REST endpoint</kind>
+      <signature>GET https://gmail.googleapis.com/gmail/v1/users/me/history?startHistoryId={historyId}</signature>
+      <path>External API</path>
+    </interface>
+  </interfaces>
+
+  <constraints>
+    <constraint>Follow singleton service pattern (see gmailOAuthService, tokenStorageService examples)</constraint>
+    <constraint>All API paths must be relative to project root (not absolute paths)</constraint>
+    <constraint>Use createGmailRateLimiter() from rateLimiter.ts - DO NOT recreate rate limiting logic</constraint>
+    <constraint>Use SyncProgressService for ALL progress tracking - DO NOT create separate progress logic</constraint>
+    <constraint>Store sync state in RxDB syncState collection for persistence across restarts</constraint>
+    <constraint>Rate limiting: Gmail API uses quota units (messages.list=1, messages.get=5). Respect 250 units/second limit.</constraint>
+    <constraint>Network events: Use navigator.onLine + window.addEventListener('online'/'offline') for network detection</constraint>
+    <constraint>Token refresh: On 401 errors, use gmailOAuthService.refreshAccessToken() then tokenStorageService.storeTokens()</constraint>
+    <constraint>Multi-account: Each account has separate syncState document (keyed by accountId). Filter all queries by accountId.</constraint>
+    <constraint>Email parsing: Parse Gmail API response to EmailDocument schema. Handle headers (From, To, Subject), body (HTML/text), labels, attachments.</constraint>
+    <constraint>Progress updates: Update progress every 10 emails to avoid excessive RxDB writes</constraint>
+    <constraint>Incremental sync: Use Gmail History API with historyId from last sync (stored in syncState.syncToken)</constraint>
+    <constraint>Testing: Write unit tests with mocked Gmail API responses. Use vitest for unit tests, Playwright for E2E (deferred to Story 1.6C).</constraint>
+  </constraints>
+
+  <tests>
+    <standards>
+      Unit tests use Vitest (vitest.config.ts configured). E2E tests use Playwright (playwright.config.ts configured). Tests located in src/**/__tests__/ for unit tests, e2e/ for E2E tests. Follow existing test patterns from tokenEncryption.test.ts (44 tests) and outlookOAuth.test.ts (24 tests). Mock external APIs using vitest mocks.
+    </standards>
+
+    <locations>
+      <location>src/services/sync/__tests__/gmailSync.test.ts</location>
+      <location>src/services/sync/__tests__/syncOrchestrator.test.ts</location>
+      <location>e2e/ (deferred to Story 1.6C)</location>
+    </locations>
+
+    <ideas>
+      <idea ac="AC1">Test initial sync fetches 90 days of emails with mocked Gmail API messages.list response</idea>
+      <idea ac="AC1">Test configurable sync days via VITE_SYNC_DAYS_INITIAL environment variable</idea>
+      <idea ac="AC2">Test progress tracking calculates percentage correctly (emailsSynced / totalEmailsToSync)</idea>
+      <idea ac="AC2">Test time estimation accuracy within ±10% (mock sync rate and verify estimate)</idea>
+      <idea ac="AC3">Test emails stored in RxDB with all required fields (id, threadId, from, to, subject, body, timestamp, accountId)</idea>
+      <idea ac="AC3">Test indexes created correctly (timestamp DESC, labels, threadId)</idea>
+      <idea ac="AC4">Test incremental sync uses Gmail History API with historyId from last sync</idea>
+      <idea ac="AC4">Test sync scheduler runs every 2-5 minutes (configurable via VITE_SYNC_INTERVAL_MS)</idea>
+      <idea ac="AC5">Test rate limiter enforces 250 quota units/second limit</idea>
+      <idea ac="AC5">Test rate limiter correctly calculates quota units (messages.list=1, messages.get=5)</idea>
+      <idea ac="AC6">Test sync pauses when navigator.onLine becomes false</idea>
+      <idea ac="AC6">Test sync resumes when navigator.onLine becomes true (continues from pageToken)</idea>
+      <idea ac="AC6">Test syncState persists across app restarts (use test database)</idea>
+      <idea ac="AC7">Test emails associated with correct accountId</idea>
+      <idea ac="AC7">Test multi-account sync isolation (two accounts syncing independently)</idea>
+      <idea>Test token refresh on 401 error during sync (mock 401 response, verify refreshAccessToken called)</idea>
+      <idea>Test email parsing from Gmail API format to EmailDocument schema</idea>
+      <idea>Test error handling for network failures (mock fetch errors)</idea>
+    </ideas>
+  </tests>
+</story-context>

@@ -1,0 +1,188 @@
+<story-context id="1-8-multi-account-management" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>8</storyId>
+    <title>Multi-Account Management</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-25</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/1-8-multi-account-management.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>user</asA>
+    <iWant>to connect up to 3 email accounts</iWant>
+    <soThat>I can manage multiple inboxes in one place</soThat>
+    <tasks>
+      <task id="1">Create AccountSwitcher component (AC: 1, 4, 6)</task>
+      <task id="2">Create account store with Zustand (AC: 4, 6)</task>
+      <task id="3">Implement 3-account limit validation (AC: 5)</task>
+      <task id="4">Verify RxDB queries filter by accountId (AC: 3)</task>
+      <task id="5">Implement independent sync per account (AC: 2)</task>
+      <task id="6">Create account settings/management UI (AC: 1, 5)</task>
+      <task id="7">Write unit tests for all components</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC1">Account switcher UI implemented (dropdown or sidebar)</criterion>
+    <criterion id="AC2">Each account syncs independently</criterion>
+    <criterion id="AC3">RxDB collections properly scoped by account (accountId filtering)</criterion>
+    <criterion id="AC4">User can switch between accounts seamlessly</criterion>
+    <criterion id="AC5">Account connection limit enforced (max 3 accounts)</criterion>
+    <criterion id="AC6">Clear indication of which account is currently active</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Decision Document</title>
+        <section>Decision 2: State Management (Zustand)</section>
+        <snippet>Use Zustand v5.x for global state management. Feature-based slices with DevTools enabled for debugging. No combined root store.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Decision Document</title>
+        <section>RxDB Schema Definitions - Email Schema</section>
+        <snippet>Email schema includes accountId field with index for efficient multi-account queries. All indexed fields require minimum/maximum constraints per RxDB validation.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics/epic-1-foundation-core-infrastructure.md</path>
+        <title>Epic 1: Foundation &amp; Core Infrastructure</title>
+        <section>Story 1.8: Multi-Account Management</section>
+        <snippet>Connect up to 3 email accounts. Account switcher UI, independent sync, RxDB scoping, account limit enforcement.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/1-7-basic-email-list-view-ui.md</path>
+        <title>Story 1.7 - Basic Email List View UI</title>
+        <section>Dev Agent Record</section>
+        <snippet>Created useEmails hook with accountId parameter for filtering. Email schema already has accountId field indexed.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>src/hooks/useEmails.ts</path>
+        <kind>hook</kind>
+        <symbol>useEmails</symbol>
+        <lines>29-101</lines>
+        <reason>Already accepts accountId parameter for filtering emails. Core hook to integrate with account store for active account filtering.</reason>
+      </artifact>
+      <artifact>
+        <path>src/store/notificationStore.ts</path>
+        <kind>store</kind>
+        <symbol>NotificationStore</symbol>
+        <lines>23-140</lines>
+        <reason>Pattern reference for subscription-based store. Uses Map for per-account data, listener pattern for reactivity. Use as template for AccountStore.</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/auth/gmailOAuth.ts</path>
+        <kind>service</kind>
+        <symbol>GmailOAuthService</symbol>
+        <lines>35-329</lines>
+        <reason>Needs account limit check in initiateAuth() or callback handler. Returns tokens that should be associated with account.</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/auth/outlookOAuth.ts</path>
+        <kind>service</kind>
+        <symbol>OutlookOAuthService</symbol>
+        <reason>Needs same account limit check as Gmail OAuth. Pattern should match gmailOAuth.ts modifications.</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/sync/gmailSync.ts</path>
+        <kind>service</kind>
+        <symbol>GmailSyncService</symbol>
+        <reason>Already uses accountId parameter (Story 1.6A). Verify startSync() handles multi-account correctly.</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/sync/outlookSync.ts</path>
+        <kind>service</kind>
+        <symbol>OutlookSyncService</symbol>
+        <reason>Already uses accountId parameter (Story 1.6B). Verify sync orchestration for multiple accounts.</reason>
+      </artifact>
+      <artifact>
+        <path>src/components/email/EmailList.tsx</path>
+        <kind>component</kind>
+        <symbol>EmailList</symbol>
+        <reason>Uses useEmails hook. Should automatically update when active account changes via hook's accountId parameter.</reason>
+      </artifact>
+      <artifact>
+        <path>src/App.tsx</path>
+        <kind>component</kind>
+        <symbol>App</symbol>
+        <reason>Main app shell. AccountSwitcher should be added to header area. Currently integrates EmailList.</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <ecosystem name="node">
+        <package name="zustand" version="^5.0.8">State management - use for AccountStore</package>
+        <package name="rxdb" version="^16.20.0">Database with reactive queries and accountId filtering</package>
+        <package name="rxjs" version="^7.8.2">Observable pattern for reactive subscriptions</package>
+        <package name="react" version="19.2">UI framework</package>
+        <package name="lucide-react" version="^0.552.0">Icons for provider logos (Gmail, Outlook)</package>
+        <package name="tailwindcss" version="^4.1.16">Styling for AccountSwitcher component</package>
+      </ecosystem>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint source="architecture.md">State management: Use Zustand with feature-based slices. No boilerplate, TypeScript-first design.</constraint>
+    <constraint source="architecture.md">Database access: Only services access RxDB. Components use hooks/stores.</constraint>
+    <constraint source="story-notes">Account limit: Maximum 3 accounts to prevent IndexedDB bloat (300K emails max).</constraint>
+    <constraint source="story-notes">Data isolation: All email queries MUST include accountId filter. Never display inactive account emails.</constraint>
+    <constraint source="story-notes">Persistence: Store activeAccountId in localStorage. Restore on app launch.</constraint>
+    <constraint source="architecture.md">Naming: Store hooks use{Domain}Store pattern. Files {domain}.store.ts.</constraint>
+    <constraint source="architecture.md">Components: PascalCase.tsx files, {ComponentName}Props for prop types.</constraint>
+    <constraint source="testing-strategy">Unit tests required for all new components and stores.</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>Account</name>
+      <kind>TypeScript interface</kind>
+      <signature>interface Account { id: string; email: string; provider: 'gmail' | 'outlook'; displayName?: string; connectedAt: number; lastSyncAt?: number; }</signature>
+      <path>src/store/accountStore.ts (to be created)</path>
+    </interface>
+    <interface>
+      <name>AccountStore</name>
+      <kind>Zustand store</kind>
+      <signature>interface AccountStore { accounts: Account[]; activeAccountId: string | null; setActiveAccount(id: string): void; addAccount(account: Account): void; removeAccount(id: string): void; getActiveAccount(): Account | null; }</signature>
+      <path>src/store/accountStore.ts (to be created)</path>
+    </interface>
+    <interface>
+      <name>useEmails</name>
+      <kind>React hook</kind>
+      <signature>function useEmails(options?: { accountId?: string; folder?: string; limit?: number; sortOrder?: 'asc' | 'desc' }): { emails: EmailDocument[]; loading: boolean; error: Error | null; count: number; }</signature>
+      <path>src/hooks/useEmails.ts</path>
+    </interface>
+    <interface>
+      <name>gmailOAuthService.initiateAuth</name>
+      <kind>async method</kind>
+      <signature>async initiateAuth(): Promise&lt;void&gt;</signature>
+      <path>src/services/auth/gmailOAuth.ts</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Unit tests use Vitest 4.0 with jsdom environment. React Testing Library for component tests. Test files co-located in __tests__ folders. Coverage target 80%. Use @testing-library/user-event for interactions. Mock RxDB with fake-indexeddb.
+    </standards>
+    <locations>
+      <location>src/components/account/__tests__/</location>
+      <location>src/store/__tests__/</location>
+      <location>src/services/auth/__tests__/</location>
+    </locations>
+    <ideas>
+      <idea ac="AC1">Test AccountSwitcher renders connected accounts with correct provider icons</idea>
+      <idea ac="AC1">Test AccountSwitcher shows "Connect Account" button when &lt; 3 accounts</idea>
+      <idea ac="AC2">Test sync continues for other accounts when one account sync fails</idea>
+      <idea ac="AC3">Test useEmails hook filters by active accountId correctly</idea>
+      <idea ac="AC4">Test account switching updates email list via store subscription</idea>
+      <idea ac="AC5">Test connecting 4th account shows error message</idea>
+      <idea ac="AC5">Test "Remove Account" deletes account data from RxDB</idea>
+      <idea ac="AC6">Test active account has visual indicator (checkmark/highlight)</idea>
+      <idea>Test activeAccountId persists in localStorage and restores on reload</idea>
+      <idea>Test default to first account if stored activeAccountId removed</idea>
+    </ideas>
+  </tests>
+</story-context>

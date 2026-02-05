@@ -38,6 +38,7 @@ export const GRAPH_API_BASE = 'https://graph.microsoft.com/v1.0/me'
 export abstract class BaseEmailModifier implements Modifier<EmailDocument> {
   readonly id: string
   readonly entityId: string
+  readonly threadId?: string
   readonly entityType = 'email' as const
   readonly createdAt: number
   readonly accountId: string
@@ -53,13 +54,15 @@ export abstract class BaseEmailModifier implements Modifier<EmailDocument> {
     accountId: string,
     provider: ProviderType,
     id?: string,
-    createdAt?: number
+    createdAt?: number,
+    threadId?: string
   ) {
     this.id = id || generateModifierId()
     this.entityId = entityId
     this.accountId = accountId
     this.provider = provider
     this.createdAt = createdAt || Date.now()
+    this.threadId = threadId
   }
 
   /**
@@ -87,6 +90,7 @@ export abstract class BaseEmailModifier implements Modifier<EmailDocument> {
     return {
       id: this.id,
       entityId: this.entityId,
+      threadId: this.threadId,
       entityType: this.entityType,
       type: this.type,
       accountId: this.accountId,

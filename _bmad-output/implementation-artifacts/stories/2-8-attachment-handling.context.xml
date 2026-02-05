@@ -1,0 +1,314 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Story Context: 2.8 - Attachment Handling
+  Generated: 2025-12-08
+  Purpose: Provide implementation context for Story 2.8
+-->
+<story-context version="1.0">
+  <metadata>
+    <story-id>2-8-attachment-handling</story-id>
+    <epic-id>epic-2</epic-id>
+    <generated>2025-12-08</generated>
+    <status>drafted</status>
+  </metadata>
+
+  <story-summary>
+    <title>Attachment Handling</title>
+    <user-story>As a user, I want to view and download email attachments, so that I can access shared files.</user-story>
+    <acceptance-criteria>
+      <criterion id="AC1">Attachments listed in thread view with icons and file sizes</criterion>
+      <criterion id="AC2">Click to download attachment to user's Downloads folder</criterion>
+      <criterion id="AC3">Lazy loading: attachments fetched on-demand, not during initial sync</criterion>
+      <criterion id="AC4">Image attachments show inline preview</criterion>
+      <criterion id="AC5">PDF/document attachments open in system default app</criterion>
+      <criterion id="AC6">Compose interface supports drag-and-drop file attachment</criterion>
+    </acceptance-criteria>
+  </story-summary>
+
+  <existing-infrastructure>
+    <!-- Attachment Display Components (from Story 2.2) -->
+    <component path="src/components/email/AttachmentItem.tsx">
+      <description>Single attachment display with icon, filename, size, and download button</description>
+      <interfaces>
+        <interface name="AttachmentItemProps">
+          <property name="attachment" type="Attachment" required="true"/>
+          <property name="onDownload" type="(attachment: Attachment) => void" required="false"/>
+          <property name="className" type="string" required="false"/>
+        </interface>
+      </interfaces>
+      <functions>
+        <function name="formatFileSize" signature="(bytes: number) => string"/>
+        <function name="getColorForMimeType" signature="(mimeType: string) => string"/>
+        <function name="renderIcon" signature="(mimeType: string) => JSX.Element"/>
+      </functions>
+      <note>Download button exists but onDownload is placeholder - needs real implementation</note>
+    </component>
+
+    <component path="src/components/email/AttachmentList.tsx">
+      <description>Grid layout for attachments, filters inline vs regular attachments</description>
+      <interfaces>
+        <interface name="AttachmentListProps">
+          <property name="attachments" type="Attachment[]" required="true"/>
+          <property name="onDownload" type="(attachment: Attachment) => void" required="false"/>
+          <property name="excludeInline" type="boolean" default="true"/>
+          <property name="className" type="string" required="false"/>
+        </interface>
+      </interfaces>
+    </component>
+
+    <component path="src/components/email/InlineImage.tsx">
+      <description>Lazy-loaded inline image with IntersectionObserver</description>
+      <interfaces>
+        <interface name="InlineImageProps">
+          <property name="src" type="string" required="true"/>
+          <property name="alt" type="string" required="true"/>
+          <property name="width" type="number | string" required="false"/>
+          <property name="height" type="number | string" required="false"/>
+          <property name="className" type="string" required="false"/>
+        </interface>
+      </interfaces>
+      <note>Already implements lazy loading pattern - reuse for attachment previews</note>
+    </component>
+
+    <!-- Compose Components (from Story 2.3) -->
+    <component path="src/components/compose/ComposeDialog.tsx">
+      <description>Modal dialog for composing emails - needs attachment support</description>
+      <interfaces>
+        <interface name="ComposeDialogProps">
+          <property name="open" type="boolean" required="true"/>
+          <property name="onClose" type="() => void" required="true"/>
+          <property name="initialContext" type="ComposeContext" required="false"/>
+          <property name="accountId" type="string" required="true"/>
+          <property name="onSend" type="function" required="false"/>
+        </interface>
+      </interfaces>
+      <note>Footer area available for attachment button - integrate AttachmentUpload component</note>
+    </component>
+
+    <component path="src/components/compose/RichTextEditor.tsx">
+      <description>TipTap-based rich text editor</description>
+    </component>
+
+    <!-- Email Schema -->
+    <schema path="src/services/database/schemas/email.schema.ts">
+      <interface name="Attachment">
+        <property name="id" type="string" description="Attachment identifier for fetching from API"/>
+        <property name="filename" type="string" description="Original filename"/>
+        <property name="mimeType" type="string" description="MIME type (e.g., application/pdf)"/>
+        <property name="size" type="number" description="Size in bytes"/>
+        <property name="isInline" type="boolean" description="Whether attachment is inline (embedded in HTML)"/>
+        <property name="contentId" type="string" optional="true" description="Content-ID for inline attachments"/>
+      </interface>
+    </schema>
+
+    <!-- Auth Services -->
+    <service path="src/services/auth/gmailOAuth.ts">
+      <description>Gmail OAuth 2.0 with PKCE - handles token management</description>
+      <exports>
+        <export name="gmailOAuthService" type="GmailOAuthService"/>
+      </exports>
+      <methods>
+        <method name="refreshAccessToken" signature="(refreshToken: string) => Promise&lt;OAuthTokens&gt;"/>
+      </methods>
+    </service>
+
+    <service path="src/services/auth/tokenStorage.ts">
+      <description>Encrypted token storage in IndexedDB via RxDB</description>
+      <exports>
+        <export name="tokenStorageService" type="TokenStorageService"/>
+      </exports>
+      <methods>
+        <method name="getTokens" signature="(accountId: string) => Promise&lt;StoredTokens | null&gt;"/>
+        <method name="storeTokens" signature="(accountId: string, tokens: OAuthTokens) => Promise&lt;void&gt;"/>
+      </methods>
+    </service>
+
+    <!-- Email Send Services (for attachment upload patterns) -->
+    <service path="src/services/email/gmailSendService.ts">
+      <description>Gmail API email sending with RFC 2822 formatting</description>
+      <patterns>
+        <pattern name="Token Refresh">Get valid access token with automatic refresh</pattern>
+        <pattern name="Base64URL Encoding">base64UrlEncode() for Gmail API payloads</pattern>
+        <pattern name="MIME Multipart">formatRfc2822Message() for multipart emails</pattern>
+      </patterns>
+      <note>Use similar patterns for attachment MIME parts</note>
+    </service>
+
+    <service path="src/services/email/outlookSendService.ts">
+      <description>Microsoft Graph API email sending</description>
+      <constants>
+        <constant name="GRAPH_API_BASE" value="https://graph.microsoft.com/v1.0"/>
+      </constants>
+    </service>
+
+    <!-- Sync Services -->
+    <service path="src/services/sync/gmailSync.ts">
+      <description>Gmail sync with rate limiting and retry logic</description>
+      <constants>
+        <constant name="GMAIL_API_BASE" value="implied from patterns"/>
+      </constants>
+      <note>Reference for API call patterns and error handling</note>
+    </service>
+  </existing-infrastructure>
+
+  <api-references>
+    <gmail-api>
+      <endpoint name="messages.attachments.get">
+        <url>https://gmail.googleapis.com/gmail/v1/users/me/messages/{messageId}/attachments/{attachmentId}</url>
+        <method>GET</method>
+        <response>
+          <field name="size" type="number"/>
+          <field name="data" type="string" description="Base64url encoded attachment data"/>
+        </response>
+        <note>Attachment data is base64url encoded, needs decoding to bytes</note>
+      </endpoint>
+    </gmail-api>
+
+    <microsoft-graph-api>
+      <endpoint name="messages.attachments.get">
+        <url>https://graph.microsoft.com/v1.0/me/messages/{messageId}/attachments/{attachmentId}</url>
+        <method>GET</method>
+        <response>
+          <field name="contentBytes" type="string" description="Base64 encoded content"/>
+          <field name="contentType" type="string"/>
+          <field name="name" type="string"/>
+          <field name="size" type="number"/>
+        </response>
+      </endpoint>
+      <endpoint name="messages.attachments.list">
+        <url>https://graph.microsoft.com/v1.0/me/messages/{messageId}/attachments</url>
+        <note>Returns list of attachments with metadata</note>
+      </endpoint>
+    </microsoft-graph-api>
+  </api-references>
+
+  <implementation-patterns>
+    <!-- From Story 2.8 Dev Notes -->
+    <pattern name="Gmail Attachment Fetch">
+      <code><![CDATA[
+// attachmentService.ts
+import { gmailOAuthService } from '@/services/auth/gmailOAuth'
+import { tokenStorageService } from '@/services/auth/tokenStorage'
+
+export async function fetchGmailAttachment(
+  accountId: string,
+  messageId: string,
+  attachmentId: string
+): Promise<Blob> {
+  // Get valid access token (with refresh if needed)
+  const tokens = await tokenStorageService.getTokens(accountId.replace('gmail:', ''))
+  // ... token refresh logic similar to gmailSendService ...
+
+  const response = await fetch(
+    `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}/attachments/${attachmentId}`,
+    {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    }
+  )
+
+  const data = await response.json()
+  // Gmail returns base64url-encoded data - decode to bytes
+  const bytes = Uint8Array.from(
+    atob(data.data.replace(/-/g, '+').replace(/_/g, '/')),
+    c => c.charCodeAt(0)
+  )
+  return new Blob([bytes])
+}
+]]></code>
+    </pattern>
+
+    <pattern name="Browser Download Trigger">
+      <code><![CDATA[
+export function downloadBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}
+]]></code>
+    </pattern>
+
+    <pattern name="Drag-and-Drop Handler">
+      <code><![CDATA[
+const handleDrop = (e: DragEvent) => {
+  e.preventDefault()
+  const files = Array.from(e.dataTransfer?.files || [])
+  setAttachments(prev => [...prev, ...files])
+}
+
+const handleDragOver = (e: DragEvent) => {
+  e.preventDefault()
+  e.dataTransfer.dropEffect = 'copy'
+}
+]]></code>
+    </pattern>
+
+    <pattern name="Attachment Base64 Encoding for Send">
+      <code><![CDATA[
+// For uploading attachments with send
+async function encodeAttachment(file: File): Promise<string> {
+  const buffer = await file.arrayBuffer()
+  const bytes = new Uint8Array(buffer)
+  return btoa(String.fromCharCode(...bytes))
+}
+]]></code>
+    </pattern>
+  </implementation-patterns>
+
+  <project-structure>
+    <new-files>
+      <file path="src/services/email/attachmentService.ts" description="Attachment download/cache service"/>
+      <file path="src/hooks/useAttachmentPreview.ts" description="Hook for fetching attachment preview data"/>
+      <file path="src/components/compose/AttachmentUpload.tsx" description="Drag-and-drop attachment upload for compose"/>
+    </new-files>
+    <modified-files>
+      <file path="src/components/email/AttachmentItem.tsx" description="Integrate real download via attachmentService"/>
+      <file path="src/components/compose/ComposeDialog.tsx" description="Add AttachmentUpload component"/>
+      <file path="src/services/email/index.ts" description="Export attachmentService"/>
+    </modified-files>
+  </project-structure>
+
+  <learnings-from-previous>
+    <learning source="Story 2.7">
+      <item>UI barrel export pattern: src/components/ui/index.ts</item>
+      <item>Zustand pattern: Select values individually to avoid infinite loops</item>
+      <item>Use useMemo for derived state from store values</item>
+      <item>Leverage existing services directly</item>
+    </learning>
+    <learning source="Story 2.6">
+      <item>Singleton pattern for services</item>
+      <item>Queue-based architecture for offline operations</item>
+    </learning>
+  </learnings-from-previous>
+
+  <dependencies>
+    <existing>
+      <dependency name="lucide-react" usage="Icons (Download, File, etc.)"/>
+      <dependency name="rxdb" usage="Caching layer for attachments"/>
+    </existing>
+    <new>
+      <note>No new external dependencies required - uses existing Web APIs (File, Blob, URL.createObjectURL)</note>
+    </new>
+  </dependencies>
+
+  <testing-notes>
+    <unit-tests>
+      <test>attachmentService - Gmail attachment fetch</test>
+      <test>attachmentService - Outlook attachment fetch</test>
+      <test>attachmentService - Cache layer</test>
+      <test>useAttachmentPreview hook</test>
+      <test>AttachmentUpload component</test>
+    </unit-tests>
+    <integration-tests>
+      <test>Download flow end-to-end</test>
+      <test>Inline image preview</test>
+    </integration-tests>
+    <e2e-tests>
+      <test>Compose with attachment</test>
+    </e2e-tests>
+  </testing-notes>
+</story-context>

@@ -1,0 +1,224 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>0</epicId>
+    <storyId>9</storyId>
+    <title>Create Project README with Setup Instructions</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-06</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/0-9-create-project-readme-with-setup-instructions.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>developer</asA>
+    <iWant>comprehensive setup documentation</iWant>
+    <soThat>new developers can start contributing quickly</soThat>
+    <tasks>
+- Create comprehensive README.md file (AC: 1-10)
+- Write step-by-step setup instructions (AC: 4)
+- Document available NPM scripts (AC: 5)
+- Document project structure (AC: 6)
+- Add documentation references (AC: 7)
+- Write contribution guidelines (AC: 8)
+- Document deployment process (AC: 9)
+- Validate README completeness (AC: 10)
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+1. README.md includes project description and goals
+2. README includes technology stack list (Vite 7.0, React 19.2, TypeScript 5.9, etc.)
+3. README includes prerequisites (Node.js 22.x, npm)
+4. README includes step-by-step setup instructions:
+   - Clone repository
+   - Install dependencies (`npm install`)
+   - Copy .env.example to .env
+   - Run development server (`npm run dev`)
+5. README includes NPM scripts documentation (dev, build, test, lint, etc.)
+6. README includes project structure explanation
+7. README includes link to architecture.md and PRD.md
+8. README includes contribution guidelines
+9. README includes deployment instructions (Vercel)
+10. Test: New developer can follow README and start app successfully
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Decision Document</title>
+        <section>Executive Summary</section>
+        <snippet>Complete architectural decisions for Claine, including platform (PWA), framework (Vite 7.0 + React 19.2 + TypeScript 5.9), database (RxDB + IndexedDB), styling (TailwindCSS 4.0 + shadcn/ui), testing (Vitest 4.0 + Playwright 1.56), and deployment (Vercel). Includes version numbers and technology rationale.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Decision Document</title>
+        <section>Starter Template Decision</section>
+        <snippet>Details npm create vite command, additional dependencies to install, version specifications (Node.js 22.x required by Vite 7.0), and complete technology stack with exact versions.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics/epic-0-infrastructure-project-setup.md</path>
+        <title>Epic 0: Infrastructure & Project Setup</title>
+        <section>Expanded Goal & Story Breakdown</section>
+        <snippet>Epic 0 establishes complete project infrastructure. All 10 stories completed (0.1-0.8 done, 0.9 in progress). Includes success criteria: developer can start in &lt;5 minutes, tests pass, CI/CD works, bundle &lt;500KB.</snippet>
+      </doc>
+      <doc>
+        <path>ENV_SETUP.md</path>
+        <title>Environment Variable Setup Guide</title>
+        <section>Full document</section>
+        <snippet>Comprehensive guide for environment variable setup: copy .env.example to .env, configure variables (VITE_APP_NAME required, VITE_API_URL optional), GitHub Actions secrets, Vercel dashboard configuration. README should reference this document.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/0-8-set-up-environment-variable-management.md</path>
+        <title>Story 0.8: Environment Variable Management</title>
+        <section>Learnings from Previous Story & Code Review</section>
+        <snippet>Story 0.8 explicitly deferred README documentation to Story 0.9 (AC6). ENV_SETUP.md created as interim documentation. Environment variable infrastructure complete with .env.example, validation module, and CI/CD integration.</snippet>
+      </doc>
+      <doc>
+        <path>docs/PRD.md</path>
+        <title>Product Requirements Document</title>
+        <section>Overview</section>
+        <snippet>Claine v2 PRD defines AI-powered offline-first email client with local LLM integration, privacy-first architecture, and visual workflow automation.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>package.json</path>
+        <kind>configuration</kind>
+        <symbol>scripts, dependencies</symbol>
+        <lines>10-27, 64-66</lines>
+        <reason>Contains all NPM scripts to document in README (dev, build, test, lint, etc.) and complete dependency list with exact versions for technology stack section</reason>
+      </artifact>
+      <artifact>
+        <path>.github/workflows/ci.yml</path>
+        <kind>ci-config</kind>
+        <symbol>CI pipeline</symbol>
+        <lines>all</lines>
+        <reason>GitHub Actions CI/CD pipeline configuration to document in README deployment section. Shows lint → test → E2E → build workflow</reason>
+      </artifact>
+      <artifact>
+        <path>.env.example</path>
+        <kind>configuration</kind>
+        <symbol>environment variables</symbol>
+        <lines>all</lines>
+        <reason>Example environment file that README setup instructions should reference (step: copy .env.example to .env)</reason>
+      </artifact>
+      <artifact>
+        <path>vite.config.ts</path>
+        <kind>configuration</kind>
+        <symbol>Vite configuration</symbol>
+        <lines>all</lines>
+        <reason>Build configuration file to mention in project structure section</reason>
+      </artifact>
+      <artifact>
+        <path>tsconfig.json</path>
+        <kind>configuration</kind>
+        <symbol>TypeScript configuration</symbol>
+        <lines>all</lines>
+        <reason>TypeScript configuration file to mention in project structure section</reason>
+      </artifact>
+      <artifact>
+        <path>tailwind.config.ts</path>
+        <kind>configuration</kind>
+        <symbol>Tailwind configuration</symbol>
+        <lines>all</lines>
+        <reason>Styling framework configuration to mention in project structure section</reason>
+      </artifact>
+      <artifact>
+        <path>playwright.config.ts</path>
+        <kind>configuration</kind>
+        <symbol>Playwright configuration</symbol>
+        <lines>all</lines>
+        <reason>E2E testing configuration to mention in project structure section</reason>
+      </artifact>
+      <artifact>
+        <path>vitest.config.ts</path>
+        <kind>configuration</kind>
+        <symbol>Vitest configuration</symbol>
+        <lines>all</lines>
+        <reason>Unit testing configuration to mention in project structure section</reason>
+      </artifact>
+      <artifact>
+        <path>src/lib/env.ts</path>
+        <kind>utility</kind>
+        <symbol>validateEnv, getEnv</symbol>
+        <lines>all</lines>
+        <reason>Environment variable validation module created in Story 0.8, demonstrates established patterns for utilities in src/lib/</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <runtime>
+          <package name="react" version="19.2" />
+          <package name="react-dom" version="19.2" />
+        </runtime>
+        <devDependencies>
+          <package name="vite" version="^7.1.12" />
+          <package name="typescript" version="5.9" />
+          <package name="vitest" version="^4.0.7" />
+          <package name="@playwright/test" version="^1.56.1" />
+          <package name="tailwindcss" version="^4.1.16" />
+          <package name="eslint" version="^9.39.1" />
+          <package name="prettier" version="^3.6.2" />
+          <package name="husky" version="^9.1.7" />
+          <package name="@testing-library/react" version="^16.3.0" />
+        </devDependencies>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    - README.md must be created at project root (not in docs/)
+    - Use GitHub-flavored Markdown syntax
+    - Target audience: new developers unfamiliar with the project
+    - Keep setup instructions simple and sequential (4 main steps)
+    - Reference ENV_SETUP.md for detailed environment variable instructions
+    - All NPM scripts from package.json must be documented
+    - Include Epic 0 success criteria verification (setup in &lt;5 minutes)
+    - Link to existing documentation rather than duplicating content
+    - Document actual project structure (src/features/, src/components/, src/lib/, etc.)
+    - Include badges for build status and deployment
+    - Production URL: https://claine-rebuild-v2.vercel.app
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>npm run scripts</name>
+      <kind>CLI commands</kind>
+      <signature>
+        dev - Start Vite development server (port 5173)
+        build - TypeScript compile + Vite build
+        preview - Preview production build locally
+        test - Run Vitest unit tests in watch mode
+        test:run - Run Vitest tests once (CI mode)
+        test:coverage - Run tests with coverage report
+        test:e2e - Run Playwright E2E tests
+        test:e2e:ui - Run Playwright in UI mode
+        lint - Run ESLint on codebase
+        lint:fix - Run ESLint with auto-fix
+        format - Format code with Prettier
+        format:check - Check Prettier formatting
+      </signature>
+      <path>package.json:10-27</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      No testing required for README documentation. However, AC10 requires validation that a new developer can follow README successfully. This should be tested manually by:
+      1. Fresh clone of repository
+      2. Following README setup instructions exactly
+      3. Verifying app starts and runs correctly
+      4. Confirming setup time is under 5 minutes (Epic 0 success criteria)
+    </standards>
+    <locations>
+      N/A - Documentation story with no code testing required
+    </locations>
+    <ideas>
+      <test ac="10">Manual validation test: Clone repo in fresh directory, follow README setup steps, verify app runs and displays correctly</test>
+      <test ac="10">Link validation: Check all documentation links in README resolve correctly</test>
+      <test ac="5">NPM script verification: Run each documented script and verify it works as described</test>
+      <test ac="4">Setup timing: Time the complete setup process to confirm &lt;5 minute requirement</test>
+    </ideas>
+  </tests>
+</story-context>

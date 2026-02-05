@@ -55,7 +55,12 @@ export type {
   ModifierParams,
 } from './types'
 
-export { RETRY_DELAYS, MAX_ATTEMPTS, generateModifierId } from './types'
+export {
+  RETRY_DELAYS,
+  MAX_ATTEMPTS,
+  PARALLEL_ACTION_CONCURRENCY,
+  generateModifierId,
+} from './types'
 
 // Queue service
 export { ModifierQueue, modifierQueue } from './modifierQueue'
@@ -107,4 +112,15 @@ export async function initModifierSystem(): Promise<void> {
   // Initialize processor (which initializes queue)
   const { modifierProcessor } = await import('./modifierProcessor')
   await modifierProcessor.initialize()
+
+  // Story 2.19 Task 7.2: Expose test state on window in dev mode
+  if (import.meta.env.DEV) {
+    ;(window as Record<string, unknown>).__TEST_MODIFIER_PROCESSOR__ =
+      modifierProcessor.__getTestState()
+    // Update on each processing event
+    modifierProcessor.getEvents$().subscribe(() => {
+      ;(window as Record<string, unknown>).__TEST_MODIFIER_PROCESSOR__ =
+        modifierProcessor.__getTestState()
+    })
+  }
 }

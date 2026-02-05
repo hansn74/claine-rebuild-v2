@@ -1,0 +1,226 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>3f</storyId>
+    <title>Add E2E Tests for Migration Persistence</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-14</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/1-3f-add-migration-e2e-tests.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>a developer</asA>
+    <iWant>end-to-end tests for database migration persistence using real IndexedDB</iWant>
+    <soThat>I can validate migrations work correctly across browser sessions</soThat>
+    <tasks>
+      - Evaluate E2E test necessity (AC: 8) - DECISION POINT
+        - Review current unit test coverage (37 tests with fake-indexeddb)
+        - Assess risk of fake-indexeddb vs real IndexedDB behavioral differences
+        - Determine if persistence validation is critical for migration system
+        - Decision: Create E2E tests OR document limitation acceptance
+        - Document decision rationale in story completion notes
+
+      IF PROCEEDING WITH E2E TESTS:
+
+      - Create E2E test infrastructure (AC: 1, 5)
+        - Create e2e/database-migrations.spec.ts
+        - Set up Playwright test with browser context
+        - Create test helper to initialize database in browser
+        - Create test helper to access IndexedDB directly
+        - Test: Verify test file structure and imports
+
+      - Test version persistence (AC: 2)
+        - Test: Create database, set version to 3
+        - Test: Close database (simulate browser close)
+        - Test: Reopen database with same name
+        - Test: Verify version is still 3 (persisted)
+        - Test: Update version to 5, close, reopen, verify 5
+
+      - Test migration log persistence (AC: 3)
+        - Test: Create database, log 3 migration events
+        - Test: Close database
+        - Test: Reopen database with same name
+        - Test: Query migration history, verify 3 logs present
+        - Test: Verify log details match (migrationName, status, timestamp)
+
+      - Test data integrity after migrations (AC: 4)
+        - Test: Create database with test data
+        - Test: Run migration that modifies data (e.g., add sentiment field)
+        - Test: Close database
+        - Test: Reopen database
+        - Test: Verify migrated data persists (sentiment field exists on emails)
+
+      - CI/CD integration (AC: 6)
+        - Update GitHub Actions workflow to run E2E tests
+        - Verify E2E tests run in CI environment
+        - Configure Playwright browsers for CI (webkit, chromium, firefox)
+        - Test: E2E tests pass in CI pipeline
+
+      - Update documentation (AC: 7)
+        - Update database-migrations.md with E2E test section
+        - Document what E2E tests validate vs unit tests
+        - Add "Running E2E Tests" section with commands
+        - Document browser-specific testing approach
+
+      IF DOCUMENTING LIMITATION ACCEPTANCE:
+
+      - Document test limitation (AC: 8 alternative)
+        - Add section to database-migrations.md explaining fake-indexeddb limitation
+        - Document why unit tests with fake-indexeddb are sufficient
+        - List risks accepted by not having E2E persistence tests
+        - Add note about manual testing approach for persistence validation
+        - Update versionTracker.test.ts skip comment with acceptance rationale
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    1. E2E test file created at e2e/database-migrations.spec.ts
+    2. Test validates version persistence across database close/reopen cycles
+    3. Test validates migration execution persistence (migration logs survive sessions)
+    4. Test validates data integrity after migrations (schema changes persist)
+    5. Test uses real Playwright browser context with real IndexedDB
+    6. All E2E tests pass in CI/CD pipeline
+    7. Test coverage documented in database-migrations.md
+    8. Alternative: If E2E deemed unnecessary, document test limitation acceptance
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/database-migrations.md</path>
+        <title>Database Migrations Documentation</title>
+        <section>Testing</section>
+        <snippet>Documents unit tests for migrations. Currently no E2E tests for persistence validation. Will be updated with either E2E test section or limitation acceptance documentation.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/1-3c-implement-schema-migration-strategy.md</path>
+        <title>Parent Story: Schema Migration Strategy</title>
+        <section>Code Review - Action Items</section>
+        <snippet>Line 412 identified need for E2E persistence tests or documentation acceptance. Currently 1 unit test skipped (versionTracker.test.ts:214) due to fake-indexeddb limitation.</snippet>
+      </doc>
+      <doc>
+        <path>docs/technical-decisions/adr-012-test-strategy-benchmark-harness.md</path>
+        <title>ADR-012: Test Strategy</title>
+        <section>Decision - E2E Tests</section>
+        <snippet>Playwright 1.56.x for cross-browser E2E testing (Chromium, Firefox, WebKit). E2E tests target critical user workflows. CI/CD integration required for all E2E tests.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/0-5-configure-playwright-1-56-e2e-testing-infrastructure.md</path>
+        <title>Story 0-5: Playwright Setup</title>
+        <section>Implementation</section>
+        <snippet>Playwright 1.56 configured with webkit, chromium, firefox browsers. E2E tests in e2e/ directory. Test helpers and patterns established for browser-based testing.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>src/services/database/__tests__/versionTracker.test.ts</path>
+        <kind>test</kind>
+        <symbol>version persistence test (skipped)</symbol>
+        <lines>214-251</lines>
+        <reason>Skipped unit test for version persistence across database sessions. Uses fake-indexeddb which doesn't fully support persistence. This story addresses this gap with E2E test or documented acceptance.</reason>
+      </artifact>
+      <artifact>
+        <path>e2e/database-init.spec.ts</path>
+        <kind>test (potential reference)</kind>
+        <symbol>database initialization E2E pattern</symbol>
+        <lines>all</lines>
+        <reason>Existing E2E test pattern (if exists) that can serve as template for database-migrations.spec.ts. Shows Playwright setup for database operations in browser context.</reason>
+      </artifact>
+      <artifact>
+        <path>playwright.config.ts</path>
+        <kind>config</kind>
+        <symbol>Playwright configuration</symbol>
+        <lines>all</lines>
+        <reason>Playwright test configuration. Defines browser projects (webkit, chromium, firefox), CI settings, test directory patterns. E2E tests must follow config conventions.</reason>
+      </artifact>
+      <artifact>
+        <path>.github/workflows/ci.yml</path>
+        <kind>config</kind>
+        <symbol>CI/CD pipeline</symbol>
+        <lines>all</lines>
+        <reason>GitHub Actions workflow. E2E tests must be added to CI pipeline if implemented. Playwright test execution in CI environment requires browser installation step.</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/database/versionTracker.ts</path>
+        <kind>service</kind>
+        <symbol>VersionTracker</symbol>
+        <lines>all</lines>
+        <reason>Version tracking service to be tested in E2E context. Methods getCurrentVersion/setVersion/logMigration/getMigrationHistory will be validated with real IndexedDB persistence.</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <runtime>
+        <package name="rxdb" version="^16.20.0">Database with IndexedDB storage</package>
+      </runtime>
+      <devDependencies>
+        <package name="@playwright/test" version="^1.56.1">E2E testing framework for browser-based tests</package>
+        <package name="playwright" version="^1.56.1">Playwright browser automation</package>
+        <package name="fake-indexeddb" version="^6.2.4">Current unit test mock (limitation to address)</package>
+        <package name="vitest" version="^4.0.7">Unit test framework</package>
+      </devDependencies>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    - DECISION POINT: Evaluate E2E necessity before implementation (AC 8)
+    - E2E tests must use real Playwright browser context (no mocks for IndexedDB)
+    - E2E tests must validate actual persistence (close/reopen database cycles)
+    - Test file location: e2e/database-migrations.spec.ts (follow project conventions)
+    - CI/CD integration required if E2E tests implemented (AC 6)
+    - All browsers must pass: webkit, chromium, firefox (cross-browser validation)
+    - If documenting acceptance: clearly state risks and rationale
+    - Documentation update required regardless of decision (E2E section or acceptance section)
+    - Maintain single source of truth for testing approach in database-migrations.md
+    - Consider maintenance burden vs. confidence gain when making decision
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>Playwright Test API</name>
+      <kind>Testing framework</kind>
+      <signature>import { test, expect, Page } from '@playwright/test'</signature>
+      <path>node_modules/@playwright/test</path>
+      <note>Playwright test API for E2E tests. Provides test() function, expect() assertions, Page object for browser automation.</note>
+    </interface>
+    <interface>
+      <name>IndexedDB browser API</name>
+      <kind>Web API</kind>
+      <signature>window.indexedDB.open(name: string, version?: number): IDBOpenDBRequest</signature>
+      <path>Browser native API</path>
+      <note>Real IndexedDB API accessed in Playwright browser context. Used to verify RxDB persistence behavior without mocking.</note>
+    </interface>
+    <interface>
+      <name>VersionTracker.getCurrentVersion (via browser)</name>
+      <kind>Service method tested in E2E</kind>
+      <signature>async getCurrentVersion(db: RxDatabase): Promise&lt;number&gt;</signature>
+      <path>src/services/database/versionTracker.ts</path>
+      <note>E2E test validates this method works correctly with real IndexedDB persistence across page reloads/database reopens.</note>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      E2E tests use Playwright 1.56.1 for browser-based testing with real IndexedDB. Tests in e2e/ directory. CI integration via GitHub Actions. Cross-browser testing (webkit, chromium, firefox) required. E2E tests complement unit tests by validating real persistence behavior that fake-indexeddb cannot simulate.
+    </standards>
+    <locations>
+      - e2e/database-migrations.spec.ts (to be created if E2E path chosen)
+      - src/services/database/__tests__/versionTracker.test.ts:214 (skipped persistence test to address)
+      - .github/workflows/ci.yml (CI pipeline to update if E2E path chosen)
+    </locations>
+    <ideas>
+      - AC1: Create e2e/database-migrations.spec.ts with Playwright setup
+      - AC2: Test version persistence - set v3, close DB, reopen, verify v3 persists
+      - AC3: Test migration log persistence - log 3 events, close, reopen, verify logs survive
+      - AC4: Test data migration persistence - add field, close, reopen, verify field persists
+      - AC5: Verify Playwright browser context with real IndexedDB (no mocks)
+      - AC6: Add E2E tests to CI pipeline, verify all browsers pass
+      - AC7: Document E2E tests in database-migrations.md with examples
+      - AC8 (alternative): Document limitation acceptance with risk assessment
+      - Decision factor: Compare maintenance cost vs. confidence gain from E2E tests
+      - Decision factor: RxDB library already tested - is additional E2E layer needed?
+      - Validation: If E2E implemented, all tests must pass in CI across all browsers
+      - Validation: If acceptance documented, must include manual testing approach
+    </ideas>
+  </tests>
+</story-context>

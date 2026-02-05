@@ -1,0 +1,195 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>0</epicId>
+    <storyId>4</storyId>
+    <title>Configure Vitest 4.0 Unit Testing Infrastructure</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-04</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/0-4-configure-vitest-4-0-unit-testing-infrastructure.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>developer</asA>
+    <iWant>Vitest unit testing configured</iWant>
+    <soThat>I can write and run unit tests for all components and services</soThat>
+    <tasks>
+      - Install Vitest 4.0 and testing dependencies (AC: 1, 4, 5)
+      - Create vitest.config.ts configuration file (AC: 2, 3, 6)
+      - Configure test setup file for React Testing Library (AC: 5)
+      - Add NPM scripts for testing (AC: 7, 8)
+      - Create example test file for App component (AC: 9)
+      - Verify testing infrastructure works (AC: 10, 11)
+      - Integrate with ESLint (from Story 0.3) (AC: 2)
+      - Update .gitignore to exclude test artifacts
+      - Verify integration and cleanup (AC: 1-11)
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    1. Vitest 4.0.x installed as dev dependency
+    2. vitest.config.ts created with correct settings
+    3. Test environment configured (jsdom for React component testing)
+    4. @testing-library/react installed for component testing
+    5. @testing-library/jest-dom installed for DOM assertions
+    6. Coverage reporting configured (v8 coverage provider)
+    7. NPM script added: `npm run test` runs Vitest
+    8. NPM script added: `npm run test:coverage` generates coverage report
+    9. Example test file created (App.test.tsx) that passes
+    10. Test: `npm run test` executes successfully
+    11. Test: Coverage report generated in coverage/ folder
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Decision Document</title>
+        <section>Executive Summary - Testing Decision</section>
+        <snippet>Testing: Vitest + Playwright (Vitest 4.0, Playwright 1.56). Vitest 4: Vite-native, browser mode support. Playwright 1.56: Best PWA E2E testing, visual regression. Test environment: jsdom for React component testing, v8 coverage provider for faster reporting.</snippet>
+      </doc>
+      <doc>
+        <path>docs/technical-decisions/adr-012-test-strategy-benchmark-harness.md</path>
+        <title>ADR-012: Test Strategy & Benchmark Harness</title>
+        <section>Decision & Implementation - Test Pyramid</section>
+        <snippet>Selected: Comprehensive Test Pyramid using Vitest 4.0.x with @testing-library/react for component testing. Coverage targets: Unit Tests >80% line coverage, >70% branch coverage. Focus on business logic, AI triage algorithm, undo/action log, and sync logic.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics/epic-0-infrastructure-project-setup.md</path>
+        <title>Epic 0: Infrastructure & Project Setup</title>
+        <section>Story 0.4 - Configure Vitest 4.0 Unit Testing Infrastructure</section>
+        <snippet>Prerequisites: Story 0.1. Acceptance Criteria: Vitest 4.0.x installed, vitest.config.ts created, jsdom environment configured, @testing-library/react and @testing-library/jest-dom installed, v8 coverage provider, NPM scripts for test and coverage, example test file passing.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/0-3-set-up-eslint-prettier-husky-pre-commit-hooks.md</path>
+        <title>Story 0.3: ESLint + Prettier + Husky Setup</title>
+        <section>ESLint Configuration & Integration</section>
+        <snippet>ESLint 9 flat config (eslint.config.js) implemented with React 19.2 + TypeScript 5.9 support. Test files will be linted with existing config. Vitest globals (describe, it, expect, vi, beforeEach, afterEach, beforeAll, afterAll) may need to be added to ESLint language options to avoid undefined variable errors.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>src/App.tsx</path>
+        <kind>component</kind>
+        <symbol>App</symbol>
+        <lines>3-21</lines>
+        <reason>Main component to test - renders Claine v2 heading, Tailwind test div, and shadcn/ui buttons. First example test file will be App.test.tsx testing this component.</reason>
+      </artifact>
+      <artifact>
+        <path>src/shared/components/ui/button.tsx</path>
+        <kind>component</kind>
+        <symbol>Button</symbol>
+        <lines>all</lines>
+        <reason>shadcn/ui Button component used in App.tsx - tests will verify buttons render correctly with different variants (default, secondary, outline).</reason>
+      </artifact>
+      <artifact>
+        <path>vite.config.ts</path>
+        <kind>config</kind>
+        <symbol>defineConfig</symbol>
+        <lines>6-17</lines>
+        <reason>Vite configuration with path aliases (@/, @features, @shared, @db, @workers). vitest.config.ts must mirror these path aliases for test imports to work correctly.</reason>
+      </artifact>
+      <artifact>
+        <path>tsconfig.json</path>
+        <kind>config</kind>
+        <symbol>compilerOptions.paths</symbol>
+        <lines>11-16</lines>
+        <reason>TypeScript path aliases configuration (@/*). vitest.config.ts resolve.alias must match these paths for TypeScript imports in tests.</reason>
+      </artifact>
+      <artifact>
+        <path>eslint.config.js</path>
+        <kind>config</kind>
+        <symbol>default</symbol>
+        <lines>10-70</lines>
+        <reason>ESLint 9 flat config with React + TypeScript rules. Test files will be linted with this config. May need to add Vitest globals (describe, it, expect, vi) to languageOptions.globals to avoid undefined variable errors.</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <vitest>^4.0.0</vitest>
+        <testing-library-react>latest</testing-library-react>
+        <testing-library-jest-dom>latest</testing-library-jest-dom>
+        <testing-library-user-event>latest</testing-library-user-event>
+        <vitest-ui>latest</vitest-ui>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    - Test environment MUST be 'jsdom' for React component testing (not node or happy-dom)
+    - Coverage provider MUST be 'v8' (not istanbul) for faster performance
+    - Path aliases in vitest.config.ts MUST exactly match vite.config.ts aliases: @/, @features, @shared, @db, @workers
+    - Vitest config MUST use React plugin from '@vitejs/plugin-react' (same as Vite config)
+    - Test setup file at src/test/setup.ts MUST extend Vitest expect with @testing-library/jest-dom matchers
+    - Coverage exclude patterns MUST include: node_modules, dist, coverage, .husky, bmad, docs, **/*.config.*, **/test/, **/*.test.*
+    - NPM test script should run in watch mode by default for development (npm run test)
+    - CI mode test script should run once without watch (npm run test:run)
+    - ESLint may need Vitest globals added to avoid linting errors in test files
+    - Pre-commit hook should NOT run tests (keep fast per Story 0.3 requirements)
+    - Coverage directory MUST be added to .gitignore
+    - Test files should be co-located with components using .test.tsx/.test.ts naming convention
+  </constraints>
+  <interfaces>
+    <npm-scripts>
+      <script name="test" command="vitest" description="Run tests in watch mode (development)"/>
+      <script name="test:run" command="vitest run" description="Run tests once (CI mode)"/>
+      <script name="test:coverage" command="vitest run --coverage" description="Generate coverage report (HTML in coverage/)"/>
+      <script name="test:ui" command="vitest --ui" description="Open Vitest UI dashboard (optional)"/>
+    </npm-scripts>
+    <vitest-config>
+      <path>vitest.config.ts</path>
+      <required-fields>
+        - plugins: [react()] - React plugin for JSX support
+        - test.globals: true - Enable describe, it, expect globally
+        - test.environment: 'jsdom' - Browser-like environment for React
+        - test.setupFiles: './src/test/setup.ts' - Test setup file
+        - test.coverage.provider: 'v8' - Fast coverage provider
+        - test.coverage.reporter: ['text', 'json', 'html'] - Coverage output formats
+        - resolve.alias: Must match vite.config.ts aliases
+      </required-fields>
+    </vitest-config>
+    <test-setup>
+      <path>src/test/setup.ts</path>
+      <required-content>
+        - Import expect, afterEach from vitest
+        - Import cleanup from @testing-library/react
+        - Import matchers from @testing-library/jest-dom/matchers
+        - Extend expect with jest-dom matchers
+        - Call cleanup() after each test
+      </required-content>
+    </test-setup>
+  </interfaces>
+  <tests>
+    <standards>
+Unit tests use Vitest 4.0 with @testing-library/react for component testing. Test user-visible behavior rather than implementation details. Use semantic queries (getByRole, getByLabelText, getByText) over getByTestId. Write tests that resemble how users interact with the app. Coverage targets: utilities/services 80%+, components 60%+ focusing on critical paths. Mock external dependencies using vi.mock(). Tests should be fast (&lt;5ms per test ideal). Vitest runs in watch mode during development, single-run mode for CI.
+    </standards>
+    <locations>
+      - Component tests: Co-located with components (e.g., src/App.test.tsx)
+      - Utility tests: Co-located with utilities (e.g., src/lib/utils.test.ts)
+      - Integration tests: src/__tests__/integration/ (if needed)
+      - Test setup: src/test/setup.ts
+      - Coverage output: coverage/ directory (add to .gitignore)
+      - E2E tests: tests/ or e2e/ directory (Story 0.5)
+    </locations>
+    <ideas>
+      <test ac="9" file="src/App.test.tsx">
+        - Test 1: Renders Claine v2 heading (expect(screen.getByText('Claine v2')).toBeInTheDocument())
+        - Test 2: Renders Tailwind test div with correct text (expect(screen.getByText(/Tailwind Test/)).toBeInTheDocument())
+        - Test 3: Renders Default Button (expect(screen.getByText('Default Button')).toBeInTheDocument())
+        - Test 4: Renders Secondary Button (expect(screen.getByText('Secondary')).toBeInTheDocument())
+        - Test 5: Renders Outline Button (expect(screen.getByText('Outline')).toBeInTheDocument())
+      </test>
+      <test ac="10" file="npm run test:run">
+        - Verify Vitest executes and discovers App.test.tsx
+        - All example tests pass without errors
+        - Test output shows test results clearly
+      </test>
+      <test ac="11" file="npm run test:coverage">
+        - Coverage report generates in coverage/ directory
+        - HTML report (coverage/index.html) is viewable in browser
+        - Coverage includes App.tsx with percentage reported
+        - JSON and text reports also generated
+      </test>
+    </ideas>
+  </tests>
+</story-context>

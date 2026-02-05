@@ -1,0 +1,276 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>1.12</storyId>
+    <title>Configure Bundle Analysis and Size Budgets</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-28</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/1-12-configure-bundle-analysis-and-size-budgets.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>developer</asA>
+    <iWant>bundle size monitoring beyond Epic 0 basic setup</iWant>
+    <soThat>we can track bundle growth as features are added</soThat>
+    <tasks>
+      <task id="1" title="Install and Configure Bundle Analyzer">
+        <file>vite.config.ts</file>
+        <subtasks>
+          <subtask id="1.1">Install rollup-plugin-visualizer for bundle visualization</subtask>
+          <subtask id="1.2">Configure visualizer plugin with template: 'treemap' output</subtask>
+          <subtask id="1.3">Generate report to reports/bundle-analysis.html</subtask>
+          <subtask id="1.4">Add npm run build:analyze script for development use</subtask>
+        </subtasks>
+      </task>
+      <task id="2" title="Create Bundle Size Tracking Script">
+        <file>scripts/bundle-size.ts</file>
+        <subtasks>
+          <subtask id="2.1">Create script to parse Vite build output for chunk sizes</subtask>
+          <subtask id="2.2">Group chunks by module (auth, database, sync, ui, vendor)</subtask>
+          <subtask id="2.3">Calculate gzipped sizes using gzip-size package</subtask>
+          <subtask id="2.4">Output results as JSON to reports/bundle-sizes.json</subtask>
+          <subtask id="2.5">Compare against budget thresholds and exit with error if exceeded</subtask>
+        </subtasks>
+      </task>
+      <task id="3" title="Define Module Boundaries">
+        <file>scripts/bundle-config.ts</file>
+        <subtasks>
+          <subtask id="3.1">Define module patterns for auth, database, sync, ui, vendor</subtask>
+          <subtask id="3.2">Define size budgets (gzipped KB)</subtask>
+          <subtask id="3.3">Export configuration for use by tracking script</subtask>
+        </subtasks>
+      </task>
+      <task id="4" title="Integrate with CI/CD Pipeline">
+        <file>.github/workflows/ci.yml</file>
+        <subtasks>
+          <subtask id="4.1">Add bundle-size job to CI workflow</subtask>
+          <subtask id="4.2">Run bundle analysis on PR builds</subtask>
+          <subtask id="4.3">Post bundle size comparison as PR comment</subtask>
+          <subtask id="4.4">Fail CI if any module exceeds budget</subtask>
+        </subtasks>
+      </task>
+      <task id="5" title="Create Bundle Size History Tracking">
+        <file>reports/bundle-history.json</file>
+        <subtasks>
+          <subtask id="5.1">Create JSON schema for bundle history entries</subtask>
+          <subtask id="5.2">Update history file on each main branch build</subtask>
+          <subtask id="5.3">Include commit SHA, date, and per-module sizes</subtask>
+        </subtasks>
+      </task>
+      <task id="6" title="Add Development Scripts">
+        <file>package.json</file>
+        <subtasks>
+          <subtask id="6.1">Add bundle:analyze - Generate visual bundle report</subtask>
+          <subtask id="6.2">Add bundle:check - Check against size budgets</subtask>
+          <subtask id="6.3">Add bundle:compare - Compare current vs main branch</subtask>
+        </subtasks>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <group title="Bundle Analysis Integration (AC 1-2)">
+      <criterion id="AC-1">Bundle analysis integrated into Epic 1 build process (npm run build includes analysis output)</criterion>
+      <criterion id="AC-2">Vite Rollup bundle visualizer generates report on each build (HTML or JSON format)</criterion>
+    </group>
+    <group title="Per-Feature Bundle Tracking (AC 3-5)">
+      <criterion id="AC-3">Auth module bundle size tracked separately: src/services/auth/* - OAuth services, token encryption</criterion>
+      <criterion id="AC-4">RxDB/database module bundle size tracked: src/services/database/* - RxDB schemas, migrations, reactive layer</criterion>
+      <criterion id="AC-5">Sync engine bundle size tracked: src/services/sync/* - Rate limiter, retry engine, sync orchestrator; src/services/quota/* - Quota monitor, cleanup service</criterion>
+    </group>
+    <group title="Bundle Size Budgets (AC 6-8)">
+      <criterion id="AC-6">Size budget thresholds defined: Auth &lt;50KB gzipped, Database &lt;100KB gzipped, Sync &lt;75KB gzipped, Total &lt;500KB gzipped</criterion>
+      <criterion id="AC-7">CI/CD warns when any module exceeds 80% of budget</criterion>
+      <criterion id="AC-8">CI/CD fails build when any module exceeds 100% of budget</criterion>
+    </group>
+    <group title="Trend Tracking (AC 9-10)">
+      <criterion id="AC-9">Bundle size history tracked in JSON file (committed to repo)</criterion>
+      <criterion id="AC-10">Size comparison shown in PR comments (current vs main branch)</criterion>
+    </group>
+    <group title="Documentation (AC 11)">
+      <criterion id="AC-11">Bundle size analysis documented in Epic 1 completion report</criterion>
+    </group>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/PRD.md</path>
+        <title>Product Requirements Document</title>
+        <section>Non-Functional Requirements</section>
+        <snippet>NFR001: Sub-50ms input latency for 95% of user interactions. NFR004: Support local storage of up to 100,000 emails per account with &lt;5% performance degradation. Bundle size directly impacts load time performance.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/1-11-implement-quota-management-indexeddb-gmail-api.md</path>
+        <title>Story 1.11: Quota Management</title>
+        <section>Dev Agent Record - Learnings</section>
+        <snippet>Created QuotaMonitorService, CleanupService (singleton pattern), StorageSettingsWidget, CleanupWizard, QuotaWarningBanner, RateLimitStatus components. Enhanced rateLimiter with throttling support. These modules should be tracked for bundle size.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>vite.config.ts</path>
+        <kind>config</kind>
+        <symbol>defineConfig</symbol>
+        <lines>1-49</lines>
+        <reason>Existing Vite config with rollup-plugin-visualizer already configured (outputs to stats.html). Need to enhance for per-module tracking and move output to reports/ directory.</reason>
+      </artifact>
+      <artifact>
+        <path>package.json</path>
+        <kind>manifest</kind>
+        <symbol>scripts</symbol>
+        <lines>10-28</lines>
+        <reason>Existing npm scripts including 'analyze' (line 14). Need to add bundle:analyze, bundle:check, bundle:compare scripts.</reason>
+      </artifact>
+      <artifact>
+        <path>.github/workflows/ci.yml</path>
+        <kind>ci-config</kind>
+        <symbol>test-and-build</symbol>
+        <lines>1-53</lines>
+        <reason>Existing CI workflow. Need to add bundle-size job with budget checks and PR comments.</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/auth/</path>
+        <kind>module</kind>
+        <symbol>auth module</symbol>
+        <lines>all</lines>
+        <reason>Auth module (OAuth, PKCE, token encryption, account management). Files: gmailOAuth.ts, outlookOAuth.ts, pkce.ts, tokenEncryption.ts, tokenStorage.ts, tokenRefresh.ts, accountManager.ts, accountLoader.ts, notificationIntegration.ts. Budget: &lt;50KB gzipped.</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/database/</path>
+        <kind>module</kind>
+        <symbol>database module</symbol>
+        <lines>all</lines>
+        <reason>RxDB database module (schemas, migrations, CRUD, backup, version tracking). Files: init.ts, crud.ts, backup.ts, versionTracker.ts, migrationRunner.ts, reactive.ts, schemas/, migrations/. Budget: &lt;100KB gzipped (RxDB is large).</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/sync/</path>
+        <kind>module</kind>
+        <symbol>sync module</symbol>
+        <lines>all</lines>
+        <reason>Sync engine (Gmail/Outlook sync, rate limiting, retry, conflict detection). Files: gmailSync.ts, outlookSync.ts, syncOrchestrator.ts, rateLimiter.ts, retryEngine.ts, errorClassification.ts, conflictDetection.ts, resolutionStrategies.ts, syncFailureService.ts, syncProgress.ts. Budget: &lt;75KB gzipped (combined with quota).</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/quota/</path>
+        <kind>module</kind>
+        <symbol>quota module</symbol>
+        <lines>all</lines>
+        <reason>Quota management (storage monitoring, cleanup). Files: quotaMonitor.ts, cleanupService.ts, storageBreakdown.ts. Part of sync budget (&lt;75KB combined).</reason>
+      </artifact>
+      <artifact>
+        <path>src/components/</path>
+        <kind>module</kind>
+        <symbol>ui module</symbol>
+        <lines>all</lines>
+        <reason>UI components including email/, account/, settings/, conflicts/, common/, notifications/. Should be tracked separately for bundle analysis.</reason>
+      </artifact>
+      <artifact>
+        <path>src/hooks/</path>
+        <kind>module</kind>
+        <symbol>hooks module</symbol>
+        <lines>all</lines>
+        <reason>React hooks: useDatabase.ts, useEmails.ts, useQuotaStatus.ts, useSyncRetryRecovery.ts, useReAuthNotifications.ts. Part of UI bundle.</reason>
+      </artifact>
+      <artifact>
+        <path>.gitignore</path>
+        <kind>config</kind>
+        <symbol>gitignore</symbol>
+        <lines>1-46</lines>
+        <reason>Current gitignore includes stats.html. Need to add reports/ directory rules (ignore all except bundle-history.json).</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <ecosystem name="node">
+        <package name="react" version="19.2" type="production">Core React library - ~40KB gzipped</package>
+        <package name="react-dom" version="19.2" type="production">React DOM - bundled with react</package>
+        <package name="rxdb" version="^16.20.0" type="production">RxDB for IndexedDB - ~80-100KB gzipped (largest dependency)</package>
+        <package name="rxjs" version="^7.8.2" type="production">RxJS for reactive programming - used by RxDB</package>
+        <package name="zustand" version="^5.0.8" type="production">State management - ~2KB gzipped</package>
+        <package name="@azure/msal-browser" version="^4.26.2" type="production">Microsoft auth library for Outlook OAuth</package>
+        <package name="@microsoft/microsoft-graph-client" version="^3.0.7" type="production">Microsoft Graph API client</package>
+        <package name="rollup-plugin-visualizer" version="^6.0.5" type="dev">Bundle visualization plugin - already installed</package>
+        <package name="gzip-size" version="latest" type="dev" status="to-install">Calculate gzipped file sizes for budget checking</package>
+      </ecosystem>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="directory-structure">
+      <rule>Scripts go in scripts/ directory (create if needed)</rule>
+      <rule>Reports go in reports/ directory (create if needed)</rule>
+      <rule>Add reports/ to .gitignore except bundle-history.json</rule>
+    </constraint>
+    <constraint type="existing-config">
+      <rule>Vite config already has visualizer plugin - enhance, don't replace</rule>
+      <rule>Existing 'analyze' script opens stats.html - create new scripts, don't break existing</rule>
+      <rule>CI workflow already runs build - add new job, don't modify existing</rule>
+    </constraint>
+    <constraint type="budget-thresholds">
+      <rule>Auth module: &lt;50KB gzipped</rule>
+      <rule>Database module: &lt;100KB gzipped (RxDB is large)</rule>
+      <rule>Sync engine (including quota): &lt;75KB gzipped</rule>
+      <rule>Total app bundle: &lt;500KB gzipped (excluding RxDB peer deps)</rule>
+      <rule>Warning threshold: 80% of budget</rule>
+      <rule>Failure threshold: 100% of budget</rule>
+    </constraint>
+    <constraint type="typescript">
+      <rule>All scripts must be TypeScript (.ts)</rule>
+      <rule>No TypeScript errors allowed</rule>
+      <rule>No ESLint warnings allowed</rule>
+    </constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>visualizer</name>
+      <kind>rollup-plugin</kind>
+      <signature>visualizer({ filename: string, template: 'treemap' | 'sunburst' | 'network', gzipSize: boolean, brotliSize: boolean })</signature>
+      <path>vite.config.ts</path>
+    </interface>
+    <interface>
+      <name>manualChunks</name>
+      <kind>rollup-output-config</kind>
+      <signature>manualChunks: { [chunkName: string]: string[] }</signature>
+      <path>vite.config.ts</path>
+    </interface>
+    <interface>
+      <name>BundleConfig</name>
+      <kind>typescript-interface</kind>
+      <signature>interface BundleConfig { modules: Record&lt;string, string[]&gt;; budgets: Record&lt;string, number&gt;; thresholds: { warning: number; error: number } }</signature>
+      <path>scripts/bundle-config.ts (to create)</path>
+    </interface>
+    <interface>
+      <name>BundleSizeReport</name>
+      <kind>typescript-interface</kind>
+      <signature>interface BundleSizeReport { timestamp: string; commit: string; modules: Record&lt;string, { raw: number; gzip: number; brotli?: number }&gt;; total: { raw: number; gzip: number } }</signature>
+      <path>scripts/bundle-size.ts (to create)</path>
+    </interface>
+    <interface>
+      <name>GitHub Actions PR Comment</name>
+      <kind>github-action</kind>
+      <signature>uses: actions/github-script@v7 with script to post PR comment</signature>
+      <path>.github/workflows/ci.yml</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Project uses Vitest for unit testing (vitest.config.ts) and Playwright for E2E testing (playwright.config.ts). Tests should follow existing patterns: co-locate unit tests in __tests__/ directories adjacent to source files. Use describe/it blocks with clear test names. Mock browser APIs (navigator.storage, fetch) using Vitest mocks. TypeScript strict mode enabled.
+    </standards>
+    <locations>
+      <location>scripts/__tests__/ - Unit tests for bundle scripts (to create)</location>
+      <location>src/**/__tests__/ - Existing test directories for reference</location>
+    </locations>
+    <ideas>
+      <idea ac="AC-1">Test: npm run build outputs bundle analysis - verify report file exists after build</idea>
+      <idea ac="AC-2">Test: Visualizer generates HTML report with gzip sizes - parse generated HTML for expected structure</idea>
+      <idea ac="AC-3,4,5">Test: Bundle size script correctly groups chunks by module patterns - unit test with mock build output</idea>
+      <idea ac="AC-6">Test: Budget config exports correct thresholds for each module</idea>
+      <idea ac="AC-7">Test: Warning exit code when module at 80-99% of budget</idea>
+      <idea ac="AC-8">Test: Error exit code when module exceeds 100% of budget</idea>
+      <idea ac="AC-9">Test: History file updated with correct schema on main branch</idea>
+      <idea ac="AC-10">Test: Size comparison generates readable diff output</idea>
+    </ideas>
+  </tests>
+</story-context>

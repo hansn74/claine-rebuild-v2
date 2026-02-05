@@ -1,0 +1,246 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>1</storyId>
+    <title>Virtualized Inbox Rendering</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-11-28</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/2-1-virtualized-inbox-rendering.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>user</asA>
+    <iWant>smooth, fast scrolling through large email lists</iWant>
+    <soThat>I can quickly navigate my inbox without lag</soThat>
+    <tasks>
+      <task n="1" title="Install and Configure Virtualization Library">
+        <files>package.json, src/components/email/EmailList.tsx</files>
+        <subtasks>
+          <subtask>1.1: Install @tanstack/react-virtual</subtask>
+          <subtask>1.2: Create VirtualEmailList component wrapper</subtask>
+          <subtask>1.3: Configure virtualizer with estimateSize and overscan</subtask>
+        </subtasks>
+      </task>
+      <task n="2" title="Implement Virtual List Container">
+        <files>src/components/email/VirtualEmailList.tsx, src/components/email/EmailRow.tsx, src/components/email/index.ts</files>
+        <subtasks>
+          <subtask>2.1: Create VirtualEmailList component with useVirtualizer hook</subtask>
+          <subtask>2.2: Create EmailRow component for individual email rendering</subtask>
+          <subtask>2.3: Implement dynamic row height measurement</subtask>
+          <subtask>2.4: Add overscan prop for 20-30 row buffer</subtask>
+          <subtask>2.5: Connect to email store for data source</subtask>
+        </subtasks>
+      </task>
+      <task n="3" title="Implement Dynamic Row Heights">
+        <files>src/components/email/EmailRow.tsx, src/hooks/useEmailRowHeight.ts</files>
+        <subtasks>
+          <subtask>3.1: Create useEmailRowHeight hook for measuring row content</subtask>
+          <subtask>3.2: Implement row height estimation based on preview length</subtask>
+          <subtask>3.3: Add ResizeObserver for dynamic height updates</subtask>
+          <subtask>3.4: Cache measured heights in virtualizer</subtask>
+        </subtasks>
+      </task>
+      <task n="4" title="Implement Scroll Position Persistence">
+        <files>src/store/emailListStore.ts, src/components/email/VirtualEmailList.tsx, src/hooks/useScrollPosition.ts</files>
+        <subtasks>
+          <subtask>4.1: Create scroll position state in Zustand store</subtask>
+          <subtask>4.2: Save scroll position on navigation away</subtask>
+          <subtask>4.3: Restore scroll position on return to inbox</subtask>
+          <subtask>4.4: Handle edge cases (list size changes, new emails)</subtask>
+        </subtasks>
+      </task>
+      <task n="5" title="Performance Optimization">
+        <files>src/components/email/EmailRow.tsx, src/components/email/VirtualEmailList.tsx</files>
+        <subtasks>
+          <subtask>5.1: Implement React.memo on EmailRow component</subtask>
+          <subtask>5.2: Optimize re-render triggers (memoize callbacks)</subtask>
+          <subtask>5.3: Add loading skeleton for initial render</subtask>
+          <subtask>5.4: Implement windowed loading strategy</subtask>
+        </subtasks>
+      </task>
+      <task n="6" title="Performance Benchmarking">
+        <files>src/components/email/__tests__/VirtualEmailList.perf.test.ts, scripts/email-list-benchmark.ts</files>
+        <subtasks>
+          <subtask>6.1: Create performance test with 10,000+ mock emails</subtask>
+          <subtask>6.2: Measure scroll interaction time (&lt;50ms target)</subtask>
+          <subtask>6.3: Measure FPS during scroll (60 FPS target)</subtask>
+          <subtask>6.4: Add performance monitoring with Performance API</subtask>
+          <subtask>6.5: Document benchmark results in test output</subtask>
+        </subtasks>
+      </task>
+      <task n="7" title="Testing and Integration">
+        <files>src/components/email/__tests__/VirtualEmailList.test.tsx, e2e/email-list-performance.spec.ts</files>
+        <subtasks>
+          <subtask>7.1: Write unit tests for VirtualEmailList component</subtask>
+          <subtask>7.2: Write unit tests for scroll position persistence</subtask>
+          <subtask>7.3: Write E2E test for scrolling with large dataset</subtask>
+          <subtask>7.4: Add @perf tag to performance tests</subtask>
+        </subtasks>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <ac id="1">React-window or @tanstack/virtual implemented for inbox list</ac>
+    <ac id="2">Only visible emails rendered in DOM (20-30 rows buffer)</ac>
+    <ac id="3">Smooth 60 FPS scrolling with 10,000+ emails loaded</ac>
+    <ac id="4">Dynamic row heights supported (varying email preview lengths)</ac>
+    <ac id="5">Scroll position preserved when navigating back to inbox</ac>
+    <ac id="6">Performance benchmarked: &lt;50ms scroll interaction time</ac>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Claine v2 Architecture</title>
+        <section>Performance Targets</section>
+        <snippet>NFR001: Sub-50ms UI performance. Virtualized lists should render 20-30 rows buffer. Use react-window or @tanstack/virtual for virtualization.</snippet>
+      </doc>
+      <doc>
+        <path>docs/testing.md</path>
+        <title>Testing Infrastructure</title>
+        <section>Performance Benchmarks</section>
+        <snippet>Performance tests ensure database operations meet PRD requirements. Use @perf tag for performance tests. Query 1000 emails sorted should be under 100ms.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics/epic-2-offline-first-email-client-with-attributes.md</path>
+        <title>Epic 2: Offline-First Email Client</title>
+        <section>Story 2.1 Virtualized Inbox Rendering</section>
+        <snippet>Implement virtualized list rendering for smooth scrolling with large email volumes. Target 60 FPS with 10,000+ emails.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>src/components/email/EmailList.tsx</path>
+        <kind>component</kind>
+        <symbol>EmailList</symbol>
+        <lines>1-143</lines>
+        <reason>Existing email list component to be replaced/wrapped with virtualization. Contains EmptyState, LoadingState, ErrorState components to reuse.</reason>
+      </artifact>
+      <artifact>
+        <path>src/components/email/EmailListItem.tsx</path>
+        <kind>component</kind>
+        <symbol>EmailListItem</symbol>
+        <lines>1-127</lines>
+        <reason>Existing email row component with formatting. Contains formatDate, getSenderDisplay utilities. Will be refactored to EmailRow for virtualization.</reason>
+      </artifact>
+      <artifact>
+        <path>src/hooks/useEmails.ts</path>
+        <kind>hook</kind>
+        <symbol>useEmails, UseEmailsOptions, UseEmailsResult</symbol>
+        <lines>1-165</lines>
+        <reason>Data source hook providing reactive email queries from RxDB. VirtualEmailList will consume this hook for email data.</reason>
+      </artifact>
+      <artifact>
+        <path>src/store/accountStore.ts</path>
+        <kind>store</kind>
+        <symbol>useAccountStore</symbol>
+        <lines>1-228</lines>
+        <reason>Zustand store pattern to follow for emailListStore. Shows localStorage persistence, actions, and E2E test exposure patterns.</reason>
+      </artifact>
+      <artifact>
+        <path>src/store/settingsStore.ts</path>
+        <kind>store</kind>
+        <symbol>useSettingsStore</symbol>
+        <lines>1-142</lines>
+        <reason>Another Zustand store example for consistent pattern. Shows default values and persistence patterns.</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/logger/logger.ts</path>
+        <kind>service</kind>
+        <symbol>logger</symbol>
+        <reason>Logging service. Use logger.debug('ui', ...) for performance debugging during development.</reason>
+      </artifact>
+      <artifact>
+        <path>src/components/common/ErrorBoundary.tsx</path>
+        <kind>component</kind>
+        <symbol>ErrorBoundary</symbol>
+        <reason>Wrap VirtualEmailList in ErrorBoundary for graceful error handling.</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/database/schemas/email.schema.ts</path>
+        <kind>schema</kind>
+        <symbol>EmailDocument</symbol>
+        <reason>Email document type definition. VirtualEmailList uses this for type safety.</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <ecosystem name="node">
+        <package name="react" version="19.2" />
+        <package name="react-dom" version="19.2" />
+        <package name="zustand" version="^5.0.8" />
+        <package name="rxdb" version="^16.20.0" />
+        <package name="vitest" version="^4.0.7" dev="true" />
+        <package name="@testing-library/react" version="^16.3.0" dev="true" />
+        <package name="@playwright/test" version="^1.56.1" dev="true" />
+        <package name="tailwindcss" version="^4.1.16" dev="true" />
+        <note>Install: npm install @tanstack/react-virtual</note>
+      </ecosystem>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="performance">Sub-50ms UI interactions (NFR001). Virtual list must not block main thread.</constraint>
+    <constraint type="performance">60 FPS target during scroll. Use requestAnimationFrame for smooth animations.</constraint>
+    <constraint type="architecture">Follow Zustand store pattern from accountStore.ts for emailListStore.</constraint>
+    <constraint type="architecture">Components in src/components/email/. Hooks in src/hooks/. Stores in src/store/.</constraint>
+    <constraint type="testing">Use @perf tag for performance tests. Benchmark with 10,000+ mock emails.</constraint>
+    <constraint type="testing">Use mock email data generators from testing.md patterns.</constraint>
+    <constraint type="browser">Browser-only APIs (no Node.js). IndexedDB for persistence via RxDB.</constraint>
+    <constraint type="typescript">Strict TypeScript. No any types. Export types for public interfaces.</constraint>
+    <constraint type="styling">Use Tailwind CSS classes. Follow existing component styling patterns.</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>useEmails</name>
+      <kind>React Hook</kind>
+      <signature>useEmails(options: UseEmailsOptions): UseEmailsResult</signature>
+      <path>src/hooks/useEmails.ts</path>
+      <note>Returns { emails, loading, error, count }. Subscribe to RxDB for reactive updates.</note>
+    </interface>
+    <interface>
+      <name>useVirtualizer</name>
+      <kind>TanStack Virtual Hook</kind>
+      <signature>useVirtualizer(options: VirtualizerOptions): Virtualizer</signature>
+      <path>@tanstack/react-virtual</path>
+      <note>Core virtualization hook. Configure count, getScrollElement, estimateSize, overscan.</note>
+    </interface>
+    <interface>
+      <name>EmailDocument</name>
+      <kind>TypeScript Interface</kind>
+      <signature>interface EmailDocument { id, messageId, threadId, accountId, from, to, subject, snippet, body, timestamp, read, starred, labels, attachments }</signature>
+      <path>src/services/database/schemas/email.schema.ts</path>
+    </interface>
+    <interface>
+      <name>EmailListStore</name>
+      <kind>Zustand Store</kind>
+      <signature>interface EmailListState { scrollOffset: number; setScrollOffset(offset: number): void }</signature>
+      <path>src/store/emailListStore.ts (NEW)</path>
+      <note>New store for scroll position persistence. Follow accountStore.ts pattern.</note>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Use Vitest for unit tests with @testing-library/react. Use Playwright for E2E tests. Tag performance tests with @perf. Follow mock patterns from testing.md: mockEmailData.ts for generating test emails, mockSyncServer.ts for API simulation. Performance thresholds from architecture: &lt;50ms interactions, 60 FPS scroll. Tests run in CI via GitHub Actions.
+    </standards>
+    <locations>
+      <location>src/components/email/__tests__/*.test.tsx</location>
+      <location>src/components/email/__tests__/*.perf.test.ts</location>
+      <location>src/hooks/__tests__/*.test.ts</location>
+      <location>src/store/__tests__/*.test.ts</location>
+      <location>e2e/email-list-performance.spec.ts</location>
+    </locations>
+    <ideas>
+      <idea ac="1">Test that VirtualEmailList renders only buffer + visible rows (not all 10,000)</idea>
+      <idea ac="2">Verify DOM node count stays constant during scroll (20-30 nodes)</idea>
+      <idea ac="3">Benchmark scroll FPS using requestAnimationFrame measurements</idea>
+      <idea ac="4">Test rows with varying snippet lengths render correctly</idea>
+      <idea ac="5">Navigate away, return, verify scroll position restored</idea>
+      <idea ac="6">Measure time from scroll start to paint completion under 50ms</idea>
+    </ideas>
+  </tests>
+</story-context>

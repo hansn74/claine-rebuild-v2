@@ -1,0 +1,213 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>13</storyId>
+    <title>Custom Attributes System - Data Model &amp; CRUD</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-12-15</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/2-13-custom-attributes-system-data-model-crud.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>power user</asA>
+    <iWant>to create and manage custom attributes for email organization</iWant>
+    <soThat>I can structure my emails according to my domain-specific needs</soThat>
+    <tasks>
+      <task id="1" ac="1,7">Create Attribute RxDB Schema
+        <subtask id="1.1">Create src/services/database/schemas/attribute.schema.ts</subtask>
+        <subtask id="1.2">Add attribute collection to database initialization</subtask>
+        <subtask id="1.3">Create migration if needed</subtask>
+        <subtask id="1.4">Create TypeScript types in src/types/attributes.ts</subtask>
+        <subtask id="1.5">Write schema validation tests</subtask>
+      </task>
+      <task id="2" ac="1,6,7">Implement Attribute Service Layer
+        <subtask id="2.1">Create src/services/attributes/attributeService.ts with CRUD methods</subtask>
+        <subtask id="2.2">Implement validation rules (duplicate prevention, enum validation)</subtask>
+        <subtask id="2.3">Create useAttributes hook</subtask>
+        <subtask id="2.4">Write unit tests</subtask>
+      </task>
+      <task id="3" ac="4,5">Create Built-in Attribute Presets
+        <subtask id="3.1">Create src/services/attributes/presets.ts (Status, Priority, Context)</subtask>
+        <subtask id="3.2">Implement preset initialization on first launch</subtask>
+        <subtask id="3.3">Add enable/disable toggle</subtask>
+        <subtask id="3.4">Mark presets as isBuiltIn=true</subtask>
+        <subtask id="3.5">Write preset tests</subtask>
+      </task>
+      <task id="4" ac="1,7">Create Zustand Store for Attributes
+        <subtask id="4.1">Create src/store/attributeStore.ts</subtask>
+        <subtask id="4.2">Subscribe to RxDB changes</subtask>
+        <subtask id="4.3">Implement optimistic updates</subtask>
+        <subtask id="4.4">Write store tests</subtask>
+      </task>
+      <task id="5" ac="3,4,5">Build Attribute Management UI
+        <subtask id="5.1">Create AttributeManager.tsx</subtask>
+        <subtask id="5.2">Create AttributeList.tsx</subtask>
+        <subtask id="5.3">Create AttributeForm.tsx</subtask>
+        <subtask id="5.4">Create AttributeCard.tsx</subtask>
+        <subtask id="5.5">Add delete confirmation dialog</subtask>
+        <subtask id="5.6">Optional: drag-and-drop reordering</subtask>
+        <subtask id="5.7">Write component tests</subtask>
+      </task>
+      <task id="6" ac="3">Integrate with Settings Page
+        <subtask id="6.1">Add Attributes section to settings</subtask>
+        <subtask id="6.2">Create route/tab for attribute management</subtask>
+        <subtask id="6.3">Add keyboard navigation</subtask>
+        <subtask id="6.4">Ensure responsive design</subtask>
+      </task>
+      <task id="7" ac="1-7">Testing &amp; Documentation
+        <subtask id="7.1">Write E2E tests for CRUD operations</subtask>
+        <subtask id="7.2">Test persistence across restarts</subtask>
+        <subtask id="7.3">Test validation error messages</subtask>
+        <subtask id="7.4">Add inline documentation</subtask>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <ac id="1">RxDB schema extended with attributes collection (name, type, values, display settings)</ac>
+    <ac id="2">Attributes types supported: enum (fixed value list), text (free form), date (picker), boolean (yes/no), number</ac>
+    <ac id="3">Settings UI for attribute management: Create, Read, Update, Delete attributes</ac>
+    <ac id="4">Built-in attribute presets available: Status (To-Do/In-Progress/Waiting/Done), Priority (High/Medium/Low), Context (Work/Personal/Projects)</ac>
+    <ac id="5">User can enable/disable built-in presets</ac>
+    <ac id="6">Validation: duplicate attribute names prevented, enum values validated</ac>
+    <ac id="7">Attributes persist in RxDB and sync across app restarts</ac>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/architecture.md" title="Architecture Decision Document" section="Decision 1: Database (RxDB + IndexedDB)">
+        RxDB schema patterns, validation rules, index strategy. Schemas store PARSED data with version 0. Array fields cannot be indexed directly. Indexed numbers require min/max constraints.
+      </doc>
+      <doc path="docs/architecture.md" title="Architecture Decision Document" section="RxDB Schema Definitions">
+        Email schema shows custom attributes field pattern: attributes: { [key: string]: string | number | boolean | null } with additionalProperties: true.
+      </doc>
+      <doc path="docs/epics/epic-2-offline-first-email-client-with-attributes.md" title="Epic 2" section="Story 2.13">
+        Acceptance criteria and prerequisites for custom attributes system. Depends on Story 2.9 (Folders/Labels) and Story 1.3 (RxDB).
+      </doc>
+      <doc path="docs/architecture.md" title="Architecture Decision Document" section="Decision 2: State Management (Zustand)">
+        Zustand v5.x for state management. Feature-based slices pattern, devtools enabled. Store hooks: use{Domain}Store naming convention.
+      </doc>
+      <doc path="docs/architecture.md" title="Architecture Decision Document" section="Project Structure">
+        Feature organization: src/features/{domain}/ with components/, hooks/, services/, store/, types/, utils/. Shared code in src/shared/.
+      </doc>
+    </docs>
+    <code>
+      <file path="src/services/database/schemas/email.schema.ts" kind="schema" symbol="emailSchema" reason="Reference for schema pattern. Shows attributes field with additionalProperties:true for flexible key-value storage.">
+        <interface>
+          attributes: { [key: string]: string | number | boolean | null }
+        </interface>
+      </file>
+      <file path="src/services/database/schemas/index.ts" kind="exports" symbol="*" reason="Central schema exports. New attribute schema must be exported here."/>
+      <file path="src/services/database/init.ts" kind="service" symbol="initDatabase" reason="Database initialization. Attribute collection must be added to migration system."/>
+      <file path="src/store/accountStore.ts" kind="store" symbol="useAccountStore" reason="Reference Zustand store pattern. Shows state/actions structure, localStorage persistence, and getters."/>
+      <file path="src/services/email/sendQueueService.ts" kind="service" reason="Reference service pattern. Shows CRUD operations structure with RxDB collections."/>
+      <file path="src/hooks/useOnboardingState.ts" kind="hook" reason="Reference hook pattern for localStorage persistence. Similar pattern for attribute presets initialization."/>
+      <file path="src/components/common/EmptyState.tsx" kind="component" reason="UI component pattern reference from Story 2.12."/>
+      <file path="src/context/ShortcutContext.tsx" kind="context" reason="Context pattern reference from Story 2.11. Shows provider pattern with hooks."/>
+    </code>
+    <dependencies>
+      <node>
+        <runtime>
+          <package name="rxdb" version="^16.20.0">Offline-first reactive database for IndexedDB</package>
+          <package name="zustand" version="^5.0.8">State management</package>
+          <package name="react" version="19.2">UI framework</package>
+          <package name="lucide-react" version="^0.552.0">Icons for UI</package>
+        </runtime>
+        <dev>
+          <package name="vitest" version="^4.0.7">Unit testing framework</package>
+          <package name="@testing-library/react" version="^16.3.0">React component testing</package>
+          <package name="@playwright/test" version="^1.56.1">E2E testing</package>
+          <package name="fake-indexeddb" version="^6.2.4">IndexedDB mock for tests</package>
+          <package name="typescript" version="5.9">Type checking</package>
+        </dev>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint source="architecture.md">RxDB schemas must start at version 0 with explicit migrations for version bumps</constraint>
+    <constraint source="architecture.md">Array fields and optional nested fields cannot be directly indexed in RxDB - use application-level filtering</constraint>
+    <constraint source="architecture.md">All indexed number fields require minimum/maximum constraints per RxDB validation</constraint>
+    <constraint source="architecture.md">String fields must have maxLength constraints</constraint>
+    <constraint source="architecture.md">Services access RxDB directly; components access data through store or hooks only</constraint>
+    <constraint source="architecture.md">Cross-feature communication only through Zustand store or events</constraint>
+    <constraint source="architecture.md">Store hooks follow naming: use{Domain}Store (e.g., useAttributeStore)</constraint>
+    <constraint source="epic-2">Built-in attributes cannot be deleted, only disabled</constraint>
+    <constraint source="story">Duplicate attribute names must be prevented (case-insensitive)</constraint>
+    <constraint source="story">Enum type requires non-empty values array</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface name="Attribute" kind="TypeScript interface" path="src/types/attributes.ts (to create)">
+      interface Attribute {
+        id: string
+        name: string
+        displayName: string
+        type: 'enum' | 'text' | 'date' | 'boolean' | 'number'
+        values?: string[] // For enum type
+        defaultValue?: string | number | boolean
+        color?: string
+        icon?: string
+        isBuiltIn: boolean
+        enabled: boolean
+        order: number
+        createdAt: number
+        updatedAt: number
+      }
+    </interface>
+    <interface name="AttributeService" kind="Service class" path="src/services/attributes/attributeService.ts (to create)">
+      class AttributeService {
+        createAttribute(attr: Omit&lt;Attribute, 'id' | 'createdAt' | 'updatedAt'&gt;): Promise&lt;Attribute&gt;
+        getAttributes(): Promise&lt;Attribute[]&gt;
+        getAttributeById(id: string): Promise&lt;Attribute | null&gt;
+        updateAttribute(id: string, updates: Partial&lt;Attribute&gt;): Promise&lt;Attribute&gt;
+        deleteAttribute(id: string): Promise&lt;void&gt;
+        validateAttribute(attr: Partial&lt;Attribute&gt;): ValidationResult
+      }
+    </interface>
+    <interface name="useAttributeStore" kind="Zustand store hook" path="src/store/attributeStore.ts (to create)">
+      interface AttributeState {
+        attributes: Attribute[]
+        loading: boolean
+        error: string | null
+        fetchAttributes: () => Promise&lt;void&gt;
+        addAttribute: (attr: Omit&lt;Attribute, 'id'&gt;) => Promise&lt;void&gt;
+        updateAttribute: (id: string, updates: Partial&lt;Attribute&gt;) => Promise&lt;void&gt;
+        deleteAttribute: (id: string) => Promise&lt;void&gt;
+        togglePreset: (id: string, enabled: boolean) => Promise&lt;void&gt;
+      }
+    </interface>
+    <interface name="attributeSchema" kind="RxDB Schema" path="src/services/database/schemas/attribute.schema.ts (to create)">
+      RxJsonSchema with version 0, primaryKey 'id', indexes on name, type, enabled, order
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Vitest for unit tests with @testing-library/react for component testing. Playwright for E2E tests.
+      Use fake-indexeddb for RxDB mocking in tests. Follow patterns from src/services/database/__tests__/ for schema tests.
+      Unit test coverage target: 80%. Test files co-located with source in __tests__/ directories.
+    </standards>
+    <locations>
+      <glob>src/services/database/schemas/__tests__/*.test.ts</glob>
+      <glob>src/services/attributes/__tests__/*.test.ts</glob>
+      <glob>src/store/__tests__/*.test.ts</glob>
+      <glob>src/components/settings/__tests__/*.test.tsx</glob>
+      <glob>e2e/attributes-*.spec.ts</glob>
+    </locations>
+    <ideas>
+      <idea ac="1">Schema validation: test attribute document with all field types validates correctly</idea>
+      <idea ac="1">Schema validation: test required fields reject incomplete documents</idea>
+      <idea ac="2">Type tests: test each attribute type (enum, text, date, boolean, number) can be created</idea>
+      <idea ac="3">CRUD tests: createAttribute, getAttributes, updateAttribute, deleteAttribute operations</idea>
+      <idea ac="4">Preset tests: verify Status, Priority, Context presets created on initialization</idea>
+      <idea ac="5">Toggle tests: enable/disable preset updates database and UI state</idea>
+      <idea ac="6">Validation: duplicate name rejection (case-insensitive)</idea>
+      <idea ac="6">Validation: enum type requires non-empty values array</idea>
+      <idea ac="7">Persistence: attributes survive app restart (localStorage/IndexedDB)</idea>
+      <idea ac="3">E2E: complete CRUD flow - create attribute, edit, delete</idea>
+      <idea ac="4,5">E2E: preset management - view presets, toggle enabled state</idea>
+    </ideas>
+  </tests>
+</story-context>

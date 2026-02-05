@@ -18,6 +18,7 @@ import { Subject, Observable } from 'rxjs'
 import { getDatabase } from '@/services/database/init'
 import { circuitBreaker } from '@/services/sync/circuitBreaker'
 import { classifyError } from '@/services/sync/errorClassification'
+import { attachmentBlobStore } from '@/services/email/attachmentBlobStore'
 import { logger } from '@/services/logger'
 import type { ProviderId } from '@/services/sync/circuitBreakerTypes'
 import type { DraftDocument } from '@/services/database/schemas/draft.schema'
@@ -70,9 +71,9 @@ export class SendQueueService {
   private processingIds = new Set<string>()
   private initialized = false
   /**
-   * Memory cache for attachment content to avoid RxDB stack overflow with large files.
-   * Key format: `${queueId}:${attachmentId}`
-   * Note: Cache is lost on page refresh - pending emails with attachments need to be re-queued
+   * In-memory fallback cache for attachment content when IndexedDB quota is exceeded.
+   * Story 2.18: Primary storage moved to attachmentBlobStore (IndexedDB).
+   * This cache is only used when quota check fails — content here is lost on page refresh.
    */
   private attachmentContentCache = new Map<string, string>()
 
@@ -144,34 +145,40 @@ export class SendQueueService {
     const now = Date.now()
     const queueId = `send-${now}-${Math.random().toString(36).slice(2, 11)}`
 
-    // Convert draft attachments to send queue format
-    // Store content in memory cache (not in RxDB) to avoid stack overflow with large files
-    const attachments = (draft.attachments || []).map((att) => {
-      // Store large content in memory cache instead of RxDB
-      if (att.content && att.content.length > 0) {
-        this.attachmentContentCache.set(`${queueId}:${att.id}`, att.content)
-      }
-      return {
-        id: att.id,
-        filename: att.filename,
-        mimeType: att.mimeType,
-        size: att.size,
-        // Don't store content in RxDB - it's in the cache
-        content: '',
-      }
-    })
+    // Story 2.18 (Task 1.3, 1.7): Store attachment content in IndexedDB blob store
+    // Falls back to in-memory cache if quota is insufficient
+    const attachments = await Promise.all(
+      (draft.attachments || []).map(async (att) => {
+        if (att.content && att.content.length > 0) {
+          // AC 4: Check quota before persisting large attachments
+          const quota = await attachmentBlobStore.checkQuota(att.size)
+          if (quota.sufficient) {
+            await attachmentBlobStore.put(queueId, att.id, att.content, att.size, att.mimeType)
+          } else {
+            // Quota insufficient — fall back to in-memory cache and warn
+            logger.warn('sendQueue', 'Storage quota insufficient, using memory cache', {
+              queueId,
+              attachmentId: att.id,
+              filename: att.filename,
+              required: quota.required,
+              available: quota.available,
+            })
+            this.attachmentContentCache.set(`${queueId}:${att.id}`, att.content)
+          }
+        }
+        return {
+          id: att.id,
+          filename: att.filename,
+          mimeType: att.mimeType,
+          size: att.size,
+          content: '',
+        }
+      })
+    )
 
-    // Debug logging for attachments
-    logger.info('sendQueue', 'Attachment debug', {
+    logger.info('sendQueue', 'Attachment storage', {
       draftAttachmentCount: draft.attachments?.length || 0,
       queueAttachmentCount: attachments.length,
-      cachedContentCount: this.attachmentContentCache.size,
-      attachmentDetails: attachments.map((a) => ({
-        filename: a.filename,
-        mimeType: a.mimeType,
-        size: a.size,
-        hasCachedContent: this.attachmentContentCache.has(`${queueId}:${a.id}`),
-      })),
     })
 
     const queueItem: SendQueueDocument = {
@@ -190,6 +197,9 @@ export class SendQueueService {
       status: 'pending',
       attempts: 0,
       maxAttempts: MAX_ATTEMPTS,
+      // Story 2.18 (Task 3.1): Idempotency key for duplicate send prevention
+      idempotencyKey: crypto.randomUUID(),
+      lastProcessedBy: 'app',
       createdAt: now,
       updatedAt: now,
     }
@@ -199,6 +209,9 @@ export class SendQueueService {
       id: queueItem.id,
       to: queueItem.to.map((t) => t.email).join(', '),
     })
+
+    // Story 2.18 (Task 6.1): Register Background Sync if available
+    await this.registerBackgroundSync()
 
     this.events$.next({ type: 'queued', item: queueItem })
 
@@ -277,6 +290,21 @@ export class SendQueueService {
     const sendQueue = db.sendQueue
     if (!sendQueue) return
 
+    // Story 2.18 (Task 3.2): Check if already sent (idempotency)
+    if (item.sentMessageId) {
+      logger.debug('sendQueue', 'Skipping already-sent item', { id: item.id })
+      return
+    }
+
+    // Story 2.18 (Task 3.3): Skip if already being processed
+    if (item.status === 'sending' || item.status === 'sent') {
+      logger.debug('sendQueue', 'Skipping item in non-pending state', {
+        id: item.id,
+        status: item.status,
+      })
+      return
+    }
+
     // Story 1.19: Check circuit breaker before sending (Task 6.2, AC 17)
     const providerId = this.getProviderIdForAccount(item.accountId)
     if (!forceSend && providerId && !circuitBreaker.canExecute(providerId)) {
@@ -287,10 +315,15 @@ export class SendQueueService {
       return // Leave as pending, will be processed when circuit closes
     }
 
-    // Mark as sending
+    // Mark as sending with app ownership (Task 3.5: atomic lock via update)
     this.processingIds.add(item.id)
     await sendQueue.findOne(item.id).update({
-      $set: { status: 'sending' as SendQueueStatus, updatedAt: Date.now() },
+      $set: {
+        status: 'sending' as SendQueueStatus,
+        lastProcessedBy: 'app',
+        lastAttemptAt: Date.now(),
+        updatedAt: Date.now(),
+      },
     })
     this.events$.next({ type: 'sending', item: { ...item, status: 'sending' } })
 
@@ -301,8 +334,8 @@ export class SendQueueService {
         throw new Error(`No send provider registered for account: ${item.accountId}`)
       }
 
-      // Hydrate attachment content from cache before sending
-      const hydratedItem = this.hydrateAttachmentContent(item)
+      // Hydrate attachment content from blob store / cache before sending
+      const hydratedItem = await this.hydrateAttachmentContent(item)
 
       logger.debug('sendQueue', 'Sending with hydrated attachments', {
         id: item.id,
@@ -338,8 +371,8 @@ export class SendQueueService {
         sentMessageId,
       })
 
-      // Clean up attachment content from cache after successful send
-      this.cleanupAttachmentCache(item.id, item.attachments)
+      // Clean up attachment content from blob store and cache after successful send
+      await this.cleanupAttachmentStorage(item.id, item.attachments)
 
       const sentItem = { ...item, status: 'sent' as const, sentAt: now, sentMessageId }
       this.events$.next({ type: 'sent', item: sentItem, messageId: sentMessageId })
@@ -358,63 +391,81 @@ export class SendQueueService {
   }
 
   /**
-   * Hydrate attachment content from memory cache
-   * Restores the base64 content that was stored in cache instead of RxDB
+   * Hydrate attachment content from IndexedDB blob store or fallback memory cache.
+   * Story 2.18 (Task 1.4): Primary source is attachmentBlobStore (persists across refresh).
+   * Falls back to in-memory cache for items stored there due to quota limits.
    *
    * @param item - Queue item with empty attachment content
    * @returns Queue item with hydrated attachment content
    */
-  private hydrateAttachmentContent(item: SendQueueDocument): SendQueueDocument {
+  private async hydrateAttachmentContent(item: SendQueueDocument): Promise<SendQueueDocument> {
     if (!item.attachments || item.attachments.length === 0) {
       return item
     }
 
-    const hydratedAttachments = item.attachments.map((att) => {
-      const cacheKey = `${item.id}:${att.id}`
-      const cachedContent = this.attachmentContentCache.get(cacheKey)
+    const hydratedAttachments = await Promise.all(
+      item.attachments.map(async (att) => {
+        // Try IndexedDB blob store first (persistent)
+        const blobRecord = await attachmentBlobStore.get(item.id, att.id)
+        if (blobRecord) {
+          logger.debug('sendQueue', 'Hydrated attachment from blob store', {
+            filename: att.filename,
+            contentLength: blobRecord.blob.length,
+          })
+          return { ...att, content: blobRecord.blob }
+        }
 
-      if (cachedContent) {
-        logger.debug('sendQueue', 'Hydrated attachment from cache', {
+        // Fallback to in-memory cache (non-persistent, used when quota exceeded)
+        const cacheKey = `${item.id}:${att.id}`
+        const cachedContent = this.attachmentContentCache.get(cacheKey)
+        if (cachedContent) {
+          logger.debug('sendQueue', 'Hydrated attachment from memory cache', {
+            filename: att.filename,
+            contentLength: cachedContent.length,
+          })
+          return { ...att, content: cachedContent }
+        }
+
+        // Content not available — lost after page refresh when only in memory
+        logger.warn('sendQueue', 'Attachment content not available', {
+          queueId: item.id,
+          attachmentId: att.id,
           filename: att.filename,
-          contentLength: cachedContent.length,
         })
-        return { ...att, content: cachedContent }
-      }
-
-      // Content not in cache - may happen after page refresh
-      logger.warn('sendQueue', 'Attachment content not in cache', {
-        queueId: item.id,
-        attachmentId: att.id,
-        filename: att.filename,
+        return att
       })
-      return att
-    })
+    )
 
     return { ...item, attachments: hydratedAttachments }
   }
 
   /**
-   * Clean up attachment content from cache after successful send
+   * Clean up attachment content from blob store and memory cache after successful send.
+   * Story 2.18 (Task 1.5): Cleans both IndexedDB blob store and in-memory fallback cache.
+   *
+   * AC 3: Attachment storage cleaned up after successful send (no orphaned blobs)
    *
    * @param queueId - Queue item ID
    * @param attachments - Attachments to clean up
    */
-  private cleanupAttachmentCache(
+  private async cleanupAttachmentStorage(
     queueId: string,
     attachments: SendQueueDocument['attachments']
-  ): void {
-    if (!attachments || attachments.length === 0) {
-      return
+  ): Promise<void> {
+    // Clean IndexedDB blob store
+    try {
+      const deleted = await attachmentBlobStore.deleteForQueueItem(queueId)
+      if (deleted > 0) {
+        logger.debug('sendQueue', 'Cleaned up blobs from store', { queueId, count: deleted })
+      }
+    } catch (err) {
+      logger.warn('sendQueue', 'Failed to clean blob store', { queueId, error: err })
     }
 
-    for (const att of attachments) {
-      const cacheKey = `${queueId}:${att.id}`
-      if (this.attachmentContentCache.delete(cacheKey)) {
-        logger.debug('sendQueue', 'Cleaned up attachment from cache', {
-          queueId,
-          attachmentId: att.id,
-          filename: att.filename,
-        })
+    // Clean in-memory fallback cache
+    if (attachments && attachments.length > 0) {
+      for (const att of attachments) {
+        this.attachmentContentCache.delete(`${queueId}:${att.id}`)
       }
     }
   }
@@ -517,6 +568,9 @@ export class SendQueueService {
       $set: { status: 'cancelled' as SendQueueStatus, updatedAt: Date.now() },
     })
 
+    // Story 2.18 (Task 1.6): Clean up attachment blobs on cancel
+    await this.cleanupAttachmentStorage(id, item.toJSON().attachments)
+
     logger.info('sendQueue', 'Email cancelled', { id })
     this.events$.next({
       type: 'cancelled',
@@ -563,6 +617,9 @@ export class SendQueueService {
     })
 
     logger.info('sendQueue', 'Email queued for retry', { id })
+
+    // Story 2.18 (Task 6.3): Re-register Background Sync on retry
+    await this.registerBackgroundSync()
 
     // Process immediately — user-initiated retry bypasses circuit breaker (AC 17)
     const updatedItem = await sendQueue.findOne(id).exec()
@@ -662,7 +719,8 @@ export class SendQueueService {
 
   /**
    * Initialize the service
-   * Called on app startup to restore any pending items
+   * Called on app startup to restore any pending items.
+   * Story 2.18: Now includes queue state reconciliation and orphan blob cleanup.
    */
   async initialize(): Promise<void> {
     if (this.initialized) return
@@ -675,6 +733,9 @@ export class SendQueueService {
     // Clean up old sent/cancelled items
     await this.cleanupOldItems()
 
+    // Story 2.18 (Task 5): Reconcile queue state on startup
+    await this.reconcileQueueState()
+
     // Log pending items count
     const pendingCount = await this.getPendingCount()
     if (pendingCount > 0) {
@@ -684,6 +745,85 @@ export class SendQueueService {
     }
 
     this.initialized = true
+  }
+
+  /**
+   * Reconcile queue state after app restart.
+   * Story 2.18 (Task 5): Handles stale states, orphaned blobs, missing attachments.
+   *
+   * AC 9: Queue survives page refresh, tab closure, browser restart
+   * AC 12: Queue status accurately reflects actual state after app restart
+   */
+  async reconcileQueueState(): Promise<void> {
+    const db = getDatabase()
+    const sendQueue = db.sendQueue
+    if (!sendQueue) return
+
+    const STALE_THRESHOLD_MS = 2 * 60 * 1000 // 2 minutes
+
+    // Task 5.2: Reset stale 'sending' items back to 'pending'
+    const sendingItems = await sendQueue.find({ selector: { status: 'sending' } }).exec()
+
+    for (const item of sendingItems) {
+      const lastAttempt = item.lastAttemptAt || item.updatedAt
+      if (Date.now() - lastAttempt > STALE_THRESHOLD_MS) {
+        await item.update({
+          $set: {
+            status: 'pending' as SendQueueStatus,
+            updatedAt: Date.now(),
+          },
+        })
+        logger.info('sendQueue', 'Reset stale sending item to pending', { id: item.id })
+      }
+    }
+
+    // Task 5.3: Verify attachment blobs exist for pending items
+    const pendingItems = await sendQueue.find({ selector: { status: 'pending' } }).exec()
+
+    for (const item of pendingItems) {
+      const doc = item.toJSON() as SendQueueDocument
+      if (doc.attachments && doc.attachments.length > 0) {
+        const hasBlobs = await attachmentBlobStore.hasBlobs(doc.id)
+        const hasMemCache = doc.attachments.some((att) =>
+          this.attachmentContentCache.has(`${doc.id}:${att.id}`)
+        )
+
+        if (!hasBlobs && !hasMemCache) {
+          logger.warn('sendQueue', 'Pending item missing attachment blobs', {
+            id: doc.id,
+            attachmentCount: doc.attachments.length,
+          })
+        }
+      }
+    }
+
+    // Task 5.4: Clean up orphaned blobs (blobs for queue items that no longer exist)
+    const allItems = await sendQueue.find().exec()
+    const activeIds = new Set(allItems.map((item) => item.id))
+    const orphansRemoved = await attachmentBlobStore.cleanupOrphanedBlobs(activeIds)
+    if (orphansRemoved > 0) {
+      logger.info('sendQueue', 'Removed orphaned attachment blobs', { count: orphansRemoved })
+    }
+  }
+
+  /**
+   * Register a Background Sync event with the service worker.
+   * Story 2.18 (Task 6.1, AC 5): Enables send queue processing even after tab closure.
+   * Only works on Chromium browsers with SyncManager support (Task 2.7).
+   */
+  async registerBackgroundSync(): Promise<void> {
+    try {
+      if (!('serviceWorker' in navigator) || !('SyncManager' in window)) {
+        return // Not supported — fallback handled by useQueueProcessor
+      }
+
+      const registration = await navigator.serviceWorker.ready
+      await registration.sync.register('send-queue-sync')
+      logger.debug('sendQueue', 'Background Sync registered')
+    } catch (err) {
+      // Background Sync registration failure is not critical
+      logger.warn('sendQueue', 'Failed to register Background Sync', { error: err })
+    }
   }
 
   /**

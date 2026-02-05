@@ -1,0 +1,211 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>3g</storyId>
+    <title>Fix Epic 0 E2E Tests After Database Integration</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-18</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/1-3g-fix-epic-0-e2e-tests.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>a developer</asA>
+    <iWant>to update Epic 0 E2E tests to wait for database initialization</iWant>
+    <soThat>all 24 failing E2E tests pass and the test suite is reliable again</soThat>
+    <tasks>
+      <category name="Planning & Analysis">
+        <task>Review all failing test screenshots to understand exact failure modes</task>
+        <task>Analyze App.tsx initialization flow and timing</task>
+        <task>Identify common wait patterns across failing tests</task>
+        <task>Document test helper requirements</task>
+      </category>
+      <category name="Implementation">
+        <task>Create e2e/helpers/database.ts with waitForDatabaseReady() helper</task>
+        <task>Update app.spec.ts tests to wait for database initialization</task>
+        <task>Update database-init.spec.ts tests for new initialization flow</task>
+        <task>Add appropriate timeouts and retry logic</task>
+        <task>Add comments explaining database initialization dependency</task>
+      </category>
+      <category name="Testing & Validation">
+        <task>Run updated tests locally across all browsers</task>
+        <task>Verify all 24 failing tests now pass (8 tests × 3 browsers)</task>
+        <task>Check test execution time remains reasonable (&lt;30s per test)</task>
+        <task>Verify tests fail appropriately when database init actually fails</task>
+      </category>
+      <category name="Documentation">
+        <task>Document test helper usage in test files</task>
+        <task>Add comments explaining database initialization pattern</task>
+        <task>Update E2E testing documentation if needed</task>
+      </category>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC1" title="App Component Tests Updated">
+      <given>the app.spec.ts test file</given>
+      <when>tests run against the app with database initialization</when>
+      <then>all 4 app tests should pass across chromium, firefox, and webkit</then>
+      <evidence>
+        - Tests wait for database initialization before asserting UI elements
+        - Tests verify database ready state before checking for app content
+        - All app.spec.ts tests passing in all browsers
+      </evidence>
+    </criterion>
+    <criterion id="AC2" title="Database Init Tests Updated">
+      <given>the database-init.spec.ts test file</given>
+      <when>tests run against the app</when>
+      <then>all 4 database initialization tests should pass across all browsers</then>
+      <evidence>
+        - Tests correctly handle the database initialization flow
+        - Tests verify both loading and ready states
+        - All database-init.spec.ts tests passing in all browsers
+      </evidence>
+    </criterion>
+    <criterion id="AC3" title="Test Patterns Documented">
+      <given>the updated test files</given>
+      <when>reviewing test implementation</when>
+      <then>clear patterns for testing database-aware components should be evident</then>
+      <evidence>
+        - Helper functions or utilities for waiting on database ready state
+        - Comments explaining the database initialization timing
+        - Reusable patterns for future E2E tests
+      </evidence>
+    </criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>README.md</path>
+        <title>Project README</title>
+        <section>Testing</section>
+        <snippet>npm run test:e2e - Run Playwright E2E tests (headless), npm run test:e2e:ui - Run E2E tests with Playwright UI. Test execution configured with Playwright 1.56+, tests at port 5154</snippet>
+      </doc>
+      <doc>
+        <path>docs/research/e2e-testing-frameworks-research.md</path>
+        <title>E2E Testing Frameworks Research</title>
+        <section>Test Patterns</section>
+        <snippet>Page Object Model pattern recommended. Tests should use semantic locators (getByRole, getByText). Wait strategies: use page.waitForSelector() instead of waitForTimeout(). Each test gets isolated browser context.</snippet>
+      </doc>
+      <doc>
+        <path>docs/technical-decisions/adr-012-test-strategy-benchmark-harness.md</path>
+        <title>Test Strategy ADR</title>
+        <section>E2E Tests</section>
+        <snippet>Critical user workflows (5-10 tests). Playwright 1.56.x for cross-browser testing. Retry logic for flaky tests (0 local, 2 CI). Screenshot and video on failure. Parallel execution for CI efficiency.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/0-5-configure-playwright-1-56-e2e-testing-infrastructure.md</path>
+        <title>Playwright Infrastructure Story</title>
+        <section>Best Practices</section>
+        <snippet>Use semantic locators (getByRole, getByText) over CSS selectors. Explicit imports from @playwright/test (not globals). Proper wait strategies (networkidle, waitForSelector). E2E tests in e2e/ folder with .spec.ts extension.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/1-3f-add-migration-e2e-tests.md</path>
+        <title>Database Migration E2E Tests Story</title>
+        <section>Implementation</section>
+        <snippet>Created e2e/database-migrations.spec.ts with proper wait pattern: await expect(page.getByText(/Database Ready/i)).toBeVisible({ timeout: 20000 }). Window interface extension for type-safe test helpers.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>e2e/app.spec.ts</path>
+        <kind>test</kind>
+        <symbol>App Component E2E Tests</symbol>
+        <lines>1-75</lines>
+        <reason>Failing test file that needs database wait pattern - 4 tests failing, no wait for database initialization</reason>
+      </artifact>
+      <artifact>
+        <path>e2e/database-init.spec.ts</path>
+        <kind>test</kind>
+        <symbol>Database Initialization</symbol>
+        <lines>1-75</lines>
+        <reason>Partially correct test file - has database wait pattern but needs adjustment for Epic 0 tests compatibility</reason>
+      </artifact>
+      <artifact>
+        <path>e2e/database-migrations.spec.ts</path>
+        <kind>test</kind>
+        <symbol>Database Migration Persistence</symbol>
+        <lines>1-50</lines>
+        <reason>Reference implementation - shows correct wait pattern and Window interface extension for test helpers</reason>
+      </artifact>
+      <artifact>
+        <path>src/App.tsx</path>
+        <kind>component</kind>
+        <symbol>App</symbol>
+        <lines>entire file</lines>
+        <reason>Main app component with database initialization flow - shows loading, error, and ready states that tests must handle</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/database/init.ts</path>
+        <kind>service</kind>
+        <symbol>initDatabase</symbol>
+        <lines>24-194</lines>
+        <reason>Database initialization function - shows timing and race condition handling that affects E2E test behavior</reason>
+      </artifact>
+      <artifact>
+        <path>playwright.config.ts</path>
+        <kind>config</kind>
+        <symbol>Playwright Configuration</symbol>
+        <lines>entire file</lines>
+        <reason>Test configuration showing webServer setup, baseURL (port 5154), browser projects, and timeout settings</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <package name="@playwright/test" version="^1.56.1" />
+        <package name="playwright" version="^1.56.1" />
+        <package name="vite" version="^7.1.2" />
+        <package name="react" version="^19.2.0" />
+        <package name="rxdb" version="^16.20.0" />
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Tests must wait for "Database Ready" indicator before asserting UI elements</constraint>
+    <constraint>Use semantic locators (page.getByText, page.getByRole) not CSS selectors</constraint>
+    <constraint>Timeout for database initialization should be 10-20 seconds (enough for migration runner)</constraint>
+    <constraint>Tests should use consistent wait pattern from database-migrations.spec.ts</constraint>
+    <constraint>Maintain existing test structure and assertions, only add wait logic</constraint>
+    <constraint>Do not modify App.tsx or database initialization code - tests must adapt to app behavior</constraint>
+    <constraint>Tests must pass across all 3 browsers (Chromium, Firefox, WebKit)</constraint>
+    <constraint>Test execution time should remain reasonable (&lt;30s per test)</constraint>
+    <constraint>Create reusable helper function for database ready wait pattern</constraint>
+  </constraints>
+  <interfaces>
+    <interface>
+      <name>Database Ready Indicator</name>
+      <kind>UI Element</kind>
+      <signature>page.getByText(/Database Ready/i)</signature>
+      <path>src/App.tsx</path>
+    </interface>
+    <interface>
+      <name>Database Initialization Flow</name>
+      <kind>React useEffect</kind>
+      <signature>useEffect(() => { await initDatabase(); setInitialized(true); }, [])</signature>
+      <path>src/App.tsx</path>
+    </interface>
+    <interface>
+      <name>Playwright Test Helpers Window Extension</name>
+      <kind>TypeScript Interface</kind>
+      <signature>interface Window { testHelpers?: TestHelpers }</signature>
+      <path>e2e/database-migrations.spec.ts:6-18</path>
+    </interface>
+  </interfaces>
+  <tests>
+    <standards>Playwright 1.56+ E2E tests using semantic locators (getByRole, getByText), explicit imports from @playwright/test, proper wait strategies (avoid waitForTimeout), screenshot/video on failure, cross-browser testing (Chromium, Firefox, WebKit). Test files use .spec.ts extension in e2e/ folder. Tests must wait for asynchronous operations (database initialization) before assertions.</standards>
+    <locations>
+      <location>e2e/**/*.spec.ts</location>
+      <location>e2e/helpers/**/*.ts (test utilities)</location>
+    </locations>
+    <ideas>
+      <test ac="AC1">Update e2e/app.spec.ts - Add waitForDatabaseReady() call before all UI assertions in 4 existing tests</test>
+      <test ac="AC2">Review e2e/database-init.spec.ts - Verify wait patterns are consistent, may need minor adjustments</test>
+      <test ac="AC3">Create e2e/helpers/database.ts - Extract waitForDatabaseReady() helper function with proper timeout and error handling</test>
+      <test ac="AC1,AC2">Verify all 8 tests pass across 3 browsers (24 total executions) after changes</test>
+      <test ac="AC3">Add test to verify helper function handles database initialization timeout gracefully</test>
+      <test ac="AC3">Document helper usage pattern in test file comments for future E2E tests</test>
+    </ideas>
+  </tests>
+</story-context>

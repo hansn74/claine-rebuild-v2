@@ -2,7 +2,7 @@
  * Email Actions Service
  *
  * Story 2.6: Email Actions (Archive, Delete, Mark Read/Unread)
- * Task 1: Create EmailActionsService class
+ * Story 2.19: Parallel Action Queue Processing
  *
  * Manages email actions: archive, delete, mark read/unread.
  * Implements singleton pattern for global access.
@@ -33,6 +33,8 @@ import {
   MarkUnreadModifier,
 } from '@/services/modifiers/email'
 import type { EmailDocument } from '@/services/database/schemas/email.schema'
+import { parallelMap } from '@/utils/parallelMap'
+import { PARALLEL_ACTION_CONCURRENCY } from '@/services/modifiers/types'
 
 /**
  * Detect provider type from accountId
@@ -115,7 +117,7 @@ export type EmailActionEvent =
  * // Toggle read/unread
  * await emailActionsService.toggleReadStatus(emailId)
  *
- * // Bulk operations
+ * // Bulk operations (Story 2.19: now processed in parallel)
  * await emailActionsService.archiveEmails([id1, id2, id3])
  * ```
  */
@@ -183,12 +185,14 @@ export class EmailActionsService {
       const providerType = getProviderType(email.accountId)
 
       // Create and queue modifier (Epic 3 - Modifier Architecture)
+      // Story 2.19: Pass threadId for thread-level dependency grouping
       const modifier = new ArchiveModifier({
         entityId: email.id,
         accountId: email.accountId,
         provider: providerType,
         currentLabels: [...email.labels],
         currentFolder: email.folder,
+        threadId: email.threadId,
       })
 
       // Apply modifier locally for immediate UI update
@@ -222,34 +226,40 @@ export class EmailActionsService {
   /**
    * Archive multiple emails
    * AC 5: Bulk actions available
+   * Story 2.19: Now processed in parallel using parallelMap
    *
    * @param emailIds - Array of email IDs to archive
    * @returns Array of action objects
    */
   async archiveEmails(emailIds: string[]): Promise<EmailAction[]> {
-    const actions: EmailAction[] = []
     // Story 1.18: Batch mode for bulk actions (>1 item) to reduce re-renders
     if (emailIds.length > 1) batchMode.enter()
     try {
-      for (const emailId of emailIds) {
-        try {
-          const action = await this.archiveEmail(emailId)
-          actions.push(action)
-        } catch (error) {
-          logger.warn('email-actions', 'Failed to archive email in bulk', {
-            emailId,
-            error: error instanceof Error ? error.message : String(error),
-          })
-        }
-      }
+      // Story 2.19: Process in parallel with bounded concurrency
+      const results = await parallelMap(
+        emailIds,
+        async (emailId) => {
+          try {
+            return await this.archiveEmail(emailId)
+          } catch (error) {
+            logger.warn('email-actions', 'Failed to archive email in bulk', {
+              emailId,
+              error: error instanceof Error ? error.message : String(error),
+            })
+            return null
+          }
+        },
+        PARALLEL_ACTION_CONCURRENCY
+      )
+      const actions = results.filter((a): a is EmailAction => a !== null)
+      logger.info('email-actions', 'Bulk archive completed', {
+        total: emailIds.length,
+        successful: actions.length,
+      })
+      return actions
     } finally {
       if (emailIds.length > 1) batchMode.exit()
     }
-    logger.info('email-actions', 'Bulk archive completed', {
-      total: emailIds.length,
-      successful: actions.length,
-    })
-    return actions
   }
 
   /**
@@ -290,12 +300,14 @@ export class EmailActionsService {
       const providerType = getProviderType(email.accountId)
 
       // Create and queue modifier (Epic 3 - Modifier Architecture)
+      // Story 2.19: Pass threadId for thread-level dependency grouping
       const modifier = new DeleteModifier({
         entityId: email.id,
         accountId: email.accountId,
         provider: providerType,
         currentFolder: email.folder,
         currentLabels: [...email.labels],
+        threadId: email.threadId,
       })
 
       // Apply modifier locally for immediate UI update
@@ -326,34 +338,40 @@ export class EmailActionsService {
   /**
    * Delete multiple emails
    * AC 5: Bulk actions available
+   * Story 2.19: Now processed in parallel using parallelMap
    *
    * @param emailIds - Array of email IDs to delete
    * @returns Array of action objects
    */
   async deleteEmails(emailIds: string[]): Promise<EmailAction[]> {
-    const actions: EmailAction[] = []
     // Story 1.18: Batch mode for bulk actions (>1 item) to reduce re-renders
     if (emailIds.length > 1) batchMode.enter()
     try {
-      for (const emailId of emailIds) {
-        try {
-          const action = await this.deleteEmail(emailId)
-          actions.push(action)
-        } catch (error) {
-          logger.warn('email-actions', 'Failed to delete email in bulk', {
-            emailId,
-            error: error instanceof Error ? error.message : String(error),
-          })
-        }
-      }
+      // Story 2.19: Process in parallel with bounded concurrency
+      const results = await parallelMap(
+        emailIds,
+        async (emailId) => {
+          try {
+            return await this.deleteEmail(emailId)
+          } catch (error) {
+            logger.warn('email-actions', 'Failed to delete email in bulk', {
+              emailId,
+              error: error instanceof Error ? error.message : String(error),
+            })
+            return null
+          }
+        },
+        PARALLEL_ACTION_CONCURRENCY
+      )
+      const actions = results.filter((a): a is EmailAction => a !== null)
+      logger.info('email-actions', 'Bulk delete completed', {
+        total: emailIds.length,
+        successful: actions.length,
+      })
+      return actions
     } finally {
       if (emailIds.length > 1) batchMode.exit()
     }
-    logger.info('email-actions', 'Bulk delete completed', {
-      total: emailIds.length,
-      successful: actions.length,
-    })
-    return actions
   }
 
   /**
@@ -396,6 +414,7 @@ export class EmailActionsService {
       const providerType = getProviderType(email.accountId)
 
       // Create appropriate modifier based on current state (Epic 3 - Modifier Architecture)
+      // Story 2.19: Pass threadId for thread-level dependency grouping
       const modifier = newReadStatus
         ? new MarkReadModifier({
             entityId: email.id,
@@ -403,6 +422,7 @@ export class EmailActionsService {
             provider: providerType,
             currentLabels: [...email.labels],
             markAsRead: true,
+            threadId: email.threadId,
           })
         : new MarkUnreadModifier({
             entityId: email.id,
@@ -410,6 +430,7 @@ export class EmailActionsService {
             provider: providerType,
             currentLabels: [...email.labels],
             markAsRead: false,
+            threadId: email.threadId,
           })
 
       // Apply modifier locally for immediate UI update
@@ -447,169 +468,181 @@ export class EmailActionsService {
   /**
    * Mark multiple emails as read
    * AC 5: Bulk actions available (Task 1.5)
-   *
-   * Uses modifier-based architecture for offline-first behavior.
+   * Story 2.19: Now processed in parallel using parallelMap
    *
    * @param emailIds - Array of email IDs to mark as read
    * @returns Array of action objects
    */
   async markAsRead(emailIds: string[]): Promise<EmailAction[]> {
     const db = getDatabase()
-    const actions: EmailAction[] = []
 
     // Story 1.18: Batch mode for bulk actions (>1 item) to reduce re-renders
     if (emailIds.length > 1) batchMode.enter()
     try {
-      for (const emailId of emailIds) {
-        try {
-          const emailDoc = await db.emails?.findOne(emailId).exec()
-          if (!emailDoc) continue
+      // Story 2.19: Process in parallel with bounded concurrency
+      const results = await parallelMap(
+        emailIds,
+        async (emailId) => {
+          try {
+            const emailDoc = await db.emails?.findOne(emailId).exec()
+            if (!emailDoc) return null
 
-          const email = emailDoc.toJSON() as EmailDocument
+            const email = emailDoc.toJSON() as EmailDocument
 
-          // Skip if already read
-          if (email.read) continue
+            // Skip if already read
+            if (email.read) return null
 
-          const providerType = getProviderType(email.accountId)
+            const providerType = getProviderType(email.accountId)
 
-          // Create action for tracking
-          const action: EmailAction = {
-            id: `action-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
-            type: 'mark-read',
-            emailId,
-            accountId: email.accountId,
-            previousState: {
-              read: email.read,
-              labels: [...email.labels],
-            },
-            timestamp: Date.now(),
+            // Create action for tracking
+            const action: EmailAction = {
+              id: `action-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+              type: 'mark-read',
+              emailId,
+              accountId: email.accountId,
+              previousState: {
+                read: email.read,
+                labels: [...email.labels],
+              },
+              timestamp: Date.now(),
+            }
+
+            // Create modifier (Epic 3 - Modifier Architecture)
+            // Story 2.19: Pass threadId for thread-level dependency grouping
+            const modifier = new MarkReadModifier({
+              entityId: email.id,
+              accountId: email.accountId,
+              provider: providerType,
+              currentLabels: [...email.labels],
+              markAsRead: true,
+              threadId: email.threadId,
+            })
+
+            // Apply modifier locally for immediate UI update
+            const modifiedEmail = modifier.modify(email)
+            await emailDoc.update({
+              $set: {
+                read: modifiedEmail.read,
+                labels: modifiedEmail.labels,
+              },
+            })
+
+            // Queue modifier for async sync
+            const modDoc = await modifierQueue.add(modifier)
+            action.id = modDoc.id
+
+            this.events$.next({ type: 'action-completed', action })
+            return action
+          } catch (error) {
+            logger.warn('email-actions', 'Failed to mark email as read in bulk', {
+              emailId,
+              error: error instanceof Error ? error.message : String(error),
+            })
+            return null
           }
+        },
+        PARALLEL_ACTION_CONCURRENCY
+      )
 
-          // Create modifier (Epic 3 - Modifier Architecture)
-          const modifier = new MarkReadModifier({
-            entityId: email.id,
-            accountId: email.accountId,
-            provider: providerType,
-            currentLabels: [...email.labels],
-            markAsRead: true,
-          })
-
-          // Apply modifier locally for immediate UI update
-          const modifiedEmail = modifier.modify(email)
-          await emailDoc.update({
-            $set: {
-              read: modifiedEmail.read,
-              labels: modifiedEmail.labels,
-            },
-          })
-
-          // Queue modifier for async sync
-          const modDoc = await modifierQueue.add(modifier)
-          action.id = modDoc.id
-
-          actions.push(action)
-          this.events$.next({ type: 'action-completed', action })
-        } catch (error) {
-          logger.warn('email-actions', 'Failed to mark email as read in bulk', {
-            emailId,
-            error: error instanceof Error ? error.message : String(error),
-          })
-        }
-      }
+      const actions = results.filter((a): a is EmailAction => a !== null)
+      logger.info('email-actions', 'Bulk mark as read completed', {
+        total: emailIds.length,
+        successful: actions.length,
+      })
+      return actions
     } finally {
       if (emailIds.length > 1) batchMode.exit()
     }
-
-    logger.info('email-actions', 'Bulk mark as read completed', {
-      total: emailIds.length,
-      successful: actions.length,
-    })
-
-    return actions
   }
 
   /**
    * Mark multiple emails as unread
    * AC 5: Bulk actions available (Task 1.6)
-   *
-   * Uses modifier-based architecture for offline-first behavior.
+   * Story 2.19: Now processed in parallel using parallelMap
    *
    * @param emailIds - Array of email IDs to mark as unread
    * @returns Array of action objects
    */
   async markAsUnread(emailIds: string[]): Promise<EmailAction[]> {
     const db = getDatabase()
-    const actions: EmailAction[] = []
 
     // Story 1.18: Batch mode for bulk actions (>1 item) to reduce re-renders
     if (emailIds.length > 1) batchMode.enter()
     try {
-      for (const emailId of emailIds) {
-        try {
-          const emailDoc = await db.emails?.findOne(emailId).exec()
-          if (!emailDoc) continue
+      // Story 2.19: Process in parallel with bounded concurrency
+      const results = await parallelMap(
+        emailIds,
+        async (emailId) => {
+          try {
+            const emailDoc = await db.emails?.findOne(emailId).exec()
+            if (!emailDoc) return null
 
-          const email = emailDoc.toJSON() as EmailDocument
+            const email = emailDoc.toJSON() as EmailDocument
 
-          // Skip if already unread
-          if (!email.read) continue
+            // Skip if already unread
+            if (!email.read) return null
 
-          const providerType = getProviderType(email.accountId)
+            const providerType = getProviderType(email.accountId)
 
-          // Create action for tracking
-          const action: EmailAction = {
-            id: `action-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
-            type: 'mark-unread',
-            emailId,
-            accountId: email.accountId,
-            previousState: {
-              read: email.read,
-              labels: [...email.labels],
-            },
-            timestamp: Date.now(),
+            // Create action for tracking
+            const action: EmailAction = {
+              id: `action-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+              type: 'mark-unread',
+              emailId,
+              accountId: email.accountId,
+              previousState: {
+                read: email.read,
+                labels: [...email.labels],
+              },
+              timestamp: Date.now(),
+            }
+
+            // Create modifier (Epic 3 - Modifier Architecture)
+            // Story 2.19: Pass threadId for thread-level dependency grouping
+            const modifier = new MarkUnreadModifier({
+              entityId: email.id,
+              accountId: email.accountId,
+              provider: providerType,
+              currentLabels: [...email.labels],
+              markAsRead: false,
+              threadId: email.threadId,
+            })
+
+            // Apply modifier locally for immediate UI update
+            const modifiedEmail = modifier.modify(email)
+            await emailDoc.update({
+              $set: {
+                read: modifiedEmail.read,
+                labels: modifiedEmail.labels,
+              },
+            })
+
+            // Queue modifier for async sync
+            const modDoc = await modifierQueue.add(modifier)
+            action.id = modDoc.id
+
+            this.events$.next({ type: 'action-completed', action })
+            return action
+          } catch (error) {
+            logger.warn('email-actions', 'Failed to mark email as unread in bulk', {
+              emailId,
+              error: error instanceof Error ? error.message : String(error),
+            })
+            return null
           }
+        },
+        PARALLEL_ACTION_CONCURRENCY
+      )
 
-          // Create modifier (Epic 3 - Modifier Architecture)
-          const modifier = new MarkUnreadModifier({
-            entityId: email.id,
-            accountId: email.accountId,
-            provider: providerType,
-            currentLabels: [...email.labels],
-            markAsRead: false,
-          })
-
-          // Apply modifier locally for immediate UI update
-          const modifiedEmail = modifier.modify(email)
-          await emailDoc.update({
-            $set: {
-              read: modifiedEmail.read,
-              labels: modifiedEmail.labels,
-            },
-          })
-
-          // Queue modifier for async sync
-          const modDoc = await modifierQueue.add(modifier)
-          action.id = modDoc.id
-
-          actions.push(action)
-          this.events$.next({ type: 'action-completed', action })
-        } catch (error) {
-          logger.warn('email-actions', 'Failed to mark email as unread in bulk', {
-            emailId,
-            error: error instanceof Error ? error.message : String(error),
-          })
-        }
-      }
+      const actions = results.filter((a): a is EmailAction => a !== null)
+      logger.info('email-actions', 'Bulk mark as unread completed', {
+        total: emailIds.length,
+        successful: actions.length,
+      })
+      return actions
     } finally {
       if (emailIds.length > 1) batchMode.exit()
     }
-
-    logger.info('email-actions', 'Bulk mark as unread completed', {
-      total: emailIds.length,
-      successful: actions.length,
-    })
-
-    return actions
   }
 
   /**

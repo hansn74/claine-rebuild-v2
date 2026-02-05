@@ -1,0 +1,295 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>6</storyId>
+    <title>Basic Email Sync Engine</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-21</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/1-6-basic-email-sync-engine.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>a user</asA>
+    <iWant>my emails to sync from my connected account to local storage</iWant>
+    <soThat>I can access them offline</soThat>
+    <tasks>
+      <category name="Planning &amp; Architecture">
+        <task id="1" acs="1,4">Review email sync patterns and best practices</task>
+        <task id="2" acs="1">Research Gmail API batch operations and pagination</task>
+        <task id="3" acs="1">Research Microsoft Graph API delta sync patterns</task>
+        <task id="4" acs="4">Design sync state management (last sync timestamp, sync status)</task>
+        <task id="5" acs="1,4">Define sync worker architecture (background vs foreground)</task>
+      </category>
+      <category name="RxDB Schema Integration">
+        <task id="6" acs="3">Verify email schema from Story 1.3B supports sync requirements</task>
+        <task id="7" acs="3">Confirm all required fields present (id, threadId, from, to, subject, body, timestamp, labels)</task>
+        <task id="8" acs="3">Verify indexes support sync queries (timestamp DESC, labels, threadId)</task>
+        <task id="9" acs="3">Test schema with sample email data</task>
+      </category>
+      <category name="Gmail Sync Implementation">
+        <task id="10" acs="1,3,4,5,8">Implement Gmail sync service</task>
+        <task id="11" acs="1,8">Create src/services/sync/gmailSync.ts</task>
+        <task id="12" acs="1">Implement initial sync (last 90 days, configurable)</task>
+        <task id="13" acs="4">Implement incremental sync (2-5 minute polling)</task>
+        <task id="14" acs="5">Implement Gmail API rate limiting (250 quotas/second)</task>
+        <task id="15" acs="3,8">Parse Gmail message format to RxDB schema</task>
+        <task id="16" acs="3">Store emails in RxDB with proper indexing</task>
+        <task id="17" acs="9">Associate emails with Gmail account ID</task>
+      </category>
+      <category name="Outlook Sync Implementation">
+        <task id="18" acs="1,3,4,5,8">Implement Outlook sync service</task>
+        <task id="19" acs="8">Create src/services/sync/outlookSync.ts</task>
+        <task id="20" acs="1">Implement initial sync using Microsoft Graph delta query</task>
+        <task id="21" acs="4">Implement incremental sync (2-5 minute polling)</task>
+        <task id="22" acs="5">Implement Microsoft Graph rate limiting (10 requests/second)</task>
+        <task id="23" acs="3,8">Parse Microsoft Graph message format to RxDB schema</task>
+        <task id="24" acs="3">Store emails in RxDB with proper indexing</task>
+        <task id="25" acs="9">Associate emails with Outlook account ID</task>
+      </category>
+      <category name="Sync Progress &amp; Status">
+        <task id="26" acs="2">Create sync status RxDB collection (status, progress, estimatedTime, errors)</task>
+        <task id="27" acs="2">Calculate progress percentage (emails synced / total emails)</task>
+        <task id="28" acs="2">Estimate remaining time based on sync rate (±10% accuracy)</task>
+        <task id="29" acs="2">Emit sync progress events for UI consumption</task>
+        <task id="30" acs="6">Store sync state for resume after interruption</task>
+      </category>
+      <category name="Network Resilience">
+        <task id="31" acs="6">Detect network status (online/offline events)</task>
+        <task id="32" acs="6">Pause sync when offline</task>
+        <task id="33" acs="6">Resume sync when online (continue from last synced email)</task>
+        <task id="34" acs="6">Persist sync state across app restarts</task>
+        <task id="35" acs="6">Handle partial sync failures gracefully</task>
+      </category>
+      <category name="Multi-Account Support">
+        <task id="36" acs="9">Associate each email with account ID</task>
+        <task id="37" acs="9">Run sync workers independently per account</task>
+        <task id="38" acs="9">Store account sync state separately</task>
+        <task id="39" acs="9">Prevent cross-account data leakage</task>
+      </category>
+      <category name="OAuth Integration &amp; Testing">
+        <task id="40" acs="7">Create E2E test for Gmail OAuth flow (deferred from Story 1.4)</task>
+        <task id="41" acs="7">Create E2E test for Outlook OAuth flow (deferred from Story 1.5)</task>
+        <task id="42" acs="7,8">Test token refresh during sync operations</task>
+        <task id="43" acs="7,10">Test sync with expired tokens (triggers re-auth)</task>
+      </category>
+      <category name="User Re-Auth Notification UI">
+        <task id="44" acs="10">Create notification component for expired tokens</task>
+        <task id="45" acs="10">Integrate with tokenRefreshService callback system</task>
+        <task id="46" acs="10">Show clear message when refresh token expired</task>
+        <task id="47" acs="10">Provide "Re-authenticate" button to initiate OAuth flow</task>
+        <task id="48" acs="10">Test notification appears when refresh fails</task>
+      </category>
+      <category name="Testing">
+        <task id="49" acs="1-9">Write unit tests for sync services</task>
+        <task id="50" acs="7,8,9">Write integration tests</task>
+      </category>
+      <category name="Documentation">
+        <task id="51" acs="all">Document sync architecture</task>
+      </category>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC1">Initial sync downloads last 90 days of emails (configurable via environment variable)</criterion>
+    <criterion id="AC2">Progress indicator shows sync status and estimated time (±10% accuracy)</criterion>
+    <criterion id="AC3">Emails stored in RxDB with proper indexing (timestamp DESC, labels, threadId)</criterion>
+    <criterion id="AC4">Incremental sync fetches new emails every 2-5 minutes when online</criterion>
+    <criterion id="AC5">Sync respects API rate limits (Gmail: 250 quotas/second, Outlook: 10 requests/second)</criterion>
+    <criterion id="AC6">Graceful handling of network interruptions (resume sync when online)</criterion>
+    <criterion id="AC7">OAuth E2E tests implemented for both Gmail and Outlook (deferred from Stories 1.4 and 1.5)</criterion>
+    <criterion id="AC8">Sync engine handles both Gmail API and Microsoft Graph API</criterion>
+    <criterion id="AC9">Emails associated with correct OAuth account (multi-account support)</criterion>
+    <criterion id="AC10">User re-auth notification UI implemented (deferred technical debt from Story 1.4)</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Decision Document</title>
+        <section>Email API Strategy</section>
+        <snippet>Gmail API (Phase 1) chosen for better performance than IMAP using history API for delta sync. RxDB 16.20.0 for offline-first reactive database handling 100K emails per account.</snippet>
+      </doc>
+      <doc>
+        <path>docs/technical-decisions/adr-004-sync-protocols-api-strategy.md</path>
+        <title>ADR-004: Sync Protocols &amp; API Strategy</title>
+        <section>Gmail Sync Strategy</section>
+        <snippet>Gmail History API (historyId-based delta sync) - Store historyId locally, fetch changes since last sync. Rate limits: 250 quota units/user/day. Incremental sync every 2-5 minutes with exponential backoff on 429 errors.</snippet>
+      </doc>
+      <doc>
+        <path>docs/technical-decisions/adr-004-sync-protocols-api-strategy.md</path>
+        <title>ADR-004: Sync Protocols &amp; API Strategy</title>
+        <section>Outlook/Graph Sync Strategy</section>
+        <snippet>Microsoft Graph Delta Query - Use deltaLink from previous sync to fetch changes efficiently. Similar pattern to Gmail History API for consistency.</snippet>
+      </doc>
+      <doc>
+        <path>docs/research/incremental-sync-optimization-research.md</path>
+        <title>Incremental Sync Optimization Research</title>
+        <section>Performance Optimization</section>
+        <snippet>Parallel processing can provide 5-10x speedup. Priority-based sync (inbox-first) improves perceived performance. Cursor-based pagination is 9-17x faster than offset-based for deep pages.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics/epic-1-foundation-core-infrastructure.md</path>
+        <title>Epic 1: Foundation &amp; Core Infrastructure</title>
+        <section>Story 1.6 Context</section>
+        <snippet>Basic email sync capability building on OAuth (Stories 1.4, 1.5) and RxDB schemas (Story 1.3B). Includes deferred OAuth E2E tests and re-auth notification UI from previous stories.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>src/services/database/schemas/email.schema.ts</path>
+        <kind>schema</kind>
+        <symbol>emailSchema</symbol>
+        <lines>120-376</lines>
+        <reason>Email schema with all required fields for sync: id, threadId, from, to, subject, body, timestamp, labels, accountId. Includes historyId field for Gmail delta sync. Indexed by timestamp DESC, accountId+timestamp, threadId, and folder.</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/database/schemas/email.schema.ts</path>
+        <kind>interface</kind>
+        <symbol>EmailDocument</symbol>
+        <lines>47-94</lines>
+        <reason>EmailDocument interface defines the complete email structure that sync services must populate. Includes core fields, attachments, metadata, and optional historyId for incremental sync.</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/auth/tokenRefresh.ts</path>
+        <kind>service</kind>
+        <symbol>TokenRefreshService</symbol>
+        <lines>33-272</lines>
+        <reason>Automatic token refresh service that sync engine must integrate with. Provides callback registration for re-auth notifications (AC 10). Refreshes tokens 5 minutes before expiration.</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/auth/gmailOAuth.ts</path>
+        <kind>service</kind>
+        <symbol>GmailOAuthService</symbol>
+        <lines>35-100</lines>
+        <reason>Gmail OAuth service providing refreshAccessToken() method needed for sync token management. Implements OAuth 2.0 PKCE flow completed in Story 1.4.</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/auth/tokenStorage.ts</path>
+        <kind>service</kind>
+        <symbol>tokenStorageService</symbol>
+        <lines>1-end</lines>
+        <reason>Token storage service for retrieving OAuth tokens by accountId during sync operations. Provides encrypted token storage in IndexedDB.</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/database/init.ts</path>
+        <kind>service</kind>
+        <symbol>initializeDatabase</symbol>
+        <lines>1-end</lines>
+        <reason>Database initialization that creates email collection. Sync services will use this database instance to insert synced emails.</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <package>rxdb</package>
+        <version>^16.20.0</version>
+        <usage>Offline-first reactive database for storing synced emails</usage>
+      </node>
+      <node>
+        <package>rxjs</package>
+        <version>^7.8.2</version>
+        <usage>RxDB reactive queries dependency</usage>
+      </node>
+      <node>
+        <package>@microsoft/microsoft-graph-client</package>
+        <version>^3.0.7</version>
+        <usage>Microsoft Graph API client for Outlook sync</usage>
+      </node>
+      <node>
+        <package>@azure/msal-browser</package>
+        <version>^4.26.2</version>
+        <usage>Microsoft authentication library for Outlook OAuth</usage>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Sync services must follow singleton service pattern established in Story 1.5 (gmailSync.ts, outlookSync.ts as singleton exports)</constraint>
+    <constraint>All OAuth token access must use tokenStorageService.getTokens(accountId) - never access IndexedDB directly</constraint>
+    <constraint>Email parsing must convert provider-specific formats to EmailDocument schema before RxDB insertion</constraint>
+    <constraint>Rate limiting is mandatory: Gmail 250 quotas/second (1 message = 5 units), Outlook 10 requests/second</constraint>
+    <constraint>Network status detection required using navigator.onLine and online/offline events for AC 6</constraint>
+    <constraint>Sync state must persist in RxDB to enable resume after network interruption or app restart</constraint>
+    <constraint>Never log email content or OAuth tokens (security requirement from architecture.md)</constraint>
+    <constraint>Initial sync configurable via VITE_SYNC_DAYS_INITIAL environment variable (default 90 days)</constraint>
+    <constraint>Incremental sync interval configurable via VITE_SYNC_INTERVAL_MS (default 2-5 minutes)</constraint>
+    <constraint>Testing patterns must follow vitest.config.ts and src/test/setup.ts conventions established in Epic 0</constraint>
+    <constraint>E2E tests must use Playwright patterns from e2e/database-init.spec.ts (AC 7 deferred tests)</constraint>
+  </constraints>
+  <interfaces>
+    <interface>
+      <name>EmailDocument</name>
+      <kind>TypeScript interface</kind>
+      <signature>interface EmailDocument { id: string; threadId: string; from: EmailAddress; to: EmailAddress[]; subject: string; body: EmailBody; timestamp: number; accountId: string; attachments: Attachment[]; snippet: string; labels: string[]; folder: string; read: boolean; starred: boolean; importance: 'high' | 'normal' | 'low'; historyId?: string; attributes: Record&lt;string, string | number | boolean | null&gt;; aiMetadata?: AIMetadata }</signature>
+      <path>src/services/database/schemas/email.schema.ts</path>
+    </interface>
+    <interface>
+      <name>tokenStorageService.getTokens</name>
+      <kind>Service method</kind>
+      <signature>async getTokens(accountId: string): Promise&lt;OAuthTokens | null&gt;</signature>
+      <path>src/services/auth/tokenStorage.ts</path>
+    </interface>
+    <interface>
+      <name>gmailOAuthService.refreshAccessToken</name>
+      <kind>Service method</kind>
+      <signature>async refreshAccessToken(refreshToken: string): Promise&lt;OAuthTokens&gt;</signature>
+      <path>src/services/auth/gmailOAuth.ts</path>
+    </interface>
+    <interface>
+      <name>tokenRefreshService.onRefresh</name>
+      <kind>Callback registration</kind>
+      <signature>onRefresh(callback: (accountId: string, success: boolean, error?: string) =&gt; void): () =&gt; void</signature>
+      <path>src/services/auth/tokenRefresh.ts</path>
+    </interface>
+    <interface>
+      <name>Gmail API - messages.list</name>
+      <kind>REST endpoint</kind>
+      <signature>GET https://gmail.googleapis.com/gmail/v1/users/{userId}/messages?q={query}&amp;maxResults={maxResults}&amp;pageToken={pageToken}</signature>
+      <path>External API</path>
+    </interface>
+    <interface>
+      <name>Gmail API - messages.get</name>
+      <kind>REST endpoint</kind>
+      <signature>GET https://gmail.googleapis.com/gmail/v1/users/{userId}/messages/{id}?format=full</signature>
+      <path>External API</path>
+    </interface>
+    <interface>
+      <name>Microsoft Graph - List Messages</name>
+      <kind>REST endpoint</kind>
+      <signature>GET https://graph.microsoft.com/v1.0/me/messages?$top={top}&amp;$skip={skip}&amp;$select={fields}</signature>
+      <path>External API</path>
+    </interface>
+    <interface>
+      <name>Microsoft Graph - Delta Query</name>
+      <kind>REST endpoint</kind>
+      <signature>GET https://graph.microsoft.com/v1.0/me/messages/delta?$deltatoken={token}</signature>
+      <path>External API</path>
+    </interface>
+  </interfaces>
+  <tests>
+    <standards>
+      Unit tests use Vitest 4.0 with React Testing Library for component tests. Test files colocated in __tests__ directories. Mock external dependencies (Gmail API, Microsoft Graph) using vi.mock(). Integration tests validate full sync flow with mocked API responses. E2E tests use Playwright 1.56 for OAuth flows and sync operations. Test setup configured in vitest.config.ts and src/test/setup.ts. Coverage target: 80%+ for services.
+    </standards>
+    <locations>
+      <location>src/services/sync/__tests__/*.test.ts</location>
+      <location>src/components/notifications/__tests__/*.test.tsx</location>
+      <location>e2e/gmail-oauth.spec.ts</location>
+      <location>e2e/outlook-oauth.spec.ts</location>
+      <location>e2e/sync-*.spec.ts</location>
+    </locations>
+    <ideas>
+      <idea ac="AC1">Unit test: Initial sync fetches last 90 days (configurable). Mock Gmail API responses with 90-day date filter. Verify correct query parameters.</idea>
+      <idea ac="AC2">Unit test: Progress calculation accuracy within ±10%. Mock sync of 100 emails, verify progress updates at 25%, 50%, 75%, 100%. Test time estimation variance.</idea>
+      <idea ac="AC3">Integration test: Emails inserted into RxDB with correct indexes. Query by timestamp DESC, verify ordering. Query by accountId+timestamp compound index.</idea>
+      <idea ac="AC4">Unit test: Incremental sync scheduler triggers every 2-5 minutes. Mock timer, verify sync calls at correct intervals.</idea>
+      <idea ac="AC5">Unit test: Rate limiter respects Gmail 250 quotas/second limit. Send 500 requests, verify throttling. Test Outlook 10 requests/second limit.</idea>
+      <idea ac="AC6">Integration test: Network interruption handling. Mock offline event mid-sync, verify pause. Mock online event, verify resume from last synced email.</idea>
+      <idea ac="AC7">E2E test: Gmail OAuth flow end-to-end. Launch OAuth, complete consent, verify tokens stored. Test token refresh during sync. (Deferred from Story 1.4)</idea>
+      <idea ac="AC7">E2E test: Outlook OAuth flow end-to-end. Launch OAuth, complete consent, verify tokens stored. Test token refresh during sync. (Deferred from Story 1.5)</idea>
+      <idea ac="AC8">Integration test: Gmail and Outlook sync handlers process provider-specific formats to EmailDocument schema. Verify parsing accuracy.</idea>
+      <idea ac="AC9">Unit test: Multi-account sync isolation. Create 2 accounts, sync both, verify emails have correct accountId and no cross-contamination.</idea>
+      <idea ac="AC10">Component test: ReAuthNotification component displays when tokenRefresh callback fires with success=false. Verify "Re-authenticate" button triggers OAuth flow.</idea>
+    </ideas>
+  </tests>
+</story-context>

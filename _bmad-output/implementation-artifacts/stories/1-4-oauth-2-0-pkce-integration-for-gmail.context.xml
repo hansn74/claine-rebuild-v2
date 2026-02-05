@@ -1,0 +1,139 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>1.4</storyId>
+    <title>OAuth 2.0 PKCE Integration for Gmail</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-20</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/1-4-oauth-2-0-pkce-integration-for-gmail.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>user</asA>
+    <iWant>to securely connect my Gmail account with industry-standard security</iWant>
+    <soThat>Claine can access my emails without storing my password and my tokens are protected</soThat>
+    <tasks>
+      - Research Google OAuth 2.0 with PKCE documentation
+      - Install and configure Google APIs Client Library
+      - Implement PKCE code verifier generation using crypto.randomUUID() + SHA256
+      - Implement OAuth authorization flow with PKCE challenge
+      - Implement token exchange with code verifier validation
+      - Create token encryption service (src/services/auth/tokenEncryption.ts)
+      - Implement AES-GCM 256-bit encryption using Web Crypto API
+      - Store encrypted tokens in IndexedDB
+      - Implement token refresh scheduler (checks expiration every 1 minute)
+      - Implement automatic token refresh (triggered 5 minutes before expiration)
+      - Implement token rotation (new refresh token each refresh)
+      - Handle OAuth error codes (invalid_grant, authorization_pending, slow_down, access_denied)
+      - Configure Content Security Policy (CSP) headers
+      - Enforce HTTPS-only for OAuth redirects
+      - Write unit tests for PKCE, encryption, and refresh logic
+      - Write integration test for full OAuth flow
+      - Write security test to verify token encryption at rest
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC1">Gmail OAuth 2.0 PKCE flow implemented using Google APIs Client Library</criterion>
+    <criterion id="AC2">User redirected to Google consent screen</criterion>
+    <criterion id="AC3">Connection success confirmation shown to user</criterion>
+    <criterion id="AC4">PKCE code verifier generated using crypto.randomUUID() + SHA256 hash</criterion>
+    <criterion id="AC5">Code challenge sent to Google authorization endpoint</criterion>
+    <criterion id="AC6">Code verifier validated on token exchange</criterion>
+    <criterion id="AC7">PKCE flow tested and verified secure</criterion>
+    <criterion id="AC8">OAuth tokens stored in IndexedDB with Web Crypto API encryption (AES-GCM 256-bit)</criterion>
+    <criterion id="AC9">Token encryption key derived from user session</criterion>
+    <criterion id="AC10">Encrypted tokens cannot be read without decryption key</criterion>
+    <criterion id="AC11">Token encryption/decryption service created (src/services/auth/tokenEncryption.ts)</criterion>
+    <criterion id="AC12">Token refresh scheduler implemented (checks expiration every 1 minute)</criterion>
+    <criterion id="AC13">Automatic token refresh triggered 5 minutes before expiration</criterion>
+    <criterion id="AC14">Refresh token rotation implemented (new refresh token on each refresh)</criterion>
+    <criterion id="AC15">Token expiration detection with automatic silent refresh</criterion>
+    <criterion id="AC16">User prompted to re-authenticate ONLY if refresh token expired</criterion>
+    <criterion id="AC17">Refresh failures logged for debugging</criterion>
+    <criterion id="AC18">OAuth error handling covers all error codes (invalid_grant, authorization_pending, slow_down, access_denied)</criterion>
+    <criterion id="AC19">Network errors during OAuth handled gracefully</criterion>
+    <criterion id="AC20">Token refresh failures trigger user notification</criterion>
+    <criterion id="AC21">Content Security Policy (CSP) headers configured</criterion>
+    <criterion id="AC22">HTTPS-only enforced for OAuth redirects</criterion>
+    <criterion id="AC23">TLS 1.3 minimum for all API calls</criterion>
+    <criterion id="AC24">Security audit: No token leakage in console/network logs</criterion>
+    <criterion id="AC25">Unit tests for PKCE code verifier generation</criterion>
+    <criterion id="AC26">Unit tests for token encryption/decryption</criterion>
+    <criterion id="AC27">Unit tests for token refresh logic</criterion>
+    <criterion id="AC28">Integration test: Full OAuth flow with PKCE</criterion>
+    <criterion id="AC29">Security test: Verify tokens encrypted at rest</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/epics/epic-1-foundation-core-infrastructure.md" title="Epic 1 Requirements" section="Story 1.4" snippet="OAuth 2.0 PKCE Integration for Gmail with comprehensive security requirements including PKCE flow, token encryption, refresh strategy, and error handling"/>
+      <doc path="docs/architecture.md" title="System Architecture" section="Security" snippet="System uses IndexedDB for local storage, requires encryption for sensitive data"/>
+    </docs>
+    <code>
+      <artifact path="src/services/database/" kind="service" symbol="RxDB Database Services" reason="Existing database layer for storing encrypted tokens in IndexedDB"/>
+      <artifact path="src/services/database/schemas/" kind="schema" symbol="RxDB Schemas" reason="Schema patterns to follow for auth token storage"/>
+      <artifact path="e2e/helpers/database.ts" kind="helper" symbol="waitForDatabaseReady()" reason="Test helper pattern to follow for auth test helpers"/>
+      <artifact path="src/test/setup.ts" kind="test-config" symbol="Vitest Setup" reason="Test configuration and setup patterns"/>
+      <artifact path="vite.config.ts" kind="config" symbol="Vite Config" reason="Build configuration, may need CSP headers configuration"/>
+    </code>
+    <dependencies>
+      <node>
+        <package name="rxdb" version="^16.20.0" reason="Database layer for token storage"/>
+        <package name="vitest" version="^4.0.7" reason="Unit testing framework"/>
+        <package name="@playwright/test" version="^1.56.0" reason="E2E testing framework"/>
+        <package name="react" version="^18.2.0" reason="UI framework for OAuth consent flow"/>
+        <package name="@google/auth-library" version="TBD" reason="Google OAuth client library (to be added)"/>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    - Must use existing RxDB/IndexedDB foundation (Stories 1.3-1.3g)
+    - Follow service layer pattern from src/services/database/
+    - Create new src/services/auth/ directory for OAuth services
+    - Never store tokens in localStorage (vulnerable to XSS)
+    - Always encrypt tokens at rest using Web Crypto API (AES-GCM 256-bit)
+    - No tokens in console logs or network traces (security requirement)
+    - PKCE (RFC 7636) is mandatory for SPAs/PWAs
+    - Follow test helper pattern from e2e/helpers/database.ts
+    - Use Vitest for unit tests, Playwright for E2E tests
+    - Comprehensive JSDoc documentation required for all public APIs
+  </constraints>
+
+  <interfaces>
+    <interface name="TokenEncryptionService" kind="class" signature="class TokenEncryptionService { encrypt(token: string): Promise&lt;EncryptedToken&gt;; decrypt(encrypted: EncryptedToken): Promise&lt;string&gt;; }" path="src/services/auth/tokenEncryption.ts"/>
+    <interface name="GmailOAuthService" kind="class" signature="class GmailOAuthService { generatePKCE(): PKCEPair; getAuthorizationUrl(): string; exchangeCodeForTokens(code: string, verifier: string): Promise&lt;OAuthTokens&gt;; }" path="src/services/auth/gmailOAuth.ts"/>
+    <interface name="TokenRefreshService" kind="class" signature="class TokenRefreshService { startScheduler(): void; stopScheduler(): void; refreshIfNeeded(): Promise&lt;void&gt;; }" path="src/services/auth/tokenRefresh.ts"/>
+    <interface name="Web Crypto API" kind="browser-api" signature="crypto.subtle.encrypt(algorithm, key, data); crypto.subtle.decrypt(algorithm, key, data)" path="browser-native"/>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Testing follows established patterns from Stories 1.3d-1.3g:
+      - Unit Tests: Vitest for service logic (tokenEncryption, gmailOAuth, tokenRefresh)
+      - Integration Tests: Test full OAuth flow (may require mocking Google OAuth endpoints)
+      - E2E Tests: Playwright for user-facing OAuth flow (if feasible with OAuth redirects)
+      - Security Tests: Verify encryption at rest, no token leakage
+      - All tests in __tests__/ subdirectories alongside implementation files
+      - Follow AAA pattern (Arrange, Act, Assert)
+      - Mock external dependencies (Google APIs, crypto in tests where needed)
+    </standards>
+    <locations>
+      - src/services/auth/__tests__/tokenEncryption.test.ts
+      - src/services/auth/__tests__/gmailOAuth.test.ts
+      - src/services/auth/__tests__/tokenRefresh.test.ts
+      - e2e/oauth-flow.spec.ts (if feasible)
+    </locations>
+    <ideas>
+      <test id="T1" acs="AC4,AC5,AC6,AC7">Test PKCE code verifier generation, challenge creation, and validation</test>
+      <test id="T2" acs="AC8,AC9,AC10,AC11">Test token encryption/decryption with Web Crypto API</test>
+      <test id="T3" acs="AC12,AC13,AC14,AC15">Test token refresh scheduler timing and rotation</test>
+      <test id="T4" acs="AC16,AC17">Test re-auth prompt on expired refresh token</test>
+      <test id="T5" acs="AC18,AC19,AC20">Test error handling for all OAuth error codes</test>
+      <test id="T6" acs="AC24,AC29">Security test: verify no token leakage and encryption at rest</test>
+      <test id="T7" acs="AC1,AC2,AC3,AC28">Integration test: full OAuth flow end-to-end (may need mocking)</test>
+    </ideas>
+  </tests>
+</story-context>

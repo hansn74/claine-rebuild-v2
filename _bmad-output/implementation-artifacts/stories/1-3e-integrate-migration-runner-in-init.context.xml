@@ -1,0 +1,211 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>3e</storyId>
+    <title>Integrate Migration Runner in Database Initialization</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-14</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/1-3e-integrate-migration-runner-in-init.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>a developer</asA>
+    <iWant>migrations to run automatically during database initialization</iWant>
+    <soThat>schema updates are applied seamlessly without manual intervention</soThat>
+    <tasks>
+      - Implement automatic migration discovery (AC: 2)
+        - Create src/services/database/migrations/index.ts to export all migrations
+        - Update migrationRunner.ts to auto-register from migrations/index.ts
+        - Add new migration discovery logic to load migrations dynamically
+        - Test: Verify all migrations auto-discovered and registered
+
+      - Integrate migration runner in init.ts (AC: 1, 3, 4)
+        - Import migrationRunner and versionTracker in init.ts
+        - Add version check before migrations (getCurrentVersion)
+        - Add migration execution logic before addCollections()
+        - Only run migrations if current version &lt; target version
+        - Update version after successful migrations
+        - Test: Create test database, verify migrations run on init
+
+      - Add error handling (AC: 5, 6)
+        - Wrap migration execution in try-catch block
+        - Log migration start event before execution
+        - Log migration success with duration
+        - Log migration failure with error details
+        - Throw descriptive error if migrations fail (prevents database use)
+        - Test: Simulate migration failure, verify init throws error
+
+      - Update existing tests (AC: 7)
+        - Review init.test.ts (if exists) for compatibility
+        - Add test: Database initialization runs migrations automatically
+        - Add test: Database initialization skips migrations if version current
+        - Add test: Database initialization fails if migration fails
+        - Run full test suite - verify all tests pass
+        - Test: Integration test with real migration execution
+
+      - Update documentation (AC: 8)
+        - Update database-migrations.md "Automatic Execution" section
+        - Add init.ts integration example showing auto-migration flow
+        - Update architecture.md with initialization sequence diagram
+        - Document version check logic and migration trigger conditions
+        - Add troubleshooting section for initialization failures
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    1. Migration runner invoked in initDatabase() before addCollections()
+    2. Migrations registered automatically from migrations directory
+    3. Current database version checked before running migrations
+    4. Migrations execute only if schema version has changed
+    5. Database initialization fails gracefully if migrations fail
+    6. Migration execution logged with success/failure status
+    7. Existing database initialization tests updated and passing
+    8. Documentation updated with automatic migration flow
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/database-migrations.md</path>
+        <title>Database Migrations Documentation</title>
+        <section>Running Migrations - Automatic Execution</section>
+        <snippet>Documents how migrations run automatically on database initialization if schema version changes. Currently shows manual registration but needs update for auto-discovery pattern.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/1-3c-implement-schema-migration-strategy.md</path>
+        <title>Parent Story: Schema Migration Strategy Implementation</title>
+        <section>Code Review - Action Items</section>
+        <snippet>Code review line 411 identified incomplete init.ts integration. Migration runner ready for production but must be manually invoked. This story completes the integration.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Specification</title>
+        <section>Technology Decisions - Database</section>
+        <snippet>RxDB 16.20.0 with automatic migrations support. Database initialization pattern using initDatabase() function that creates RxDatabase instance and adds collections.</snippet>
+      </doc>
+      <doc>
+        <path>docs/technical-decisions/adr-002-local-data-store-indexing-strategy.md</path>
+        <title>ADR-002: Database Technology Decision</title>
+        <section>Decision</section>
+        <snippet>RxDB selected for reactive database with automatic migration system. Migration system should integrate seamlessly with database initialization for production deployments.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>src/services/database/init.ts</path>
+        <kind>service</kind>
+        <symbol>initDatabase</symbol>
+        <lines>all</lines>
+        <reason>Database initialization function. Needs migration runner integration before addCollections() call. Currently creates database and adds collections without running migrations.</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/database/migrationRunner.ts</path>
+        <kind>service</kind>
+        <symbol>MigrationRunner</symbol>
+        <lines>all</lines>
+        <reason>Migration execution service. Needs auto-discovery logic to register migrations from migrations/index.ts. Currently requires manual migration registration.</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/database/versionTracker.ts</path>
+        <kind>service</kind>
+        <symbol>VersionTracker</symbol>
+        <lines>1-50</lines>
+        <reason>Version tracking service used by init.ts to check current version before migrations. Methods: getCurrentVersion() and setVersion() needed for version check logic.</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/database/migrations/types.ts</path>
+        <kind>interface</kind>
+        <symbol>Migration</symbol>
+        <lines>1-37</lines>
+        <reason>Migration interface definition. New migrations/index.ts will export all migrations implementing this interface for auto-registration pattern.</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/database/__tests__/init.test.ts</path>
+        <kind>test</kind>
+        <symbol>init tests</symbol>
+        <lines>all</lines>
+        <reason>Existing database initialization tests. Needs updates to verify migrations run automatically. May need new tests for version checking and migration execution flow.</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <runtime>
+        <package name="rxdb" version="^16.20.0">Reactive database with migration support</package>
+        <package name="rxjs" version="^7.8.2">RxDB peer dependency</package>
+      </runtime>
+      <devDependencies>
+        <package name="typescript" version="5.9">TypeScript compiler</package>
+        <package name="vitest" version="^4.0.7">Test runner for init and migration tests</package>
+        <package name="fake-indexeddb" version="^6.2.4">IndexedDB mock for testing</package>
+      </devDependencies>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    - Migration runner must be invoked BEFORE addCollections() in init.ts
+    - Database initialization must fail fast if migrations fail (no partial init state)
+    - Version check must handle first-time initialization (no version metadata exists yet)
+    - Must detect version regression (current &gt; target) and throw clear error
+    - Migration auto-discovery via migrations/index.ts export pattern
+    - Define LATEST_SCHEMA_VERSION constant in migrations module
+    - Maintain backward compatibility with existing database initialization code
+    - Error messages must be clear and actionable for troubleshooting
+    - Migration logging must happen before calling migrationRunner (for audit trail)
+    - All existing database tests must continue to pass
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>initDatabase</name>
+      <kind>Function returning Promise&lt;RxDatabase&gt;</kind>
+      <signature>export async function initDatabase(): Promise&lt;RxDatabase&gt;</signature>
+      <path>src/services/database/init.ts</path>
+      <note>Database initialization function. Will be modified to include version check and migration execution before addCollections().</note>
+    </interface>
+    <interface>
+      <name>MigrationRunner.runMigrations</name>
+      <kind>Method</kind>
+      <signature>async runMigrations(db: RxDatabase, currentVersion: number, targetVersion: number): Promise&lt;MigrationResult[]&gt;</signature>
+      <path>src/services/database/migrationRunner.ts</path>
+      <note>Executes pending migrations sequentially. Called from init.ts when current version &lt; target version.</note>
+    </interface>
+    <interface>
+      <name>VersionTracker.getCurrentVersion</name>
+      <kind>Method</kind>
+      <signature>async getCurrentVersion(db: RxDatabase): Promise&lt;number&gt;</signature>
+      <path>src/services/database/versionTracker.ts</path>
+      <note>Retrieves current schema version from metadata collection. Called in init.ts to determine if migrations needed.</note>
+    </interface>
+    <interface>
+      <name>migrations/index.ts (to be created)</name>
+      <kind>Module export</kind>
+      <signature>export { migration_20251113_add_sentiment_field } from './20251113_add_sentiment_field'</signature>
+      <path>src/services/database/migrations/index.ts</path>
+      <note>Centralized migration registry. Exports all migrations for auto-registration. Update this file when adding new migrations.</note>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Unit tests use Vitest 4.0.7. Test files in __tests__ directories. Tests use async/await patterns for database operations. Use fake-indexeddb for mocking RxDB storage. Integration tests verify end-to-end migration flow during initialization.
+    </standards>
+    <locations>
+      - src/services/database/__tests__/init.test.ts (existing - needs updates)
+      - src/services/database/__tests__/migrationRunner.test.ts (12 passing - verify compatibility)
+      - src/services/database/__tests__/versionTracker.test.ts (11 passing - verify compatibility)
+    </locations>
+    <ideas>
+      - AC1: Test initDatabase() calls migrationRunner before addCollections (execution order)
+      - AC2: Test migrations auto-registered from migrations/index.ts (auto-discovery)
+      - AC3: Test getCurrentVersion called before migration check
+      - AC4: Test migrations skipped if currentVersion === targetVersion
+      - AC4: Test migrations run if currentVersion &lt; targetVersion
+      - AC5: Test init throws error if migration fails (graceful failure)
+      - AC6: Test migration logs created during init (start, success/failure events)
+      - AC7: Run full test suite - all existing tests pass
+      - AC8: Manual verification - database-migrations.md updated with auto-flow examples
+      - Edge case: First-time init with no version metadata (should initialize to version 0)
+      - Edge case: Version regression detection (current &gt; target throws error)
+    </ideas>
+  </tests>
+</story-context>

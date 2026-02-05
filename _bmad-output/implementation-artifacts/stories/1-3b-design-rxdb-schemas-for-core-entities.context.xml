@@ -1,0 +1,289 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>3b</storyId>
+    <title>Design RxDB Schemas for Core Entities</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-10</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/1-3b-design-rxdb-schemas-for-core-entities.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>developer</asA>
+    <iWant>comprehensive RxDB schemas designed for all core entities</iWant>
+    <soThat>data structures are consistent and optimized before Epic 2 depends on them</soThat>
+    <tasks>
+- Design Email schema with all fields (AC: 1)
+  - Define core email fields (id, threadId, from, to, cc, bcc, subject, body, timestamp)
+  - Define metadata fields (labels, folder, read, starred, importance)
+  - Define custom attributes structure (key-value pairs for user-defined attributes)
+  - Define AI metadata structure (triageScore, priority, suggestedAttributes, confidence, reasoning)
+  - Specify field types, maxLength constraints, required fields
+  - Test: Validate schema against RxDB schema validator
+
+- Design Thread schema (AC: 2)
+  - Define thread fields (id, subject, participants, messageCount, lastMessageDate, snippet)
+  - Specify field types and constraints
+  - Define relationship to email collection
+  - Test: Validate schema structure
+
+- Design Workflow schema (AC: 3)
+  - Define workflow metadata (id, name, description, enabled, createdAt, updatedAt)
+  - Define nodes structure (array of node objects with type, position, data)
+  - Define edges structure (array of edge objects with source, target, handles)
+  - Define triggers structure (array of trigger configurations)
+  - Specify field types and nested object schemas
+  - Test: Validate schema supports workflow engine requirements
+
+- Design AI Metadata schema (AC: 4)
+  - Define AI metadata fields (id, emailId, triageScore, priority, suggestedAttributes)
+  - Define confidence scoring and reasoning fields
+  - Define modelVersion and processedAt for tracking
+  - Specify field types and constraints
+  - Test: Validate schema structure
+
+- Define performance indexes (AC: 5)
+  - Specify Email indexes: timestamp DESC, labels array, attributes compound, aiMetadata.priority
+  - Specify Thread indexes: lastMessageDate DESC, participants array
+  - Specify Workflow indexes: enabled boolean, triggers array
+  - Document index rationale and expected query patterns
+  - Test: Validate index configuration syntax
+
+- Define validation rules (AC: 6)
+  - Specify required fields for each schema
+  - Define data type constraints (string maxLength, number ranges, enum values)
+  - Define array constraints (minItems, maxItems)
+  - Define nested object validation rules
+  - Test: Validate validation rules with RxDB
+
+- Document schemas in architecture.md (AC: 7)
+  - Add Email schema to architecture.md with full field definitions
+  - Add Thread schema documentation
+  - Add Workflow schema documentation
+  - Add AI Metadata schema documentation
+  - Add index specifications
+  - Add validation rules
+  - Test: Review documentation for completeness
+
+- Validate storage capacity (AC: 8)
+  - Calculate average email size with all fields (core + metadata + attributes + AI)
+  - Estimate storage for 100K emails per account
+  - Validate against browser IndexedDB quota (~60% of disk)
+  - Document storage estimates in architecture.md
+  - Test: Verify estimates align with NFR004 requirements
+
+- Test query performance (AC: 9)
+  - Create test dataset with 1K, 10K, 50K, 100K emails
+  - Run common query patterns (inbox view, search by label, filter by attribute)
+  - Measure query execution time
+  - Validate <50ms for common queries (NFR001)
+  - Document performance test results
+  - Test: All common queries execute in <50ms with 100K emails
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+AC1: Email schema defined with all fields:
+   - Core: id, threadId, from, to, cc, bcc, subject, body, timestamp
+   - Metadata: labels, folder, read status, starred, importance
+   - Custom: attributes (user-defined key-value pairs)
+   - AI: aiMetadata (triageScore, priority, suggestedAttributes, confidence, reasoning)
+
+AC2: Thread schema defined:
+   - id, subject, participants, messageCount, lastMessageDate, snippet
+
+AC3: Workflow schema defined:
+   - id, name, description, nodes (array), edges (array), triggers (array), enabled, createdAt, updatedAt
+
+AC4: AI metadata schema defined:
+   - id, emailId, triageScore, priority, suggestedAttributes, confidence, reasoning, modelVersion, processedAt
+
+AC5: Indexes specified for performance:
+   - Email: timestamp (DESC), labels, attributes, aiMetadata.priority
+   - Thread: lastMessageDate (DESC), participants
+   - Workflow: enabled, triggers
+
+AC6: Validation rules defined (required fields, data types, constraints)
+
+AC7: All schemas documented in architecture.md
+
+AC8: Schemas support 100K emails per account (NFR004 validation)
+
+AC9: Query performance tested: <50ms for common queries (NFR001)
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Decision Document</title>
+        <section>Database Decision (RxDB + IndexedDB)</section>
+        <snippet>RxDB v16.20.0 with IndexedDB adapter for offline data storage. Must handle 100K emails (~1.5GB) within browser quota. Automatic migrations required for schema evolution. Use RxDB observables for reactive data flow.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Decision Document</title>
+        <section>Storage Estimates</section>
+        <snippet>Average email size: 15 KB (with metadata). 100K emails = ~1.5 GB. Chrome quota: ~60% of disk (20 GB disk → 12 GB quota). Well within browser limits.</snippet>
+      </doc>
+      <doc>
+        <path>docs/PRD.md</path>
+        <title>Product Requirements Document</title>
+        <section>Custom Attributes System (FR024)</section>
+        <snippet>System shall support user-defined custom attributes with configurable types (enum, text, date, boolean, number) that can be applied to emails for structured organization. Users can create domain-specific custom attributes with custom value sets. System shall support attribute-based filtering and search.</snippet>
+      </doc>
+      <doc>
+        <path>docs/PRD.md</path>
+        <title>Product Requirements Document</title>
+        <section>AI Attribute Suggestions (FR025)</section>
+        <snippet>System shall analyze incoming emails and suggest attribute values with confidence scores (0-100%) and explainable reasoning. System shall store both AI-suggested and user-final attribute values with metadata (source: ai_suggested/ai_accepted/user_manual/workflow, confidence score, timestamp).</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics/epic-1-foundation-core-infrastructure.md</path>
+        <title>Epic 1: Foundation & Core Infrastructure</title>
+        <section>Story 1.3b - Design RxDB Schemas for Core Entities</section>
+        <snippet>Design comprehensive RxDB schemas for all core entities before Epic 2 depends on them. Schemas must support Email (core, metadata, custom attributes, AI metadata), Thread, Workflow, and AI Metadata collections. Performance indexes required. Query performance target: <50ms for common queries.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/1-3-rxdb-indexeddb-data-layer-setup.md</path>
+        <title>Story 1.3: RxDB + IndexedDB Data Layer Setup</title>
+        <section>Completion Notes</section>
+        <snippet>RxDB 16.20.0 + Dexie storage adapter implemented. Database initialization service with IndexedDB working. Collections use lowercase names, cannot start with underscore. Schema structure: version, primaryKey, type, properties, required, indexes. Metadata collection pattern established for database versioning.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>src/services/database/init.ts</path>
+        <kind>service</kind>
+        <symbol>initDatabase</symbol>
+        <lines>22-103</lines>
+        <reason>Database initialization service showing RxDB collection creation pattern, schema structure (version, primaryKey, properties, required), and metadata collection implementation to reference for schema design</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/database/init.ts</path>
+        <kind>service</kind>
+        <symbol>metadata collection schema</symbol>
+        <lines>52-73</lines>
+        <reason>Example of RxDB schema structure with version 0, primaryKey, type, properties (id, version, lastMigration), and required fields - pattern to follow for new schemas</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/database/crud.ts</path>
+        <kind>service</kind>
+        <symbol>CRUD operations</symbol>
+        <lines>1-285</lines>
+        <reason>Generic CRUD operations that will operate on the schemas we design - shows how collections are accessed, queried, and updated via RxDB</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/database/reactive.ts</path>
+        <kind>service</kind>
+        <symbol>Reactive query utilities</symbol>
+        <lines>1-56</lines>
+        <reason>Reactive query patterns that will use our schema indexes - demonstrates how RxDB observables work with collection queries</reason>
+      </artifact>
+      <artifact>
+        <path>src/hooks/useDatabase.ts</path>
+        <kind>hook</kind>
+        <symbol>useDatabase, useDocument</symbol>
+        <lines>1-end</lines>
+        <reason>React hooks that subscribe to RxDB collections - shows how UI will consume data from our schemas via reactive queries</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <ecosystem name="node">
+        <package name="rxdb" version="16.20.0" />
+        <package name="rxjs" version="7.8.2" />
+      </ecosystem>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    - **Schema Naming:** Collection names must be lowercase and cannot start with underscore (CouchDB compatibility requirement). Use plural names (emails, threads, workflows).
+    - **Schema Structure:** All schemas must include: version (number, start at 0), primaryKey (string, usually 'id'), type ('object'), properties (object defining fields), required (array of required field names).
+    - **Field Constraints:** String fields must have maxLength specified. Nested objects must have complete schema definitions. Arrays must define items schema.
+    - **Index Strategy:** Indexes specified as array of field names. Compound indexes for multiple fields. DESC indexes for sorting (e.g., timestamp DESC). Array indexes for filtering (e.g., labels, participants).
+    - **Storage Budget:** Average email size target: 15 KB. 100K emails must fit within ~1.5 GB. Browser IndexedDB quota: ~60% of available disk space.
+    - **Performance Requirements:** Common queries must execute in <50ms with 100K emails (NFR001). Indexes required for: timestamp DESC, labels, attributes, aiMetadata.priority, threadId, accountId.
+    - **Validation:** In development mode, use wrappedValidateAjvStorage for schema validation. Production mode: skip validation for performance.
+    - **Migration Support:** Schemas must support version bumping and migration hooks for future schema evolution (RxDB automatic migrations).
+    - **Custom Attributes Structure:** Attributes field must support arbitrary key-value pairs with flexible types (string | number | boolean | null). No fixed schema for attribute keys.
+    - **AI Metadata Structure:** AI metadata must include confidence scores (0-100), reasoning strings, modelVersion tracking, and processedAt timestamps.
+    - **Multi-Account Support:** All schemas must include accountId field for multi-account filtering (up to 3 accounts per FR003).
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>RxJsonSchema&lt;T&gt;</name>
+      <kind>TypeScript interface</kind>
+      <signature>{ version: number; primaryKey: string; type: 'object'; properties: Record&lt;string, any&gt;; required: string[]; indexes?: string[] | string[][]; }</signature>
+      <path>node_modules/rxdb/dist/types/types/rx-schema.d.ts</path>
+    </interface>
+    <interface>
+      <name>RxCollection&lt;T&gt;</name>
+      <kind>RxDB collection</kind>
+      <signature>Reactive database collection with methods: find(), findOne(), insert(), bulkInsert(), upsert(), atomicUpdate(), remove()</signature>
+      <path>node_modules/rxdb/dist/types/types/rx-collection.d.ts</path>
+    </interface>
+    <interface>
+      <name>RxDatabase</name>
+      <kind>RxDB database</kind>
+      <signature>Database instance with collections accessed via: db.addCollections({ collectionName: { schema } }), then db.collectionName for queries</signature>
+      <path>src/services/database/init.ts</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      **Unit Testing Framework:** Vitest 4.0 for unit tests
+      **Test Environment:** fake-indexeddb for IndexedDB simulation in Node.js test environment
+      **Schema Validation:** Test schemas against RxDB schema validator (wrappedValidateAjvStorage)
+      **Performance Testing:** Vitest benchmarks for query performance measurement
+      **Coverage Target:** >85% automated test coverage for core logic (NFR007)
+    </standards>
+    <locations>
+      - src/services/database/schemas/__tests__/*.test.ts
+      - src/services/database/__tests__/performance.test.ts
+    </locations>
+    <ideas>
+      **AC1 - Email Schema:**
+      - Test: Email schema validates required fields (id, from, subject, body, timestamp, accountId)
+      - Test: Email schema accepts optional fields (cc, bcc, labels, folder, attributes, aiMetadata)
+      - Test: Email attributes field accepts arbitrary key-value pairs
+      - Test: Email aiMetadata structure validates confidence scores (0-100)
+      - Test: Email schema rejects invalid data (missing required fields, wrong types)
+
+      **AC2 - Thread Schema:**
+      - Test: Thread schema validates required fields (id, subject, participants, messageCount, lastMessageDate, accountId)
+      - Test: Thread participants array accepts multiple email addresses
+      - Test: Thread schema rejects invalid data
+
+      **AC3 - Workflow Schema:**
+      - Test: Workflow schema validates complex nested structures (nodes array with objects, edges array)
+      - Test: Workflow nodes array accepts objects with type, position, data fields
+      - Test: Workflow edges array accepts objects with source, target, handle fields
+      - Test: Workflow schema rejects invalid nested data
+
+      **AC4 - AI Metadata Schema:**
+      - Test: AI metadata schema validates confidence scores (0-100 range)
+      - Test: AI metadata schema validates modelVersion and processedAt fields
+      - Test: AI metadata schema accepts suggestedAttributes object
+
+      **AC5 - Performance Indexes:**
+      - Test: Email index configuration syntax valid (timestamp DESC, labels, attributes, aiMetadata.priority)
+      - Test: Thread index configuration syntax valid (lastMessageDate DESC, participants)
+      - Test: Workflow index configuration syntax valid (enabled, triggers)
+
+      **AC8 - Storage Capacity:**
+      - Test: Create 1K test emails and measure storage size
+      - Test: Extrapolate to 100K emails and validate <1.5GB estimate
+      - Test: Verify storage estimate aligns with NFR004 requirements
+
+      **AC9 - Query Performance:**
+      - Test: Query 100K emails by timestamp (inbox view) executes in <50ms
+      - Test: Filter by label/folder executes in <50ms
+      - Test: Filter by custom attribute executes in <50ms
+      - Test: Filter by AI priority executes in <50ms
+      - Test: Thread query by lastMessageDate executes in <50ms
+    </ideas>
+  </tests>
+</story-context>

@@ -1,0 +1,175 @@
+<story-context id="2-16-implement-lazy-loading-for-email-threads-and-large-lists" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>16</storyId>
+    <title>Implement Lazy Loading for Email Threads and Large Lists</title>
+    <status>drafted</status>
+    <generatedAt>2026-01-03</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/2-16-implement-lazy-loading-for-email-threads-and-large-lists.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>user</asA>
+    <iWant>the app to load quickly even with large email lists</iWant>
+    <soThat>I can start working immediately without waiting for everything to load</soThat>
+    <tasks>
+      <task id="1" title="Audit Current Bundle Size" acs="8,9,10">
+        <subtask id="1.1">Run npm run bundle:check to analyze current bundle composition</subtask>
+        <subtask id="1.2">Identify largest dependencies and components</subtask>
+        <subtask id="1.3">Document baseline metrics for before/after comparison</subtask>
+        <subtask id="1.4">Create bundle size budget enforcement in CI</subtask>
+      </task>
+      <task id="2" title="Implement Code Splitting for Major Components" acs="1,2,3,4">
+        <subtask id="2.1">Lazy load ThreadDetailView component in email routing</subtask>
+        <subtask id="2.2">Lazy load ComposeDialog component (already partially done)</subtask>
+        <subtask id="2.3">Lazy load SettingsView component if exists</subtask>
+        <subtask id="2.4">Lazy load AttributeManagementUI (from Story 2.13)</subtask>
+        <subtask id="2.5">Verify each lazy chunk is less than 150 KB using bundle analyzer</subtask>
+      </task>
+      <task id="3" title="Enhance Email Thread Virtualization" acs="5,6,7">
+        <subtask id="3.1">Extend @tanstack/react-virtual to thread message list</subtask>
+        <subtask id="3.2">Implement windowed rendering for email thread messages</subtask>
+        <subtask id="3.3">Add lazy loading for attachment previews (IntersectionObserver)</subtask>
+        <subtask id="3.4">Implement image lazy loading with loading="lazy"</subtask>
+      </task>
+      <task id="4" title="Create Loading States and Skeleton Screens" acs="13,14,15">
+        <subtask id="4.1">Create EmailListSkeleton component for inbox loading</subtask>
+        <subtask id="4.2">Create ThreadDetailSkeleton component for thread loading</subtask>
+        <subtask id="4.3">Create ComposeLoadingFallback component (extend existing)</subtask>
+        <subtask id="4.4">Ensure all lazy Suspense boundaries have appropriate fallbacks</subtask>
+        <subtask id="4.5">Test for layout shift (CLS less than 0.1) during component loads</subtask>
+      </task>
+      <task id="5" title="Optimize Initial Bundle Size" acs="8,9">
+        <subtask id="5.1">Move RxDB dev-mode plugin to dynamic import (dev-only)</subtask>
+        <subtask id="5.2">Review and tree-shake unused dependencies</subtask>
+        <subtask id="5.3">Split vendor chunks (React, RxDB, Lucide icons) for caching</subtask>
+        <subtask id="5.4">Ensure initial bundle less than 500 KB, email list chunk less than 200 KB</subtask>
+      </task>
+      <task id="6" title="Performance Testing and Benchmarking" acs="11,12,16,17,18,19">
+        <subtask id="6.1">Create Playwright test for initial load time less than 3s with 100K emails</subtask>
+        <subtask id="6.2">Add Lighthouse CI integration for performance score greater than 90</subtask>
+        <subtask id="6.3">Add bundle size check to CI pipeline</subtask>
+        <subtask id="6.4">Write E2E test verifying lazy-loaded components render correctly</subtask>
+        <subtask id="6.5">Benchmark TTI and document in performance report</subtask>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1" category="Code Splitting">Email thread component lazy loaded (separate chunk)</criterion>
+    <criterion id="2" category="Code Splitting">Compose component lazy loaded (only loads when user clicks compose)</criterion>
+    <criterion id="3" category="Code Splitting">Settings component lazy loaded</criterion>
+    <criterion id="4" category="Code Splitting">Attribute management UI lazy loaded</criterion>
+    <criterion id="5" category="Virtualized Scrolling">React-window virtualization extended from Story 2.1</criterion>
+    <criterion id="6" category="Virtualized Scrolling">Email thread messages virtualized (only visible messages rendered)</criterion>
+    <criterion id="7" category="Virtualized Scrolling">Large attachment previews lazy loaded on scroll</criterion>
+    <criterion id="8" category="Performance Targets">Initial bundle size less than 500 KB</criterion>
+    <criterion id="9" category="Performance Targets">Email list chunk less than 200 KB</criterion>
+    <criterion id="10" category="Performance Targets">Each lazy-loaded chunk less than 150 KB</criterion>
+    <criterion id="11" category="Performance Targets">Lighthouse performance score greater than 90</criterion>
+    <criterion id="12" category="Performance Targets">Time to Interactive (TTI) less than 3 seconds</criterion>
+    <criterion id="13" category="User Experience">Loading indicators shown for lazy-loaded components</criterion>
+    <criterion id="14" category="User Experience">Skeleton screens for email thread loading</criterion>
+    <criterion id="15" category="User Experience">No layout shift when components load</criterion>
+    <criterion id="16" category="Testing">Test: Initial load less than 3s with 100K emails in database</criterion>
+    <criterion id="17" category="Testing">Test: Lighthouse performance score greater than 90</criterion>
+    <criterion id="18" category="Testing">Test: Bundle sizes meet budgets</criterion>
+    <criterion id="19" category="Testing">Test: Lazy-loaded components load correctly</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/stories/2-1-virtualized-inbox-rendering.md" title="Story 2.1: Virtualized Inbox Rendering" section="Technical Implementation Tasks">
+        Implements @tanstack/react-virtual with 25-row overscan buffer, dynamic height measurement via measureElement API, and scroll position persistence.
+      </doc>
+      <doc path="docs/stories/0-10-configure-bundle-analysis-and-size-budgets.md" title="Story 0.10: Configure Bundle Analysis and Size Budgets" section="Acceptance Criteria">
+        Defines bundle size budgets: initial bundle less than 500 KB, email list chunk less than 200 KB, AI chunk less than 3 MB.
+      </doc>
+      <doc path="docs/research/virtual-scrolling-research.md" title="Virtual Scrolling Libraries Research" section="TanStack Virtual">
+        Recommends TanStack Virtual for email client. Performance: sub-16ms frame times with 10,000+ items, 10-15KB bundle size.
+      </doc>
+      <doc path="docs/architecture.md" title="Architecture Document" section="Performance Targets">
+        Key performance targets: sub-50ms UI interactions, 60 FPS scrolling, less than 500KB initial bundle.
+      </doc>
+      <doc path="docs/ux-design-specification.md" title="UX Design Specification" section="Loading States">
+        Skeleton screens should use animate-pulse bg-slate-200 pattern. No layout shift during component loads.
+      </doc>
+    </docs>
+
+    <code>
+      <file path="src/utils/lazyPreload.ts" kind="utility" symbol="preloadable, lazyComponents, preloadCriticalComponents" lines="1-147" reason="Core lazy loading utility with preload support. Use this pattern for all new lazy-loaded components."/>
+      <file path="src/App.tsx" kind="component" symbol="ComposeDialog, CommandPalette (lazy)" lines="41-44" reason="Existing lazy loading implementation for compose and search. Extend this pattern."/>
+      <file path="src/components/email/VirtualEmailList.tsx" kind="component" symbol="VirtualEmailList, useVirtualizer" lines="1-100" reason="Virtualized email list using @tanstack/react-virtual. Extend pattern to thread messages."/>
+      <file path="src/components/common/LoadingFallback.tsx" kind="component" symbol="ComposeLoadingFallback, SearchLoadingFallback, ThreadDetailLoadingFallback, EmailListLoadingFallback" lines="1-213" reason="Existing skeleton loading fallbacks. Reuse patterns for new skeleton components."/>
+      <file path="vite.config.ts" kind="config" symbol="manualChunks, chunkSizeWarningLimit" lines="23-50" reason="Vite build configuration for chunk splitting. Add new manual chunks here."/>
+      <file path=".github/workflows/ci.yml" kind="ci" symbol="bundle-size step" lines="80-91" reason="CI bundle size check. Already integrated, may need threshold updates."/>
+      <file path="scripts/bundle-size.ts" kind="script" reason="Bundle size checking script. Use for validation and baseline measurement."/>
+    </code>
+
+    <dependencies>
+      <npm>
+        <package name="@tanstack/react-virtual" version="^3.13.12" usage="Virtualized list rendering for large datasets"/>
+        <package name="react" version="^19.2.2" usage="Core React library"/>
+        <package name="react-dom" version="^19.2.2" usage="React DOM rendering"/>
+        <package name="vite" version="^7.1.12" usage="Build tool with code splitting support"/>
+        <package name="rollup-plugin-visualizer" version="^6.0.5" usage="Bundle analysis visualization"/>
+        <package name="lucide-react" version="^0.552.0" usage="Icon library - consider tree-shaking"/>
+        <package name="rxdb" version="*" usage="Database - dev-mode plugin should be dynamically imported"/>
+      </npm>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="bundle-size">Initial bundle must be less than 500 KB (Epic 0 budget)</constraint>
+    <constraint type="bundle-size">Email list chunk must be less than 200 KB</constraint>
+    <constraint type="bundle-size">Each lazy-loaded chunk must be less than 150 KB</constraint>
+    <constraint type="performance">Time to Interactive (TTI) must be less than 3 seconds (NFR004)</constraint>
+    <constraint type="performance">Lighthouse performance score must be greater than 90</constraint>
+    <constraint type="ux">No layout shift (CLS less than 0.1) during lazy component loads</constraint>
+    <constraint type="pattern">Use React.lazy() + Suspense for code splitting</constraint>
+    <constraint type="pattern">Use @tanstack/react-virtual for virtualized rendering</constraint>
+    <constraint type="pattern">Follow existing lazyPreload.ts patterns for new lazy components</constraint>
+    <constraint type="pattern">Use IntersectionObserver for attachment/image lazy loading</constraint>
+    <constraint type="testing">All performance tests must use @perf tag for CI identification</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface name="preloadable" kind="function" path="src/utils/lazyPreload.ts">
+      <signature>function preloadable&lt;T&gt;(importFn: ComponentImport&lt;T&gt;): PreloadableLazyComponent&lt;T&gt;</signature>
+    </interface>
+    <interface name="useVirtualizer" kind="hook" path="@tanstack/react-virtual">
+      <signature>useVirtualizer({ count, getScrollElement, estimateSize, overscan }): Virtualizer</signature>
+    </interface>
+    <interface name="lazyComponents" kind="object" path="src/utils/lazyPreload.ts">
+      <signature>{ composeDialog: PreloadableLazyComponent, commandPalette: PreloadableLazyComponent }</signature>
+    </interface>
+    <interface name="Suspense" kind="component" path="react">
+      <signature>&lt;Suspense fallback={JSX.Element}&gt;{children}&lt;/Suspense&gt;</signature>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Tests use Vitest for unit testing and Playwright for E2E tests. Performance tests should use the @perf tag pattern established in Story 2.1. Bundle size tests use scripts/bundle-size.ts with threshold validation. Skeleton components should be tested for correct rendering and no layout shift.
+    </standards>
+    <locations>
+      <location>src/**/__tests__/*.test.ts{x}</location>
+      <location>src/**/__tests__/*.perf.test.ts{x}</location>
+      <location>e2e/*.spec.ts</location>
+      <location>scripts/bundle-size.ts</location>
+    </locations>
+    <ideas>
+      <idea ac="1,2,3,4">Test that lazy-loaded components produce separate chunks in build output</idea>
+      <idea ac="5,6">Test thread virtualization with 1000+ message thread, verify only visible messages rendered</idea>
+      <idea ac="7">Test IntersectionObserver triggers lazy load for attachment previews</idea>
+      <idea ac="8,9,10">Assert bundle sizes in CI using scripts/bundle-size.ts --check</idea>
+      <idea ac="11,17">Integrate Lighthouse CI with performance score threshold of 90</idea>
+      <idea ac="12,16">Create Playwright test that seeds 100K emails and measures TTI less than 3s</idea>
+      <idea ac="13,14">Visual regression test for skeleton screens matching expected layout</idea>
+      <idea ac="15">Measure CLS using Lighthouse or custom Performance API measurement</idea>
+      <idea ac="18">Add bundle size assertions to CI with fail condition on budget exceeded</idea>
+      <idea ac="19">E2E test that navigates to lazy-loaded components and verifies render</idea>
+    </ideas>
+  </tests>
+</story-context>

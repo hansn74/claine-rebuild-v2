@@ -1,0 +1,133 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>10</storyId>
+    <title>Performance Optimization &amp; Benchmarking</title>
+    <status>drafted</status>
+    <generatedAt>2025-12-09</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/2-10-performance-optimization-benchmarking.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>developer</asA>
+    <iWant>comprehensive performance optimization</iWant>
+    <soThat>we meet sub-50ms interaction targets and ensure smooth user experience with large datasets</soThat>
+    <tasks>
+      <task id="1" ac="1">Establish Performance Benchmark Infrastructure - Create benchmark.ts, metrics.ts with Performance API wrapper</task>
+      <task id="2" ac="1">Define Performance Targets and Baseline Measurements - Document targets, create benchmark test suite</task>
+      <task id="3" ac="2">Implement React Component Memoization - React.memo, useMemo, useCallback for expensive components</task>
+      <task id="4" ac="3">Optimize IndexedDB/RxDB Query Performance - Compound indexes, query caching</task>
+      <task id="5" ac="4">Implement Web Workers for Heavy Computation - Search indexer and email parser workers</task>
+      <task id="6" ac="5">Implement Code Splitting Strategy - Route-based and component-based lazy loading</task>
+      <task id="7" ac="6">Create Performance Monitoring Dashboard - Dev tool for metrics visualization</task>
+      <task id="8" ac="1-6">Integration and Regression Testing - Verify NFR targets met</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">Performance benchmarks established for key interactions (email list render, search, compose open)</criterion>
+    <criterion id="2">React.memo and useMemo implemented for expensive components (EmailList, ThreadDetail, SearchResults)</criterion>
+    <criterion id="3">IndexedDB queries optimized with proper indexes and query patterns</criterion>
+    <criterion id="4">Web Workers used for heavy computation (search indexing, email parsing)</criterion>
+    <criterion id="5">Code splitting implemented for faster initial load (route-based and component-based)</criterion>
+    <criterion id="6">Performance monitoring dashboard created (development tool for metrics visualization)</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/architecture.md" title="Architecture Decision Document" section="Performance Monitoring" snippet="Track key performance metrics: LCP &lt; 2.5s, FID &lt; 100ms, CLS &lt; 0.1, Email list render &lt; 50ms. Use Performance API for measurements." />
+      <doc path="docs/architecture.md" title="Architecture Decision Document" section="Key Performance Targets" snippet="LCP &lt; 2.5s, FID &lt; 100ms, CLS &lt; 0.1, Email list render &lt; 50ms, Email storage 100K emails (~1.5 GB), AI inference 500ms-2s per email." />
+      <doc path="docs/architecture.md" title="Architecture Decision Document" section="Optimization Techniques" snippet="Virtual scrolling for email lists (React Virtual), Lazy loading for routes and components, Code splitting for AI models, Memoization for expensive computations." />
+      <doc path="docs/architecture.md" title="Architecture Decision Document" section="Index Strategy Notes" snippet="Array fields (labels, participants, triggers) cannot be directly indexed in RxDB. Application-level filtering used for these cases. All indexed number fields require minimum/maximum constraints." />
+      <doc path="docs/PRD.md" title="Product Requirements Document" section="NFR001 - Performance" snippet="System shall achieve sub-50ms input latency for 95% of user interactions. UI lists must maintain ≥60 FPS scrolling with ≥10,000 emails." />
+      <doc path="docs/PRD.md" title="Product Requirements Document" section="NFR004 - Scalability" snippet="System shall support local storage of up to 100,000 emails per account with &lt;5% performance degradation." />
+      <doc path="docs/PRD.md" title="Product Requirements Document" section="FR031 - Performance &amp; UX" snippet="System shall support smooth performance when displaying and scrolling through ≥10,000 emails." />
+      <doc path="docs/epics/epic-2-offline-first-email-client-with-attributes.md" title="Epic 2" section="Story 2.10" snippet="Performance benchmarks established, React.memo/useMemo for expensive components, IndexedDB queries optimized, Web Workers for heavy computation, Code splitting, Performance monitoring dashboard." />
+    </docs>
+    <code>
+      <file path="src/components/email/VirtualEmailList.tsx" kind="component" symbol="VirtualEmailList" lines="1-219" reason="Core virtualized list component needing memoization optimization. Uses @tanstack/react-virtual, implements OVERSCAN_COUNT=25." />
+      <file path="src/components/email/EmailListItem.tsx" kind="component" symbol="EmailListItem" lines="1-127" reason="Individual email row component - primary candidate for React.memo with custom comparison function." />
+      <file path="src/components/email/EmailRow.tsx" kind="component" symbol="EmailRow" reason="Email row wrapper - needs memoization to prevent re-renders during scroll." />
+      <file path="src/components/email/ThreadDetailView.tsx" kind="component" symbol="ThreadDetailView" reason="Thread detail component - candidate for React.memo and useMemo for message grouping." />
+      <file path="src/components/search/SearchResults.tsx" kind="component" symbol="SearchResults" lines="1-158" reason="Search results with virtualization - needs memoization optimization." />
+      <file path="src/components/search/SearchResultItem.tsx" kind="component" symbol="SearchResultItem" reason="Individual search result - candidate for React.memo." />
+      <file path="src/services/database/schemas/email.schema.ts" kind="schema" symbol="emailSchema" reason="RxDB email schema - review indexes for query optimization." />
+      <file path="src/services/database/schemas/thread.schema.ts" kind="schema" symbol="threadSchema" reason="RxDB thread schema - review indexes for thread queries." />
+      <file path="src/services/search/SearchService.ts" kind="service" symbol="SearchService" reason="Search service using lunr.js - candidate for Web Worker offloading." />
+      <file path="src/hooks/useEmails.ts" kind="hook" symbol="useEmails" reason="Email fetching hook - optimize query patterns and add caching." />
+      <file path="src/store/emailListStore.ts" kind="store" symbol="useEmailListStore" reason="Zustand store for email list - optimize selectors to prevent re-renders." />
+      <file path="vite.config.ts" kind="config" symbol="defineConfig" lines="1-51" reason="Vite config - enhance code splitting with manual chunks for components." />
+    </code>
+    <dependencies>
+      <node>
+        <package name="react" version="19.2" />
+        <package name="react-dom" version="19.2" />
+        <package name="@tanstack/react-virtual" version="^3.13.12" />
+        <package name="rxdb" version="^16.20.0" />
+        <package name="rxjs" version="^7.8.2" />
+        <package name="zustand" version="^5.0.8" />
+        <package name="lunr" version="^2.3.9" />
+        <package name="vite" version="^7.1.12" />
+        <package name="vitest" version="^4.0.7" />
+        <package name="@playwright/test" version="^1.56.1" />
+        <package name="rollup-plugin-visualizer" version="^6.0.5" />
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint source="architecture">Use Performance API for all measurements (performance.mark(), performance.measure())</constraint>
+    <constraint source="architecture">Web Workers communicate via postMessage with structured clone</constraint>
+    <constraint source="architecture">Lazy loading uses React.lazy() with Suspense boundaries</constraint>
+    <constraint source="architecture">Memoization should use custom comparison functions for complex props</constraint>
+    <constraint source="architecture">Query caching should invalidate on database mutations</constraint>
+    <constraint source="architecture">Array fields cannot be directly indexed in RxDB - use application-level filtering</constraint>
+    <constraint source="NFR001">Sub-50ms input latency for 95% of user interactions</constraint>
+    <constraint source="NFR001">60 FPS scrolling with 10,000+ emails</constraint>
+    <constraint source="NFR004">Support 100,000 emails with &lt;5% performance degradation</constraint>
+    <constraint source="bundle-budget">Main bundle &lt; 200KB gzipped (per Epic 0 Story 0.10)</constraint>
+    <constraint source="bundle-budget">Individual chunks &lt; 500KB (chunkSizeWarningLimit in vite.config.ts)</constraint>
+    <constraint source="testing">Unit tests use Vitest, E2E tests use Playwright</constraint>
+    <constraint source="code-style">Follow existing singleton pattern for services (see labelService.ts)</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface name="Performance API" kind="browser-api" signature="performance.mark(name), performance.measure(name, startMark, endMark), performance.getEntriesByName(name)" path="native" />
+    <interface name="Web Worker API" kind="browser-api" signature="new Worker(url), worker.postMessage(data), worker.onmessage" path="native" />
+    <interface name="React.lazy" kind="react-api" signature="React.lazy(() =&gt; import('./Component'))" path="react" />
+    <interface name="React.memo" kind="react-api" signature="React.memo(Component, arePropsEqual?)" path="react" />
+    <interface name="useMemo" kind="react-hook" signature="useMemo(() =&gt; computeExpensiveValue(a, b), [a, b])" path="react" />
+    <interface name="useCallback" kind="react-hook" signature="useCallback((args) =&gt; fn(args), [deps])" path="react" />
+    <interface name="useVirtualizer" kind="tanstack-api" signature="useVirtualizer({ count, getScrollElement, estimateSize, overscan })" path="@tanstack/react-virtual" />
+    <interface name="RxDB Collection" kind="rxdb-api" signature="collection.find(query).exec(), collection.findOne(id).exec()" path="rxdb" />
+  </interfaces>
+
+  <tests>
+    <standards>
+      Unit tests use Vitest with jsdom environment. Tests should verify memoization prevents unnecessary renders using mock render counters. Performance benchmark tests should use performance.measure() and assert timing thresholds. E2E tests use Playwright for lazy loading verification and bundle size validation. Coverage target: 80% for core logic. Test files follow pattern: __tests__/*.test.ts(x) adjacent to source.
+    </standards>
+    <locations>
+      <location>src/**/__tests__/*.test.ts</location>
+      <location>src/**/__tests__/*.test.tsx</location>
+      <location>src/utils/performance/__tests__/*.test.ts</location>
+      <location>e2e/*.spec.ts</location>
+    </locations>
+    <ideas>
+      <idea ac="1">Test benchmark utilities measure render time accurately using Performance API mocks</idea>
+      <idea ac="1">Test metrics aggregation calculates percentiles (p50, p95, p99) correctly</idea>
+      <idea ac="2">Test EmailListItem re-renders only when relevant props change (email.id, email.read, isSelected)</idea>
+      <idea ac="2">Test VirtualEmailList renders only visible rows plus overscan buffer</idea>
+      <idea ac="2">Test ThreadDetailView memoization prevents re-render when sibling state changes</idea>
+      <idea ac="3">Test query cache returns cached results within TTL window</idea>
+      <idea ac="3">Test query cache invalidates on database mutation</idea>
+      <idea ac="3">Benchmark test: email list query with 10K emails completes in &lt;50ms</idea>
+      <idea ac="4">Test Web Worker message passing with search index build operation</idea>
+      <idea ac="4">Test Worker error handling falls back to main thread execution</idea>
+      <idea ac="5">E2E test: lazy-loaded compose modal loads separately from main bundle</idea>
+      <idea ac="5">E2E test: initial bundle size meets budget (&lt;200KB gzipped)</idea>
+      <idea ac="6">Test PerformanceMonitor displays FPS counter and memory usage</idea>
+      <idea ac="6">Test PerformanceMonitor only renders in development mode</idea>
+    </ideas>
+  </tests>
+</story-context>

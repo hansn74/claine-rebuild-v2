@@ -1,0 +1,259 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>0</epicId>
+    <storyId>6</storyId>
+    <title>Set Up GitHub Actions CI/CD Pipeline</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-05</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/0-6-set-up-github-actions-ci-cd-pipeline.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>developer</asA>
+    <iWant>automated CI/CD pipeline</iWant>
+    <soThat>tests and builds run automatically on every push</soThat>
+    <tasks>
+- Create GitHub Actions workflow directory structure (AC: 1)
+  - Create `.github/workflows/` directory in project root
+  - Test: Directory structure exists
+
+- Create CI workflow file (AC: 1, 2, 3, 4)
+  - Create `.github/workflows/ci.yml` file
+  - Configure workflow name: "CI"
+  - Configure triggers: push to main, pull_request to main
+  - Configure jobs to run on: ubuntu-latest
+  - Configure Node.js version: 20.x (LTS)
+  - Add actions/checkout@v4 step
+  - Add actions/setup-node@v4 step with node-version: '20.x'
+  - Test: Workflow file syntax is valid
+
+- Add dependency installation step (AC: 5)
+  - Add step: `npm ci` (clean install, faster in CI)
+  - Configure caching for node_modules (actions/setup-node cache: npm)
+  - Test: Dependencies install successfully in CI
+
+- Add linting step (AC: 6)
+  - Add step: `npm run lint`
+  - Configure step to fail workflow on non-zero exit code
+  - Add step name: "Run ESLint"
+  - Test: Linting errors fail the workflow
+
+- Add unit test step (AC: 7)
+  - Add step: `npm run test:run`
+  - Configure step to fail workflow on test failures
+  - Add step name: "Run Unit Tests (Vitest)"
+  - Test: Test failures fail the workflow
+
+- Add E2E test step (AC: 8)
+  - Add step: `npm run test:e2e`
+  - Install Playwright browsers: `npx playwright install --with-deps`
+  - Configure step to fail workflow on E2E test failures
+  - Add step name: "Run E2E Tests (Playwright)"
+  - Test: E2E test failures fail the workflow
+
+- Add build step (AC: 9)
+  - Add step: `npm run build`
+  - Configure step to fail workflow on build errors
+  - Add step name: "Build Production Bundle"
+  - Test: Build errors fail the workflow
+
+- Add build artifact upload (AC: 10)
+  - Add step: actions/upload-artifact@v4
+  - Configure artifact name: "dist"
+  - Configure artifact path: "./dist"
+  - Configure retention-days: 7
+  - Test: Build artifacts uploaded successfully
+
+- Test workflow execution (AC: 11, 12)
+  - Initialize git repository if not already initialized
+  - Create GitHub repository (or link existing)
+  - Push code to GitHub to trigger workflow
+  - Verify workflow runs successfully on push
+  - Check all steps pass (green checkmarks)
+  - Verify artifacts are available in workflow run
+  - Test: Workflow completes successfully with passing status
+
+- Add workflow status badge to README (Optional enhancement)
+  - Add GitHub Actions status badge to README.md
+  - Badge shows current CI status (passing/failing)
+  - Test: Badge displays correctly in README
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+1. GitHub Actions workflow file created (.github/workflows/ci.yml)
+2. Workflow triggers on push to main and pull requests
+3. Workflow runs on Ubuntu latest
+4. Workflow installs Node.js 20.x (LTS)
+5. Workflow runs: `npm install`
+6. Workflow runs: `npm run lint` (fails workflow if linting errors)
+7. Workflow runs: `npm run test` (fails workflow if tests fail)
+8. Workflow runs: `npm run test:e2e` (fails workflow if E2E tests fail)
+9. Workflow runs: `npm run build` (fails workflow if build fails)
+10. Workflow uploads build artifacts
+11. Test: Push to branch triggers workflow successfully
+12. Test: Workflow passes with clean code
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Decision Document</title>
+        <section>Key Decisions - Testing</section>
+        <snippet>Vitest 4.0: Vite-native, browser mode support. Playwright 1.56: Best PWA E2E testing, visual regression. Node.js 20.x required.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Decision Document</title>
+        <section>Key Decisions - Platform & Framework</section>
+        <snippet>Vite 7.0 (latest stable), React 19.2 (latest with improved hooks), TypeScript 5.9. Vite 7.0 requires Node.js 20.19+ or 22.12+.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics/epic-0-infrastructure-project-setup.md</path>
+        <title>Epic 0: Infrastructure & Project Setup</title>
+        <section>Story 0.6 Goal</section>
+        <snippet>Establish GitHub Actions CI/CD pipeline that runs tests and builds automatically. Success criteria: GitHub Actions CI passes on every push, all test commands execute successfully.</snippet>
+      </doc>
+      <doc>
+        <path>docs/technical-decisions/adr-012-test-strategy-benchmark-harness.md</path>
+        <title>ADR-012: Test Strategy & Benchmark Harness</title>
+        <section>Test Coverage Targets</section>
+        <snippet>Unit tests: >80% line coverage. E2E tests: 5-10 critical workflows using Playwright 1.56. Integration tests: All major integrations. CI must run lint, unit tests, E2E tests, and build.</snippet>
+      </doc>
+      <doc>
+        <path>docs/technical-decisions/adr-012-test-strategy-benchmark-harness.md</path>
+        <title>ADR-012: Test Strategy & Benchmark Harness</title>
+        <section>CI/CD Integration</section>
+        <snippet>All tests run on PR, block merge if failing. Retry logic: Playwright retries failed tests 2x. Parallel execution for faster CI. Use npm ci for deterministic builds.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>package.json</path>
+        <kind>config</kind>
+        <symbol>scripts</symbol>
+        <lines>6-22</lines>
+        <reason>Contains all NPM scripts for testing, linting, and building. CI workflow must use: npm run lint, npm run test:run, npm run test:e2e, npm run build</reason>
+      </artifact>
+      <artifact>
+        <path>vitest.config.ts</path>
+        <kind>config</kind>
+        <symbol>test configuration</symbol>
+        <lines>7-26</lines>
+        <reason>Vitest test configuration with jsdom environment, coverage settings (v8 provider), and file exclusions. CI should use npm run test:run for non-watch mode</reason>
+      </artifact>
+      <artifact>
+        <path>playwright.config.ts</path>
+        <kind>config</kind>
+        <symbol>E2E test configuration</symbol>
+        <lines>13-19</lines>
+        <reason>Playwright CI-specific settings: forbidOnly on CI, 2 retries on CI, 1 worker on CI. Requires browser installation with npx playwright install --with-deps</reason>
+      </artifact>
+      <artifact>
+        <path>playwright.config.ts</path>
+        <kind>config</kind>
+        <symbol>webServer</symbol>
+        <lines>58-62</lines>
+        <reason>Auto-starts dev server on port 5173. CI needs to install Playwright browsers before running tests</reason>
+      </artifact>
+      <artifact>
+        <path>eslint.config.js</path>
+        <kind>config</kind>
+        <symbol>linting configuration</symbol>
+        <lines>1</lines>
+        <reason>ESLint flat config format. CI must run npm run lint to check code quality before tests</reason>
+      </artifact>
+      <artifact>
+        <path>tsconfig.json</path>
+        <kind>config</kind>
+        <symbol>TypeScript configuration</symbol>
+        <lines>1-17</lines>
+        <reason>TypeScript project references. Build step runs tsc -b && vite build per package.json line 8</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <package name="vite" version="^7.1.12" />
+        <package name="vitest" version="^4.0.7" />
+        <package name="@vitest/coverage-v8" version="^4.0.7" />
+        <package name="playwright" version="^1.56.1" />
+        <package name="@playwright/test" version="^1.56.1" />
+        <package name="eslint" version="^9.39.1" />
+        <package name="typescript" version="5.9" />
+        <package name="react" version="19.2" />
+        <package name="react-dom" version="19.2" />
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+- Node.js version must be 20.x (LTS) as specified in architecture.md
+- Use npm ci instead of npm install for deterministic CI builds
+- Playwright requires browser installation: npx playwright install --with-deps
+- Run steps in order: lint → unit tests → E2E tests → build (fail fast strategy)
+- E2E tests configured with 2 retries on CI (playwright.config.ts line 16)
+- Use actions/checkout@v4, actions/setup-node@v4, actions/upload-artifact@v4 (latest stable)
+- Cache node_modules using actions/setup-node cache: npm for faster builds
+- Build artifacts in dist/ directory (Vite default)
+- Workflow must fail on any step failure (default GitHub Actions behavior)
+- Upload build artifacts with 7 days retention
+  </constraints>
+  <interfaces>
+    <interface>
+      <name>npm run lint</name>
+      <kind>CLI command</kind>
+      <signature>eslint . --ext ts,tsx,js,jsx --report-unused-disable-directives --max-warnings 0</signature>
+      <path>package.json:11</path>
+    </interface>
+    <interface>
+      <name>npm run test:run</name>
+      <kind>CLI command</kind>
+      <signature>vitest run (non-watch mode for CI)</signature>
+      <path>package.json:16</path>
+    </interface>
+    <interface>
+      <name>npm run test:e2e</name>
+      <kind>CLI command</kind>
+      <signature>playwright test (runs all E2E tests)</signature>
+      <path>package.json:19</path>
+    </interface>
+    <interface>
+      <name>npm run build</name>
+      <kind>CLI command</kind>
+      <signature>tsc -b && vite build (TypeScript compilation + Vite production build)</signature>
+      <path>package.json:8</path>
+    </interface>
+    <interface>
+      <name>GitHub Actions workflow file</name>
+      <kind>YAML configuration</kind>
+      <signature>.github/workflows/ci.yml (does not exist yet, must be created)</signature>
+      <path>.github/workflows/ci.yml</path>
+    </interface>
+  </interfaces>
+  <tests>
+    <standards>Testing infrastructure already established in Stories 0.3-0.5. Unit tests use Vitest 4.0 with @testing-library/react in src/**/*.test.tsx files. E2E tests use Playwright 1.56 in e2e/**/*.spec.ts files. Linting uses ESLint 9 with TypeScript support. All test commands configured in package.json. CI workflow must validate that all existing tests pass before merging code.</standards>
+    <locations>
+- Unit tests: src/**/*.test.tsx (Vitest)
+- E2E tests: e2e/**/*.spec.ts (Playwright)
+- Test setup: src/test/setup.ts
+- Configs: vitest.config.ts, playwright.config.ts, eslint.config.js
+- CI workflow: .github/workflows/ci.yml (to be created)
+    </locations>
+    <ideas>
+AC1: Create .github/workflows/ci.yml file and verify it exists on disk
+AC2: Test workflow triggers by pushing to a test branch and verifying GitHub Actions runs
+AC3: Test lint failure: Introduce intentional linting error, verify workflow fails
+AC4: Test unit test failure: Introduce failing test, verify workflow fails
+AC5: Test E2E test failure: Introduce failing E2E test, verify workflow fails
+AC6: Test build failure: Introduce build error (e.g., TypeScript error), verify workflow fails
+AC7: Test successful workflow: Fix all errors, verify all steps pass with green checkmarks
+AC8: Verify Playwright browsers install correctly in CI environment
+AC9: Verify artifacts uploaded and accessible in GitHub Actions UI
+AC10: Verify workflow runs on pull requests to main branch
+AC11: Test caching works: Re-run workflow, verify node_modules cached (faster second run)
+AC12: Test parallel execution: Verify workflow completes in reasonable time
+    </ideas>
+  </tests>
+</story-context>

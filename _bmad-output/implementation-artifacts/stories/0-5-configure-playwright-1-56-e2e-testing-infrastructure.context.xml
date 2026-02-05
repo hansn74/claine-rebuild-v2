@@ -1,0 +1,208 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>0</epicId>
+    <storyId>0.5</storyId>
+    <title>Configure Playwright 1.56 E2E Testing Infrastructure</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-05</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/0-5-configure-playwright-1-56-e2e-testing-infrastructure.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>developer</asA>
+    <iWant>Playwright E2E testing configured</iWant>
+    <soThat>I can write and run end-to-end tests for user workflows</soThat>
+    <tasks>
+      - Install Playwright 1.56 and testing dependencies (AC: 1, 3)
+      - Create playwright.config.ts configuration file (AC: 2, 5)
+      - Create test folder structure (AC: 4)
+      - Add NPM scripts for E2E testing (AC: 6, 7)
+      - Create example E2E test for App component (AC: 8)
+      - Verify E2E testing infrastructure works (AC: 9, 10)
+      - Integrate with ESLint (AC: 2)
+      - Update .gitignore to exclude test artifacts (AC: 2)
+      - Verify integration and cleanup (AC: 1-10)
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">Playwright 1.56.x installed as dev dependency</criterion>
+    <criterion id="2">Playwright configuration file created (playwright.config.ts)</criterion>
+    <criterion id="3">Browsers installed (Chromium, Firefox, WebKit)</criterion>
+    <criterion id="4">Test folder created (e2e/ or tests/)</criterion>
+    <criterion id="5">Base URL configured to point to Vite dev server (http://localhost:5173)</criterion>
+    <criterion id="6">NPM script added: `npm run test:e2e` runs Playwright tests</criterion>
+    <criterion id="7">NPM script added: `npm run test:e2e:ui` opens Playwright UI mode</criterion>
+    <criterion id="8">Example E2E test created (app.spec.ts) that passes</criterion>
+    <criterion id="9">Test: `npm run test:e2e` executes successfully</criterion>
+    <criterion id="10">Test: Playwright can launch dev server and run tests</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Decision Document</title>
+        <section>Testing</section>
+        <snippet>Testing Strategy: "Vitest + Playwright" (Vitest 4.0, Playwright 1.56). Vitest 4: Vite-native, browser mode support. Playwright 1.56: Best PWA E2E testing, visual regression. Platform: Progressive Web App (PWA) - Playwright 1.56 has excellent PWA E2E testing support.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics/epic-0-infrastructure-project-setup.md</path>
+        <title>Epic 0: Infrastructure & Project Setup</title>
+        <section>Story 0.5</section>
+        <snippet>Configure Playwright 1.56 E2E Testing Infrastructure. Acceptance criteria include installing Playwright 1.56.x, creating config file, installing browsers, configuring base URL to Vite dev server (http://localhost:5173), adding NPM scripts, creating example tests.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/0-4-configure-vitest-4-0-unit-testing-infrastructure.md</path>
+        <title>Story 0.4: Configure Vitest 4.0 Unit Testing Infrastructure</title>
+        <section>Dev Agent Record</section>
+        <snippet>Configuration Pattern: Use fileURLToPath pattern for path aliases (consistent with vite.config.ts). ESLint Integration: Add testing framework globals to eslint.config.js languageOptions.globals. Testing Setup: Separate setup file (src/test/setup.ts for Vitest). NPM Scripts Pattern: test (watch), test:run (CI), test:coverage, test:ui.</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <artifact>
+        <path>vite.config.ts</path>
+        <kind>config</kind>
+        <symbol>defineConfig</symbol>
+        <lines>1-18</lines>
+        <reason>Vite configuration showing dev server setup and path aliases. Playwright will need to match baseURL (http://localhost:5173) and may reference path aliases in tests.</reason>
+      </artifact>
+      <artifact>
+        <path>vitest.config.ts</path>
+        <kind>config</kind>
+        <symbol>defineConfig</symbol>
+        <lines>1-37</lines>
+        <reason>Existing test configuration pattern to follow. Shows fileURLToPath pattern for path aliases (lines 28-34), testing framework setup, coverage configuration. Playwright config should follow similar structure.</reason>
+      </artifact>
+      <artifact>
+        <path>package.json</path>
+        <kind>manifest</kind>
+        <symbol>scripts</symbol>
+        <lines>6-19</lines>
+        <reason>Existing NPM scripts showing established patterns: dev, test, test:run, test:coverage, test:ui. Playwright scripts should follow this naming convention: test:e2e, test:e2e:ui, test:e2e:debug.</reason>
+      </artifact>
+      <artifact>
+        <path>eslint.config.js</path>
+        <kind>config</kind>
+        <symbol>globals</symbol>
+        <lines>31-44</lines>
+        <reason>ESLint globals configuration showing how Vitest globals were added (describe, it, expect, vi, etc.). Playwright may need similar treatment for test files, though Playwright uses explicit imports rather than globals.</reason>
+      </artifact>
+      <artifact>
+        <path>src/test/setup.ts</path>
+        <kind>test-setup</kind>
+        <symbol>setup</symbol>
+        <lines>1-11</lines>
+        <reason>Vitest test setup file pattern. Playwright may need similar global setup file if extending test fixtures or configuring global test hooks.</reason>
+      </artifact>
+      <artifact>
+        <path>src/App.tsx</path>
+        <kind>component</kind>
+        <symbol>App</symbol>
+        <lines>1-20</lines>
+        <reason>Main app component that will be tested by Playwright E2E tests. Example test will verify: h1 contains "Claine v2", Tailwind blue background div visible, shadcn/ui buttons render.</reason>
+      </artifact>
+      <artifact>
+        <path>src/App.test.tsx</path>
+        <kind>unit-test</kind>
+        <symbol>App tests</symbol>
+        <lines>1-32</lines>
+        <reason>Existing unit tests for App component showing test structure and assertions. E2E tests will verify same functionality but through browser automation rather than React Testing Library.</reason>
+      </artifact>
+    </code>
+
+    <dependencies>
+      <node>
+        <package name="playwright" version="NEEDED: ^1.56.0" type="devDependency" reason="Core Playwright test framework for E2E testing" />
+        <package name="vite" version="^7.1.12" type="devDependency" reason="Dev server that Playwright will auto-start via webServer config" />
+        <package name="react" version="19.2" type="dependency" reason="Frontend framework being tested" />
+        <package name="react-dom" version="19.2" type="dependency" reason="React DOM renderer" />
+        <package name="typescript" version="5.9" type="devDependency" reason="Type checking for Playwright test files (.spec.ts)" />
+        <package name="vitest" version="^4.0.7" type="devDependency" reason="Existing unit test framework (Playwright complements with E2E)" />
+        <package name="eslint" version="^9.39.1" type="devDependency" reason="Linting for Playwright test files" />
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Playwright config must auto-start Vite dev server using webServer.command: 'npm run dev'</constraint>
+    <constraint>Base URL must match Vite dev server: http://localhost:5173</constraint>
+    <constraint>E2E tests must be in separate e2e/ folder, NOT src/ (distinct from unit tests)</constraint>
+    <constraint>E2E test files must use .spec.ts extension (Playwright convention), not .test.tsx (Vitest convention)</constraint>
+    <constraint>Playwright tests should use explicit imports from '@playwright/test', NOT rely on globals</constraint>
+    <constraint>Configure retries: 0 for local development, 2 for CI environments</constraint>
+    <constraint>Enable screenshots and videos on failure only (retain-on-failure) for debugging</constraint>
+    <constraint>Test across all three browsers: Chromium, Firefox, WebKit (PWA compatibility)</constraint>
+    <constraint>NPM scripts must follow established pattern: test:e2e (standard), test:e2e:ui (interactive), test:e2e:debug (optional)</constraint>
+    <constraint>Playwright artifacts (test-results/, playwright-report/, .playwright/) must be gitignored</constraint>
+    <constraint>ESLint must be configured to lint E2E test files without errors</constraint>
+    <constraint>Use semantic locators in tests: page.getByRole(), page.getByText() (preferred over selectors)</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>Vite Dev Server</name>
+      <kind>HTTP Server</kind>
+      <signature>http://localhost:5173</signature>
+      <path>vite.config.ts</path>
+      <description>Development server that serves the React app. Playwright will connect to this server to run E2E tests. Configured via webServer in playwright.config.ts.</description>
+    </interface>
+    <interface>
+      <name>Playwright Test API</name>
+      <kind>Testing Framework</kind>
+      <signature>import { test, expect } from '@playwright/test'</signature>
+      <path>@playwright/test (package)</path>
+      <description>Core Playwright test and assertion APIs. Tests should import test and expect explicitly, not rely on globals.</description>
+    </interface>
+    <interface>
+      <name>Page Locator API</name>
+      <kind>Testing API</kind>
+      <signature>page.getByRole(), page.getByText(), page.getByLabel()</signature>
+      <path>@playwright/test (package)</path>
+      <description>Semantic locator APIs for finding elements. Preferred over CSS selectors for better test maintainability.</description>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Testing framework: Playwright 1.56.x for E2E tests, Vitest 4.0.x for unit tests. E2E tests use .spec.ts extension and reside in e2e/ folder (separate from unit tests in src/). Tests should use semantic locators (page.getByRole, page.getByText) over CSS selectors. Configure webServer to auto-start Vite dev server before tests. Enable HTML reporter for detailed test reports. Configure retries for flaky tests (0 local, 2 CI). Test across Chromium, Firefox, WebKit for PWA compatibility.
+    </standards>
+
+    <locations>
+      <location>e2e/**/*.spec.ts</location>
+      <location>e2e/fixtures/</location>
+    </locations>
+
+    <ideas>
+      <idea criteriaIds="1,2,3,5,6,7,10">
+        Test: Playwright configuration loads correctly
+        - Verify playwright.config.ts is valid
+        - Verify webServer can start Vite dev server
+        - Verify baseURL is accessible
+        - Verify all three browser projects are configured
+      </idea>
+      <idea criteriaIds="8,9">
+        Test: App component E2E test (e2e/app.spec.ts)
+        - Navigate to / (baseURL)
+        - Verify h1 contains "Claine v2"
+        - Verify Tailwind blue background div is visible
+        - Verify at least 3 shadcn/ui buttons render
+        - Run across all browsers (Chromium, Firefox, WebKit)
+      </idea>
+      <idea criteriaIds="4">
+        Test: E2E folder structure
+        - Verify e2e/ directory exists
+        - Verify e2e/fixtures/ directory exists
+        - Verify .gitignore excludes Playwright artifacts
+      </idea>
+      <idea criteriaIds="6,7">
+        Test: NPM scripts work
+        - Run npm run test:e2e (should execute tests)
+        - Run npm run test:e2e:ui (should open UI mode)
+        - Verify HTML report generated after test run
+      </idea>
+    </ideas>
+  </tests>
+</story-context>

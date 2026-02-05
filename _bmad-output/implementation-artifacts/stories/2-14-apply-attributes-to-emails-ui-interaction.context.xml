@@ -1,0 +1,308 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>14</storyId>
+    <title>Apply Attributes to Emails - UI and Interaction</title>
+    <status>drafted</status>
+    <generatedAt>2025-12-15</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/2-14-apply-attributes-to-emails-ui-interaction.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>user</asA>
+    <iWant>to manually apply attributes to emails</iWant>
+    <soThat>I can organize and categorize my messages</soThat>
+    <tasks>
+      <task id="1" title="Extend Email Schema for Attributes" ac="7">
+        <subtask>1.1 Update email.schema.ts to add attributes field (ALREADY EXISTS - verify)</subtask>
+        <subtask>1.2 Create migration if needed for existing emails</subtask>
+        <subtask>1.3 Update TypeScript types in src/types/email.ts</subtask>
+        <subtask>1.4 Write schema validation tests for new field</subtask>
+      </task>
+      <task id="2" title="Create Email Attribute Service" ac="2,7,10">
+        <subtask>2.1 Create emailAttributeService.ts with CRUD methods</subtask>
+        <subtask>2.2 Integrate with existing attributeService for validation</subtask>
+        <subtask>2.3 Implement optimistic updates with rollback</subtask>
+        <subtask>2.4 Write unit tests</subtask>
+      </task>
+      <task id="3" title="Create Attribute Panel Component" ac="1,2,3,4,5,6">
+        <subtask>3.1 Create AttributePanel.tsx main component</subtask>
+        <subtask>3.2 Create input components per type (Enum, Text, Date, Boolean, Number)</subtask>
+        <subtask>3.3 Create AttributeInputFactory.tsx</subtask>
+        <subtask>3.4 Implement immediate save on change (debounced for text)</subtask>
+        <subtask>3.5 Add loading states and error handling</subtask>
+      </task>
+      <task id="4" title="Create Attribute Tags Component" ac="8,9,10">
+        <subtask>4.1 Create AttributeTag.tsx for single tag display</subtask>
+        <subtask>4.2 Create AttributeTagList.tsx for multiple tags</subtask>
+        <subtask>4.3 Style tags as colored badges/pills</subtask>
+        <subtask>4.4 Implement remove functionality</subtask>
+      </task>
+      <task id="5" title="Integrate with Thread Detail View" ac="1,9">
+        <subtask>5.1 Add AttributePanel to ThreadDetailView.tsx</subtask>
+        <subtask>5.2 Position as collapsible sidebar or dropdown</subtask>
+        <subtask>5.3 Add keyboard shortcut (a key) to toggle</subtask>
+        <subtask>5.4 Display AttributeTagList in thread header</subtask>
+        <subtask>5.5 Ensure responsive layout</subtask>
+      </task>
+      <task id="6" title="Integrate with Inbox List View" ac="8">
+        <subtask>6.1 Add AttributeTagList to EmailListItem.tsx</subtask>
+        <subtask>6.2 Show max 2-3 tags with overflow handling</subtask>
+        <subtask>6.3 Ensure tags dont affect virtualization performance</subtask>
+        <subtask>6.4 Add tooltip for truncated attributes</subtask>
+      </task>
+      <task id="7" title="Testing and Accessibility" ac="1-10">
+        <subtask>7.1 Write unit tests for all new components</subtask>
+        <subtask>7.2 Write E2E test for complete flow</subtask>
+        <subtask>7.3 Add ARIA labels to attribute inputs</subtask>
+        <subtask>7.4 Ensure keyboard navigation</subtask>
+        <subtask>7.5 Test with screen reader</subtask>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">Attribute panel accessible from thread detail view (sidebar or dropdown)</criterion>
+    <criterion id="2">User can select/apply multiple attributes to a single email</criterion>
+    <criterion id="3">Enum attributes show dropdown with values</criterion>
+    <criterion id="4">Text attributes show input field</criterion>
+    <criterion id="5">Date attributes show date picker</criterion>
+    <criterion id="6">Boolean attributes show checkbox</criterion>
+    <criterion id="7">Attribute changes saved immediately to RxDB (email attributes field)</criterion>
+    <criterion id="8">Attribute tags displayed inline in inbox list (colored badges/pills)</criterion>
+    <criterion id="9">Attribute tags displayed in thread detail view</criterion>
+    <criterion id="10">User can remove attributes (click X on tag)</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Document</title>
+        <section>Decision 1: Database (RxDB + IndexedDB)</section>
+        <snippet>Email schema already includes attributes field as object with additionalProperties: true for flexible key-value storage.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/2-13-custom-attributes-system-data-model-crud.md</path>
+        <title>Story 2.13 - Custom Attributes System</title>
+        <section>Dev Agent Record</section>
+        <snippet>Provides attribute schema, service, store, and UI component patterns. Use attributeService, useAttributes hook, and UI patterns from this story.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics/epic-2-offline-first-email-client-with-attributes.md</path>
+        <title>Epic 2 Definition</title>
+        <section>Story 2.14</section>
+        <snippet>Apply Attributes to Emails - UI and Interaction. Provides UI for applying custom attributes to individual emails.</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <!-- Attribute System (from Story 2.13) - USE these, do not recreate -->
+      <artifact>
+        <path>src/types/attributes.ts</path>
+        <kind>types</kind>
+        <symbol>Attribute, AttributeType, AttributeEnumValue, EmailAttributeValues</symbol>
+        <reason>Type definitions for attributes. EmailAttributeValues already defined for email attribute storage.</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/attributes/attributeService.ts</path>
+        <kind>service</kind>
+        <symbol>AttributeService, attributeService</symbol>
+        <reason>Singleton service for attribute CRUD. Use getAttributes(), getEnabledAttributes(), getAttributeById() for validation.</reason>
+      </artifact>
+      <artifact>
+        <path>src/store/attributeStore.ts</path>
+        <kind>store</kind>
+        <symbol>useAttributeStore</symbol>
+        <reason>Zustand store for attributes with reactive updates. Already has optimistic update pattern.</reason>
+      </artifact>
+      <artifact>
+        <path>src/hooks/useAttributes.ts</path>
+        <kind>hook</kind>
+        <symbol>useAttributes, UseAttributesReturn</symbol>
+        <reason>React hook providing enabledAttributes, getAttributeById, getAttributeByName. Use this in components.</reason>
+      </artifact>
+
+      <!-- Email Schema - MODIFY to integrate attributes -->
+      <artifact>
+        <path>src/services/database/schemas/email.schema.ts</path>
+        <kind>schema</kind>
+        <symbol>EmailDocument, emailSchema</symbol>
+        <lines>74-77, 297-302</lines>
+        <reason>Email schema ALREADY has attributes field (lines 74-77). Schema definition at lines 297-302. No migration needed - just use existing field.</reason>
+      </artifact>
+
+      <!-- UI Components to integrate with -->
+      <artifact>
+        <path>src/components/email/ThreadDetailView.tsx</path>
+        <kind>component</kind>
+        <symbol>ThreadDetailView</symbol>
+        <reason>Thread detail component. Add AttributePanel as sidebar/dropdown here (Task 5). Has useThread hook for data.</reason>
+      </artifact>
+      <artifact>
+        <path>src/components/email/EmailListItem.tsx</path>
+        <kind>component</kind>
+        <symbol>EmailListItem</symbol>
+        <reason>Email list row component. Add AttributeTagList here (Task 6). Receives EmailDocument with attributes field.</reason>
+      </artifact>
+      <artifact>
+        <path>src/components/email/VirtualEmailList.tsx</path>
+        <kind>component</kind>
+        <symbol>VirtualEmailList</symbol>
+        <reason>Virtualized list container. Consider performance when adding tags to rows.</reason>
+      </artifact>
+
+      <!-- UI Patterns to follow (from Story 2.13) -->
+      <artifact>
+        <path>src/components/settings/attributes/AttributeForm.tsx</path>
+        <kind>component</kind>
+        <symbol>AttributeForm</symbol>
+        <reason>Input patterns per attribute type. Shows enum dropdown, text input, date picker, boolean toggle, number input implementations.</reason>
+      </artifact>
+      <artifact>
+        <path>src/components/settings/attributes/AttributeCard.tsx</path>
+        <kind>component</kind>
+        <symbol>AttributeCard</symbol>
+        <reason>Shows icon-by-type pattern using useMemo with constant maps. Use same pattern for AttributeTag.</reason>
+      </artifact>
+
+      <!-- Email Store and Hooks -->
+      <artifact>
+        <path>src/store/emailStore.ts</path>
+        <kind>store</kind>
+        <symbol>useEmailStore</symbol>
+        <reason>Email store for updating email documents. Add updateEmailAttributes action.</reason>
+      </artifact>
+      <artifact>
+        <path>src/hooks/useThread.ts</path>
+        <kind>hook</kind>
+        <symbol>useThread</symbol>
+        <reason>Hook used by ThreadDetailView. Returns thread messages with attributes.</reason>
+      </artifact>
+
+      <!-- Keyboard Shortcuts -->
+      <artifact>
+        <path>src/hooks/useEmailKeyboardShortcuts.ts</path>
+        <kind>hook</kind>
+        <symbol>useEmailKeyboardShortcuts</symbol>
+        <reason>Keyboard shortcut registration. Add 'a' key for attribute panel toggle (Task 5.3).</reason>
+      </artifact>
+      <artifact>
+        <path>src/types/shortcuts.ts</path>
+        <kind>types</kind>
+        <symbol>ShortcutAction</symbol>
+        <reason>Shortcut action type definitions. Add TOGGLE_ATTRIBUTES action.</reason>
+      </artifact>
+    </code>
+
+    <dependencies>
+      <node>
+        <package>react</package>
+        <version>19.2</version>
+      </node>
+      <node>
+        <package>zustand</package>
+        <version>^5.0.8</version>
+      </node>
+      <node>
+        <package>rxdb</package>
+        <version>^16.20.0</version>
+      </node>
+      <node>
+        <package>lucide-react</package>
+        <version>^0.552.0</version>
+      </node>
+      <node>
+        <package>class-variance-authority</package>
+        <version>^0.7.1</version>
+      </node>
+      <node>
+        <package>clsx</package>
+        <version>^2.1.1</version>
+      </node>
+      <node>
+        <package>tailwind-merge</package>
+        <version>^3.3.1</version>
+      </node>
+      <node>
+        <package>react-hotkeys-hook</package>
+        <version>^4.6.2</version>
+      </node>
+      <node>
+        <package>@tanstack/react-virtual</package>
+        <version>^3.13.12</version>
+        <note>For virtualized list - ensure tags dont break performance</note>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="pattern">Use singleton service pattern for emailAttributeService (matches attributeService)</constraint>
+    <constraint type="pattern">Use useMemo with constant icon/color maps instead of creating components during render (from 2.13 fix)</constraint>
+    <constraint type="pattern">Use callback handlers instead of useEffect for state sync (avoids setState-in-effect lint error)</constraint>
+    <constraint type="pattern">Follow existing shadcn/ui component patterns with Tailwind styling</constraint>
+    <constraint type="architecture">RxDB stores PARSED data - email.attributes is already key-value object</constraint>
+    <constraint type="architecture">Use optimistic updates with rollback on error for attribute changes</constraint>
+    <constraint type="performance">Tags in EmailListItem must not affect virtualization - use React.memo with custom comparator</constraint>
+    <constraint type="accessibility">Use aria-labelledby for field groups, htmlFor for individual inputs</constraint>
+    <constraint type="testing">Follow test patterns from src/services/attributes/__tests__/ for service tests</constraint>
+    <constraint type="testing">E2E tests follow patterns from e2e/ directory using Playwright</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>EmailDocument.attributes</name>
+      <kind>schema-field</kind>
+      <signature>attributes: Record&lt;string, string | number | boolean | null&gt;</signature>
+      <path>src/services/database/schemas/email.schema.ts</path>
+      <note>ALREADY EXISTS - no migration needed. Keys are attribute IDs, values are assigned values.</note>
+    </interface>
+    <interface>
+      <name>attributeService.getEnabledAttributes()</name>
+      <kind>service-method</kind>
+      <signature>getEnabledAttributes(): Promise&lt;Attribute[]&gt;</signature>
+      <path>src/services/attributes/attributeService.ts</path>
+      <note>Returns only enabled attributes sorted by order. Use to populate AttributePanel.</note>
+    </interface>
+    <interface>
+      <name>useAttributes hook</name>
+      <kind>react-hook</kind>
+      <signature>useAttributes(): UseAttributesReturn</signature>
+      <path>src/hooks/useAttributes.ts</path>
+      <note>Provides enabledAttributes, getAttributeById. Auto-fetches on mount.</note>
+    </interface>
+    <interface>
+      <name>EmailAttributeValues</name>
+      <kind>type</kind>
+      <signature>type EmailAttributeValues = Record&lt;string, string | number | boolean | null&gt;</signature>
+      <path>src/types/attributes.ts</path>
+      <note>Type for email attribute values map.</note>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Unit tests use Vitest with @testing-library/react for component testing. Service tests follow singleton pattern with mock database. E2E tests use Playwright with page object pattern. Test files are co-located with source in __tests__ directories. Performance tests use vitest benchmark mode.
+    </standards>
+    <locations>
+      <location>src/services/email/__tests__/ (create for emailAttributeService)</location>
+      <location>src/components/email/__tests__/ (add tests for new components)</location>
+      <location>e2e/ (add e2e test for attribute flow)</location>
+    </locations>
+    <ideas>
+      <idea ac="1,2">Test AttributePanel renders all enabled attributes</idea>
+      <idea ac="3">Test EnumAttributeInput renders dropdown with colored options</idea>
+      <idea ac="4">Test TextAttributeInput with debounced save</idea>
+      <idea ac="5">Test DateAttributeInput date picker interaction</idea>
+      <idea ac="6">Test BooleanAttributeInput checkbox toggle</idea>
+      <idea ac="7">Test emailAttributeService.setEmailAttribute updates RxDB</idea>
+      <idea ac="7">Test optimistic update with rollback on error</idea>
+      <idea ac="8">Test AttributeTagList renders in EmailListItem</idea>
+      <idea ac="8">Test tag overflow handling (max 2-3 visible)</idea>
+      <idea ac="9">Test AttributeTagList renders in ThreadDetailView header</idea>
+      <idea ac="10">Test tag removal via X button click</idea>
+      <idea ac="1-10">E2E: Open thread, open panel, set attributes, verify tags in list view</idea>
+    </ideas>
+  </tests>
+</story-context>

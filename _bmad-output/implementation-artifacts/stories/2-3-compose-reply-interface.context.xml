@@ -1,0 +1,200 @@
+<story-context id="2-3-compose-reply-interface" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>3</storyId>
+    <title>Compose and Reply Interface</title>
+    <status>drafted</status>
+    <generatedAt>2025-12-01</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/2-3-compose-reply-interface.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>user</asA>
+    <iWant>to compose new emails and reply to existing ones</iWant>
+    <soThat>I can communicate with others</soThat>
+    <tasks>
+      <task id="1">Create Draft Schema and Storage - DraftDocument interface, RxDB schema, drafts collection</task>
+      <task id="2">Create Compose Dialog Component - Modal/dialog, full-screen/floating modes, keyboard shortcuts</task>
+      <task id="3">Create Recipient Input Components - Email validation, chips, autocomplete, useContacts hook</task>
+      <task id="4">Implement Rich Text Editor - TipTap integration, toolbar, formatting, paste handling</task>
+      <task id="5">Implement Reply/Reply-All/Forward Actions - Pre-populate fields, quoted content</task>
+      <task id="6">Implement Subject Line Auto-Population - Re:/Fwd: prefixes, avoid duplicates</task>
+      <task id="7">Implement Draft Auto-Save - 30-second interval, useDraft hook, save indicator</task>
+      <task id="8">Create Compose Button in Header - Global compose state, keyboard shortcut (c)</task>
+      <task id="9">Contact Storage and Extraction - Contact schema, frequency-based autocomplete</task>
+      <task id="10">Testing - Unit tests, E2E tests for compose/reply flows</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC1">Compose button opens new message editor</criterion>
+    <criterion id="AC2">Reply/Reply-all/Forward actions available in thread view</criterion>
+    <criterion id="AC3">Rich text editor implemented (basic formatting: bold, italic, lists)</criterion>
+    <criterion id="AC4">To/Cc/Bcc fields with autocomplete from contacts</criterion>
+    <criterion id="AC5">Subject line auto-populated for replies (Re: prefix)</criterion>
+    <criterion id="AC6">Draft auto-save every 30 seconds to RxDB</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/PRD.md</path>
+        <title>Product Requirements Document</title>
+        <section>Functional Requirements FR006, FR007, FR015</section>
+        <snippet>FR006: Offline-first data storage. FR007: Full read/write functionality when offline. FR015: Generate context-aware email drafts.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Decision Document</title>
+        <section>Decision 1: Database (RxDB + IndexedDB)</section>
+        <snippet>Use RxDB for draft storage. Email schema includes body.html and body.text fields. Offline-first architecture - drafts work without connectivity.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/2-2-thread-detail-view-with-conversation-history.md</path>
+        <title>Story 2.2: Thread Detail View</title>
+        <section>Prerequisites</section>
+        <snippet>ThreadDetailView component implemented with message grouping, quoted text parsing, and attachment handling. Add reply/forward actions to this component.</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <artifact>
+        <path>src/services/database/schemas/email.schema.ts</path>
+        <kind>schema</kind>
+        <symbol>EmailDocument, EmailAddress, EmailBody, Attachment</symbol>
+        <reason>Reuse EmailAddress type for recipient fields. EmailBody structure (html/text) for draft body format.</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/database/init.ts</path>
+        <kind>service</kind>
+        <symbol>getDatabase, initDatabase</symbol>
+        <reason>Add drafts and contacts collections to database initialization.</reason>
+      </artifact>
+      <artifact>
+        <path>src/hooks/useThread.ts</path>
+        <kind>hook</kind>
+        <symbol>useThread, UseThreadResult</symbol>
+        <reason>Pattern to follow for useDraft hook - RxDB reactive query pattern with loading/error states.</reason>
+      </artifact>
+      <artifact>
+        <path>src/components/email/ThreadDetailView.tsx</path>
+        <kind>component</kind>
+        <symbol>ThreadDetailView</symbol>
+        <reason>Add Reply/Reply-All/Forward buttons to this component. Integrate with ComposeDialog.</reason>
+      </artifact>
+      <artifact>
+        <path>src/components/email/ThreadMessage.tsx</path>
+        <kind>component</kind>
+        <symbol>ThreadMessage</symbol>
+        <reason>Reference for message display patterns. Use similar structure for compose preview.</reason>
+      </artifact>
+      <artifact>
+        <path>src/utils/quotedTextParser.ts</path>
+        <kind>utility</kind>
+        <symbol>parseQuotedText</symbol>
+        <reason>Reuse for formatting quoted content in replies.</reason>
+      </artifact>
+      <artifact>
+        <path>src/utils/sanitizeHtml.ts</path>
+        <kind>utility</kind>
+        <symbol>sanitizeHtml</symbol>
+        <reason>Use for paste handling in rich text editor to strip dangerous HTML.</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/logger/index.ts</path>
+        <kind>service</kind>
+        <symbol>logger</symbol>
+        <reason>Use 'compose' category for logging. Pattern: logger.debug('compose', 'message', { data }).</reason>
+      </artifact>
+      <artifact>
+        <path>src/store/emailListStore.ts</path>
+        <kind>store</kind>
+        <symbol>emailListStore</symbol>
+        <reason>Follow Zustand store pattern for compose state management.</reason>
+      </artifact>
+      <artifact>
+        <path>src/App.tsx</path>
+        <kind>component</kind>
+        <symbol>App</symbol>
+        <reason>Integrate global compose state and ComposeDialog at app root level.</reason>
+      </artifact>
+    </code>
+
+    <dependencies>
+      <ecosystem name="node">
+        <package name="react" version="19.2">UI framework</package>
+        <package name="rxdb" version="^16.20.0">Reactive database for drafts storage</package>
+        <package name="zustand" version="^5.0.8">State management for compose state</package>
+        <package name="dompurify" version="^3.3.0">HTML sanitization for paste handling</package>
+        <package name="lucide-react" version="^0.552.0">Icons for toolbar and buttons</package>
+        <package name="@tanstack/react-virtual" version="^3.13.12">Virtual scrolling (if needed for recipient list)</package>
+      </ecosystem>
+      <newDependency>
+        <package name="@tiptap/react">Rich text editor for React</package>
+        <package name="@tiptap/starter-kit">TipTap basic extensions</package>
+        <package name="@tiptap/extension-link">TipTap link extension</package>
+      </newDependency>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint source="architecture.md">Use RxDB for all local data storage - drafts must persist in IndexedDB</constraint>
+    <constraint source="PRD NFR001">Sub-50ms UI performance - compose dialog should open in under 50ms</constraint>
+    <constraint source="architecture.md">Offline-first - drafts must work completely offline</constraint>
+    <constraint source="coding-standards">Follow existing component patterns - use cn() for className merging</constraint>
+    <constraint source="coding-standards">Use logger service for debugging - category 'compose'</constraint>
+    <constraint source="testing-strategy">Unit tests required for all new components and hooks</constraint>
+    <constraint source="PRD FR007">Full read/write functionality offline - queue send for when online</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>DraftDocument</name>
+      <kind>TypeScript interface</kind>
+      <signature>interface DraftDocument { id: string; accountId: string; type: 'new' | 'reply' | 'reply-all' | 'forward'; to: EmailAddress[]; cc: EmailAddress[]; bcc: EmailAddress[]; subject: string; body: EmailBody; replyToEmailId?: string; threadId?: string; createdAt: number; lastSaved: number; }</signature>
+      <path>src/services/database/schemas/draft.schema.ts (to create)</path>
+    </interface>
+    <interface>
+      <name>UseDraftResult</name>
+      <kind>TypeScript interface</kind>
+      <signature>interface UseDraftResult { draft: DraftDocument | null; saveDraft: (updates: Partial&lt;DraftDocument&gt;) => Promise&lt;void&gt;; deleteDraft: () => Promise&lt;void&gt;; isSaving: boolean; lastSaved: Date | null; }</signature>
+      <path>src/hooks/useDraft.ts (to create)</path>
+    </interface>
+    <interface>
+      <name>ComposeContext</name>
+      <kind>TypeScript interface</kind>
+      <signature>interface ComposeContext { type: 'new' | 'reply' | 'reply-all' | 'forward'; to: EmailAddress[]; cc: EmailAddress[]; subject: string; quotedContent: string; }</signature>
+      <path>src/utils/emailCompose.ts (to create)</path>
+    </interface>
+    <interface>
+      <name>ComposeDialogProps</name>
+      <kind>React component props</kind>
+      <signature>interface ComposeDialogProps { open: boolean; onClose: () => void; initialContext?: ComposeContext; draftId?: string; }</signature>
+      <path>src/components/compose/ComposeDialog.tsx (to create)</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Use Vitest for unit tests. Use @testing-library/react for component tests. Use Playwright for E2E tests.
+      Mock RxDB database in unit tests using vi.mock(). Mock logger service.
+      Follow existing test patterns in src/components/email/__tests__/ directory.
+      Use vi.useFakeTimers() for testing auto-save intervals.
+    </standards>
+    <locations>
+      <location>src/components/compose/__tests__/*.test.tsx</location>
+      <location>src/hooks/__tests__/useDraft.test.ts</location>
+      <location>src/utils/__tests__/emailCompose.test.ts</location>
+      <location>e2e/compose-email.spec.ts</location>
+    </locations>
+    <ideas>
+      <idea ac="AC1">Test compose button click opens dialog. Test keyboard shortcut 'c' opens compose.</idea>
+      <idea ac="AC2">Test Reply button pre-populates To field with sender. Test Reply-All includes all recipients. Test Forward clears recipients.</idea>
+      <idea ac="AC3">Test bold/italic/list formatting. Test paste strips dangerous HTML. Test output includes both HTML and text.</idea>
+      <idea ac="AC4">Test autocomplete shows matching contacts. Test chip removal. Test email validation on blur.</idea>
+      <idea ac="AC5">Test Re: prefix added for replies. Test Fwd: prefix for forwards. Test no duplicate prefixes.</idea>
+      <idea ac="AC6">Test draft saves after 30 seconds. Test draft persists across page reload. Test draft deleted after send.</idea>
+    </ideas>
+  </tests>
+</story-context>

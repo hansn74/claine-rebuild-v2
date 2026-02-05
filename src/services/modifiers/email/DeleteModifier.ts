@@ -27,7 +27,7 @@ export class DeleteModifier extends BaseEmailModifier {
   private readonly currentLabels: string[]
 
   constructor(params: DeleteModifierParams) {
-    super(params.entityId, params.accountId, params.provider)
+    super(params.entityId, params.accountId, params.provider, undefined, undefined, params.threadId)
     this.currentFolder = params.currentFolder
     this.currentLabels = params.currentLabels
   }
@@ -41,7 +41,8 @@ export class DeleteModifier extends BaseEmailModifier {
     provider: ProviderType,
     payload: { currentFolder: string; currentLabels: string[] },
     id?: string,
-    createdAt?: number
+    createdAt?: number,
+    threadId?: string
   ): DeleteModifier {
     const modifier = new DeleteModifier({
       entityId,
@@ -49,6 +50,7 @@ export class DeleteModifier extends BaseEmailModifier {
       provider,
       currentFolder: payload.currentFolder,
       currentLabels: payload.currentLabels,
+      threadId,
     })
     if (id) Object.assign(modifier, { id })
     if (createdAt) Object.assign(modifier, { createdAt })
@@ -145,7 +147,7 @@ export class UndeleteModifier extends BaseEmailModifier {
   private readonly restoreFolder: string
 
   constructor(params: DeleteModifierParams & { restoreFolder?: string }) {
-    super(params.entityId, params.accountId, params.provider)
+    super(params.entityId, params.accountId, params.provider, undefined, undefined, params.threadId)
     this.currentFolder = params.currentFolder
     this.currentLabels = params.currentLabels
     // Default to inbox when restoring
@@ -161,7 +163,8 @@ export class UndeleteModifier extends BaseEmailModifier {
     provider: ProviderType,
     payload: { currentFolder: string; currentLabels: string[]; restoreFolder?: string },
     id?: string,
-    createdAt?: number
+    createdAt?: number,
+    threadId?: string
   ): UndeleteModifier {
     const modifier = new UndeleteModifier({
       entityId,
@@ -170,6 +173,7 @@ export class UndeleteModifier extends BaseEmailModifier {
       currentFolder: payload.currentFolder,
       currentLabels: payload.currentLabels,
       restoreFolder: payload.restoreFolder,
+      threadId,
     })
     if (id) Object.assign(modifier, { id })
     if (createdAt) Object.assign(modifier, { createdAt })

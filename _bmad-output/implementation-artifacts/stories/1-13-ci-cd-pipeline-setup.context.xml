@@ -1,0 +1,342 @@
+<story-context id="1-13-ci-cd-pipeline-setup" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>1.13</storyId>
+    <title>CI/CD Pipeline Setup (Epic 1 Enhancements)</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-28</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/1-13-ci-cd-pipeline-setup.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>developer</asA>
+    <iWant>Epic 1-specific CI/CD enhancements</iWant>
+    <soThat>Epic 1 features (OAuth, RxDB, sync engine) are tested automatically in every PR</soThat>
+    <tasks>
+      <task id="1" title="Configure Mock OAuth Server for CI">
+        <files>src/services/auth/__mocks__/mockOAuthServer.ts, vitest.config.ts</files>
+        <subtasks>
+          <subtask>1.1: Create MockOAuthServer class simulating Google/Microsoft OAuth endpoints</subtask>
+          <subtask>1.2: Configure mock to return valid tokens with configurable expiry</subtask>
+          <subtask>1.3: Add mock server setup to Vitest globalSetup</subtask>
+          <subtask>1.4: Document mock OAuth usage in docs/testing.md</subtask>
+        </subtasks>
+      </task>
+      <task id="2" title="Enhance OAuth E2E Tests for CI">
+        <files>e2e/gmail-oauth.spec.ts, e2e/outlook-oauth.spec.ts, playwright.config.ts</files>
+        <subtasks>
+          <subtask>2.1: Update OAuth E2E tests to use mock server when CI=true</subtask>
+          <subtask>2.2: Add @oauth tag to OAuth-related tests</subtask>
+          <subtask>2.3: Verify OAuth tests pass without real API credentials in CI</subtask>
+        </subtasks>
+      </task>
+      <task id="3" title="Add RxDB Schema Validation to CI">
+        <files>src/services/database/schemas/__tests__/schemaValidation.test.ts, .github/workflows/ci.yml</files>
+        <subtasks>
+          <subtask>3.1: Create comprehensive schema validation test suite</subtask>
+          <subtask>3.2: Test all schema constraints (required fields, types, indexes)</subtask>
+          <subtask>3.3: Add @rxdb tag to schema tests</subtask>
+          <subtask>3.4: Verify migration test runs in CI</subtask>
+        </subtasks>
+      </task>
+      <task id="4" title="Create Sync Engine Mock Data">
+        <files>src/services/sync/__mocks__/mockEmailData.ts, src/services/sync/__mocks__/mockSyncServer.ts</files>
+        <subtasks>
+          <subtask>4.1: Create generateMockEmails(count) utility</subtask>
+          <subtask>4.2: Create MockSyncServer returning mock email batches</subtask>
+          <subtask>4.3: Create mockGmailHistoryResponse for delta sync testing</subtask>
+          <subtask>4.4: Add @sync tag to sync engine tests</subtask>
+        </subtasks>
+      </task>
+      <task id="5" title="Add Performance Benchmarks">
+        <files>src/services/database/__tests__/performance.benchmark.ts, scripts/perf-baseline.json</files>
+        <subtasks>
+          <subtask>5.1: Create performance benchmark test suite using Vitest bench</subtask>
+          <subtask>5.2: Benchmark: Insert 1000 emails into RxDB</subtask>
+          <subtask>5.3: Benchmark: Query 1000 emails with sorting</subtask>
+          <subtask>5.4: Benchmark: Full text search across 1000 emails</subtask>
+          <subtask>5.5: Create baseline file for regression detection</subtask>
+          <subtask>5.6: Add @perf tag to performance tests</subtask>
+        </subtasks>
+      </task>
+      <task id="6" title="Update CI Workflow">
+        <files>.github/workflows/ci.yml</files>
+        <subtasks>
+          <subtask>6.1: Add test coverage step using vitest --coverage</subtask>
+          <subtask>6.2: Configure coverage thresholds (70% for Epic 1 code)</subtask>
+          <subtask>6.3: Add performance test step with baseline comparison</subtask>
+          <subtask>6.4: Upload coverage and perf reports as artifacts</subtask>
+          <subtask>6.5: Add CI environment variable for mock servers (CI=true)</subtask>
+        </subtasks>
+      </task>
+      <task id="7" title="Document Testing Infrastructure">
+        <files>docs/testing.md</files>
+        <subtasks>
+          <subtask>7.1: Document mock OAuth server setup and usage</subtask>
+          <subtask>7.2: Document mock email data generation</subtask>
+          <subtask>7.3: Document performance benchmark process</subtask>
+          <subtask>7.4: Document test tagging conventions (@oauth, @rxdb, @sync, @perf)</subtask>
+        </subtasks>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <group name="OAuth Integration Tests">
+      <ac id="1">OAuth E2E tests run in CI with mock OAuth providers (no real Google/Microsoft API calls)</ac>
+      <ac id="2">Mock OAuth server configuration documented for local development</ac>
+      <ac id="3">OAuth token refresh flow tested in isolation (mocked token service)</ac>
+    </group>
+    <group name="RxDB Schema Validation">
+      <ac id="4">RxDB schema validation tests run in CI for all schemas (email, thread, workflow, aiMetadata)</ac>
+      <ac id="5">Schema migration tests run in CI (v1 to v2 migration test passes)</ac>
+    </group>
+    <group name="Sync Engine Testing">
+      <ac id="6">Sync engine tests run in CI with mock email data (no real API calls)</ac>
+      <ac id="7">Mock email server configuration documented for generating test data</ac>
+      <ac id="8">Rate limiter and retry logic tested with simulated failures</ac>
+    </group>
+    <group name="Performance Testing">
+      <ac id="9">Performance test: RxDB can insert 1000 emails in under 5 seconds</ac>
+      <ac id="10">Performance test: Query 1000 emails sorted by date in under 100ms</ac>
+      <ac id="11">CI fails if performance tests regress by more than 20%</ac>
+    </group>
+    <group name="CI/CD Configuration">
+      <ac id="12">All Epic 1 tests categorized with test tags (e.g., @oauth, @rxdb, @sync, @perf)</ac>
+      <ac id="13">CI workflow generates test coverage report for Epic 1 code</ac>
+      <ac id="14">Test artifacts (coverage, performance results) uploaded to GitHub Actions</ac>
+    </group>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/technical-decisions/adr-012-test-strategy-benchmark-harness.md</path>
+        <title>Test Strategy &amp; Benchmark Harness ADR</title>
+        <section>Test Standards</section>
+        <snippet>Unit test coverage >80% line, >70% branch. E2E covers 5-10 critical workflows. Performance benchmarks on 3 hardware cohorts.</snippet>
+      </doc>
+      <doc>
+        <path>docs/TESTING_RXDB_LIMITATION.md</path>
+        <title>RxDB Testing Limitation</title>
+        <section>Known Constraints</section>
+        <snippet>RxDB open-source has 16-collection parallel limit (COL23 error). Workaround: sequential test execution with singleFork: true.</snippet>
+      </doc>
+      <doc>
+        <path>docs/PRD.md</path>
+        <title>Product Requirements Document</title>
+        <section>Non-Functional Requirements</section>
+        <snippet>NFR001: Sub-50ms input latency. NFR004: Support 100,000 emails with less than 5% performance degradation.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Document</title>
+        <section>Testing Architecture</section>
+        <snippet>Defines test pyramid approach: unit tests (fast) to integration to E2E (slower). Coverage targets and performance benchmarks.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/0-6-set-up-github-actions-ci-cd-pipeline.md</path>
+        <title>Epic 0 CI/CD Story</title>
+        <section>CI/CD Foundation</section>
+        <snippet>Established GitHub Actions workflow with lint, test, build, and bundle analysis steps.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/1-12-configure-bundle-analysis-and-size-budgets.md</path>
+        <title>Previous Story (1.12)</title>
+        <section>Dev Agent Record</section>
+        <snippet>Bundle analysis integrated. Use npx tsx for TypeScript scripts in CI. ESLint disabled with eslint-disable no-console.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <file>
+        <path>.github/workflows/ci.yml</path>
+        <kind>ci-config</kind>
+        <symbol>test-and-build job</symbol>
+        <reason>Primary CI workflow to enhance with coverage, performance tests, and mock configurations</reason>
+      </file>
+      <file>
+        <path>vitest.config.ts</path>
+        <kind>config</kind>
+        <symbol>defineConfig</symbol>
+        <reason>Unit test configuration - needs globalSetup for mock servers, coverage thresholds</reason>
+      </file>
+      <file>
+        <path>playwright.config.ts</path>
+        <kind>config</kind>
+        <symbol>defineConfig</symbol>
+        <reason>E2E test configuration - CI mode settings, browser configuration</reason>
+      </file>
+      <file>
+        <path>src/test/setup.ts</path>
+        <kind>setup</kind>
+        <symbol>test environment setup</symbol>
+        <reason>Test environment initialization - OAuth env vars, fake-indexeddb, jest-dom matchers</reason>
+      </file>
+      <file>
+        <path>src/services/auth/__tests__/pkce.test.ts</path>
+        <kind>test</kind>
+        <symbol>PKCE tests</symbol>
+        <reason>Existing OAuth tests to tag and enhance for CI mock support</reason>
+      </file>
+      <file>
+        <path>src/services/auth/__tests__/tokenEncryption.test.ts</path>
+        <kind>test</kind>
+        <symbol>Token encryption tests</symbol>
+        <reason>Existing auth tests - verify coverage in CI</reason>
+      </file>
+      <file>
+        <path>src/services/database/__tests__/testUtils.ts</path>
+        <kind>utility</kind>
+        <symbol>createTestDatabase, destroyTestDatabase</symbol>
+        <reason>Database test utilities - reuse patterns for performance benchmarks</reason>
+      </file>
+      <file>
+        <path>src/services/database/schemas/__tests__/performance.test.ts</path>
+        <kind>test</kind>
+        <symbol>RxDB Performance tests</symbol>
+        <reason>Existing performance tests - convert to Vitest bench, add baseline tracking</reason>
+      </file>
+      <file>
+        <path>src/services/database/schemas/__tests__/email.schema.test.ts</path>
+        <kind>test</kind>
+        <symbol>Email schema tests</symbol>
+        <reason>Schema validation tests to ensure run in CI</reason>
+      </file>
+      <file>
+        <path>src/services/sync/__tests__/rateLimiter.throttle.test.ts</path>
+        <kind>test</kind>
+        <symbol>Rate limiter tests</symbol>
+        <reason>Sync engine tests - verify mock data support and CI execution</reason>
+      </file>
+      <file>
+        <path>src/services/sync/__tests__/retryEngine.test.ts</path>
+        <kind>test</kind>
+        <symbol>Retry engine tests</symbol>
+        <reason>Simulated failure tests for CI validation</reason>
+      </file>
+      <file>
+        <path>e2e/gmail-oauth.spec.ts</path>
+        <kind>e2e-test</kind>
+        <symbol>Gmail OAuth E2E</symbol>
+        <reason>OAuth E2E tests to enhance with CI mock support</reason>
+      </file>
+      <file>
+        <path>e2e/outlook-oauth.spec.ts</path>
+        <kind>e2e-test</kind>
+        <symbol>Outlook OAuth E2E</symbol>
+        <reason>OAuth E2E tests to enhance with CI mock support</reason>
+      </file>
+      <file>
+        <path>e2e/helpers/database.ts</path>
+        <kind>helper</kind>
+        <symbol>waitForDatabaseReady</symbol>
+        <reason>E2E helper pattern to follow for mock server helpers</reason>
+      </file>
+      <file>
+        <path>scripts/bundle-size.ts</path>
+        <kind>script</kind>
+        <symbol>bundle analysis script</symbol>
+        <reason>Example CI script pattern - similar approach for performance baseline scripts</reason>
+      </file>
+    </code>
+    <dependencies>
+      <node>
+        <runtime>
+          <dep name="react" version="19.2" />
+          <dep name="react-dom" version="19.2" />
+          <dep name="rxdb" version="^16.20.0" />
+          <dep name="rxjs" version="^7.8.2" />
+          <dep name="zustand" version="^5.0.8" />
+          <dep name="@azure/msal-browser" version="^4.26.2" />
+          <dep name="@microsoft/microsoft-graph-client" version="^3.0.7" />
+        </runtime>
+        <testing>
+          <dep name="vitest" version="^4.0.7" />
+          <dep name="@vitest/coverage-v8" version="^4.0.7" />
+          <dep name="@vitest/ui" version="^4.0.7" />
+          <dep name="@playwright/test" version="^1.56.1" />
+          <dep name="@testing-library/react" version="^16.3.0" />
+          <dep name="@testing-library/jest-dom" version="^6.9.1" />
+          <dep name="@testing-library/user-event" version="^14.6.1" />
+          <dep name="fake-indexeddb" version="^6.2.4" />
+          <dep name="jsdom" version="^27.1.0" />
+        </testing>
+        <build>
+          <dep name="vite" version="^7.1.12" />
+          <dep name="typescript" version="5.9" />
+          <dep name="eslint" version="^9.39.1" />
+        </build>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="testing">RxDB open-source has 16-collection parallel limit - tests run sequentially with singleFork: true</constraint>
+    <constraint type="ci">Node.js 22.x required (engines in package.json)</constraint>
+    <constraint type="ci">CI uses Ubuntu Latest with npm caching</constraint>
+    <constraint type="performance">NFR001: Sub-50ms input latency - performance tests must verify</constraint>
+    <constraint type="performance">NFR004: Support 100,000 emails with less than 5% degradation</constraint>
+    <constraint type="coverage">Target: >80% line coverage, >70% branch coverage for unit tests</constraint>
+    <constraint type="e2e">E2E uses 2 retries in CI, single worker (not parallel)</constraint>
+    <constraint type="oauth">OAuth tests must work without real Google/Microsoft credentials in CI</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>Vitest bench API</name>
+      <kind>function</kind>
+      <signature>bench(name: string, fn: () => Promise&lt;void&gt;, options?: { iterations?: number })</signature>
+      <path>vitest (external)</path>
+    </interface>
+    <interface>
+      <name>createTestDatabase</name>
+      <kind>function</kind>
+      <signature>createTestDatabase(prefix: string): Promise&lt;AppDatabase&gt;</signature>
+      <path>src/services/database/__tests__/testUtils.ts</path>
+    </interface>
+    <interface>
+      <name>destroyTestDatabase</name>
+      <kind>function</kind>
+      <signature>destroyTestDatabase(db: AppDatabase): Promise&lt;void&gt;</signature>
+      <path>src/services/database/__tests__/testUtils.ts</path>
+    </interface>
+    <interface>
+      <name>waitForDatabaseReady</name>
+      <kind>function</kind>
+      <signature>waitForDatabaseReady(page: Page, timeout?: number): Promise&lt;void&gt;</signature>
+      <path>e2e/helpers/database.ts</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Testing follows ADR-012 test strategy: unit tests (Vitest with jsdom), E2E tests (Playwright), and performance benchmarks.
+      Unit tests target >80% line coverage and >70% branch coverage. E2E covers critical user workflows including OAuth flows,
+      database operations, and token refresh. Tests run sequentially due to RxDB 16-collection limit. Coverage reports use v8
+      provider. CI runs in Ubuntu with Node 22.x, 2 retries for E2E, single worker mode.
+    </standards>
+    <locations>
+      <loc>src/**/__tests__/*.test.ts</loc>
+      <loc>src/**/__tests__/*.test.tsx</loc>
+      <loc>e2e/*.spec.ts</loc>
+      <loc>src/services/database/schemas/__tests__/performance.test.ts</loc>
+    </locations>
+    <ideas>
+      <idea ac="1">Test MockOAuthServer returns valid tokens, handles errors, supports configurable expiry</idea>
+      <idea ac="2">Document mock OAuth setup with code examples and environment variable configuration</idea>
+      <idea ac="3">Unit test token refresh with mocked tokenRefreshService, verify refresh before expiry</idea>
+      <idea ac="4">Create schemaValidation.test.ts testing all schema required fields, types, and index definitions</idea>
+      <idea ac="5">Verify existing example-migration.test.ts passes, add v1 to v2 migration test case</idea>
+      <idea ac="6">Create mockEmailData.ts with generateMockEmails(count) returning realistic email objects</idea>
+      <idea ac="7">Document MockSyncServer setup in docs/testing.md with configuration options</idea>
+      <idea ac="8">Add simulated 429 errors and network failures to retryEngine tests</idea>
+      <idea ac="9">Benchmark bulkInsert of 1000 emails, assert completes in under 5000ms</idea>
+      <idea ac="10">Benchmark find().sort({timestamp:'desc'}).limit(1000), assert under 100ms</idea>
+      <idea ac="11">Create scripts/perf-baseline.json, compare current results, fail if >20% regression</idea>
+      <idea ac="12">Add describe.each patterns or file naming convention for test categorization</idea>
+      <idea ac="13">Add vitest --coverage step to ci.yml, configure thresholds in vitest.config.ts</idea>
+      <idea ac="14">Use actions/upload-artifact@v4 for coverage and perf reports with 7-day retention</idea>
+    </ideas>
+  </tests>
+</story-context>

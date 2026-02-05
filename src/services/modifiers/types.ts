@@ -150,6 +150,9 @@ export interface ModifierDocument {
   /** Target entity ID */
   entityId: string
 
+  /** Thread ID for dependency grouping (Story 2.19) */
+  threadId?: string
+
   /** Entity type (email, draft) */
   entityType: EntityType
 
@@ -197,6 +200,8 @@ export interface BaseModifierParams {
   entityId: string
   accountId: string
   provider: ProviderType
+  /** Thread ID for dependency grouping (Story 2.19) */
+  threadId?: string
 }
 
 /**
@@ -288,6 +293,12 @@ export const RETRY_DELAYS = [1000, 5000, 30000, 60000] as const
  * Maximum number of retry attempts before permanent failure
  */
 export const MAX_ATTEMPTS = 4
+
+/**
+ * Default concurrency for parallel action queue processing (Story 2.19)
+ * Matches Superhuman's proven concurrency level
+ */
+export const PARALLEL_ACTION_CONCURRENCY = 4
 
 /**
  * Generate a unique modifier ID

@@ -1,0 +1,238 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>3d</storyId>
+    <title>Refactor Database Type Safety</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-14</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/1-3d-refactor-database-type-safety.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>a developer</asA>
+    <iWant>proper TypeScript interfaces for RxDB collections instead of `any` type casts</iWant>
+    <soThat>I have compile-time type safety when accessing database collections and documents</soThat>
+    <tasks>
+      - Create TypeScript collection interfaces (AC: 1)
+        - Define DatabaseCollections interface with all collection types
+        - Define AppDatabase type extending RxDatabase&lt;DatabaseCollections&gt;
+        - Define MetadataDocument interface for metadata collection
+        - Export types from new file src/services/database/types.ts
+        - Test: Verify types compile without errors
+
+      - Refactor versionTracker.ts (AC: 2)
+        - Update method signatures to use AppDatabase type
+        - Replace (db as any).metadata with typed db.metadata
+        - Update all method implementations (getCurrentVersion, setVersion, logMigration, getMigrationHistory)
+        - Test: Run versionTracker.test.ts - all tests pass
+
+      - Refactor migrationRunner.ts (AC: 3)
+        - Update method signatures to use AppDatabase type
+        - Replace (db as any).metadata with typed db.metadata
+        - Update all method implementations (runMigrations, rollbackToVersion, executeMigration)
+        - Test: Run migrationRunner.test.ts - all tests pass
+
+      - Refactor backup.ts (AC: 4)
+        - Update method signatures to use AppDatabase type
+        - Replace (db as any)[collectionName] with typed collection access
+        - Update createBackup, restoreBackup, and storage methods
+        - Test: Run backup.test.ts - all tests pass
+
+      - Refactor example migration (AC: 5)
+        - Update migration to use typed database parameter
+        - Replace (db as any)._emails with typed db._emails
+        - Add proper type guards for optional collections
+        - Test: Run example-migration.test.ts - all tests pass
+
+      - Validate type safety (AC: 6, 7)
+        - Run all migration system tests - verify 37 tests pass
+        - Run TypeScript compiler - verify no type errors
+        - Review code - confirm no any casts remain in migration system
+        - Review code - confirm no @ts-ignore comments added
+        - Test: Full test suite passes with strict type checking
+
+      - Update documentation (AC: 8)
+        - Update database-migrations.md with typed examples
+        - Update migration template in docs to show typed approach
+        - Add type safety best practices section
+        - Update init.ts example to show AppDatabase usage
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    1. TypeScript interface created for database collections with all collection types
+    2. All any type casts eliminated from versionTracker.ts
+    3. All any type casts eliminated from migrationRunner.ts
+    4. All any type casts eliminated from backup.ts
+    5. All any type casts eliminated from example migration (20251113_add_sentiment_field.ts)
+    6. All existing tests continue to pass without modification
+    7. Type safety validated - no @ts-ignore or any workarounds used
+    8. Migration system documentation updated with typed examples
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/database-migrations.md</path>
+        <title>Database Migrations Documentation</title>
+        <section>Architecture - Components</section>
+        <snippet>Details VersionTracker, MigrationRunner, and BackupService implementations. VersionTracker manages schema version in metadata collection and logs migration events. Current implementation uses (db as any).metadata casts that this story will eliminate.</snippet>
+      </doc>
+      <doc>
+        <path>docs/technical-decisions/adr-002-local-data-store-indexing-strategy.md</path>
+        <title>ADR-002: Local Data Store and Indexing Strategy</title>
+        <section>Decision</section>
+        <snippet>Selected RxDB 16.20.0 + IndexedDB for offline-first storage. RxDB provides reactive queries and encryption plugins. Proven in Claine v1, v2 addresses performance issues with better indexing.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Architecture Specification</title>
+        <section>Technology Decisions - Framework Stack</section>
+        <snippet>TypeScript 5.9 required for type safety critical in multi-agent development. Zustand 5.0.8 selected for excellent TypeScript support. All services and components follow TypeScript-first design patterns.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/1-3c-implement-schema-migration-strategy.md</path>
+        <title>Parent Story: Schema Migration Strategy Implementation</title>
+        <section>Code Review - Action Items</section>
+        <snippet>Code review identified type safety issue (line 410): Eliminate any type casts by creating proper TypeScript collection interfaces. Affects versionTracker.ts, migrationRunner.ts, backup.ts, and example migrations.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/1-3b-design-rxdb-schemas-for-core-entities.md</path>
+        <title>Related Story: RxDB Schema Design</title>
+        <section>Schema Definitions</section>
+        <snippet>Defines Email, Thread, Workflow, and AI Metadata schemas with TypeScript interfaces. Establishes pattern for typed RxDB collections and document interfaces used throughout the application.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>src/services/database/versionTracker.ts</path>
+        <kind>service</kind>
+        <symbol>VersionTracker</symbol>
+        <lines>24,37,85,94</lines>
+        <reason>Uses (db as any).metadata casts. Lines 24,37 access metadata collection for version CRUD. Lines 85,94 insert/query migration logs. Needs typed metadata collection access.</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/database/backup.ts</path>
+        <kind>service</kind>
+        <symbol>BackupService</symbol>
+        <lines>28,38,70,79</lines>
+        <reason>Uses (db as any) casts for dynamic collection access. Line 28: metadata version lookup. Lines 38,70,79: dynamic [collectionName] indexing. Needs typed collection dictionary or union type.</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/database/migrations/types.ts</path>
+        <kind>interface</kind>
+        <symbol>Migration</symbol>
+        <lines>1-37</lines>
+        <reason>Defines Migration interface with up/down methods accepting RxDatabase. Should be updated to accept AppDatabase typed parameter for proper collection type inference.</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/database/migrations/20251113_add_sentiment_field.ts</path>
+        <kind>migration</kind>
+        <symbol>migration_20251113_add_sentiment_field</symbol>
+        <lines>28,29,46,47</lines>
+        <reason>Example migration using (db as any)._emails casts. Demonstrates pattern other migrations will follow. Needs typed db._emails with optional chaining for proper type guards.</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/database/schemas/index.ts</path>
+        <kind>module</kind>
+        <symbol>schema exports</symbol>
+        <lines>33-54</lines>
+        <reason>Establishes pattern for schema + TypeScript type exports (EmailDocument, ThreadDocument, WorkflowDocument, AIMetadataDocument). New types.ts should follow this pattern for DatabaseCollections and AppDatabase.</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/database/init.ts</path>
+        <kind>service</kind>
+        <symbol>initDatabase</symbol>
+        <lines>all</lines>
+        <reason>Database initialization function that creates RxDatabase instance and adds collections. Should return typed AppDatabase instead of generic RxDatabase for proper type inference in consumers.</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <runtime>
+        <package name="rxdb" version="^16.20.0">Reactive database with TypeScript generics for typed collections</package>
+        <package name="rxjs" version="^7.8.2">RxDB peer dependency for reactive observables</package>
+      </runtime>
+      <devDependencies>
+        <package name="typescript" version="5.9">TypeScript compiler with strict type checking</package>
+        <package name="@types/node" version="^24.10.0">Node.js TypeScript type definitions</package>
+        <package name="vitest" version="^4.0.7">Test runner for validating type safety and test compatibility</package>
+        <package name="fake-indexeddb" version="^6.2.4">IndexedDB mock for testing database operations</package>
+      </devDependencies>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    - All existing tests must pass without modification (AC 6) - proves backward compatibility
+    - No @ts-ignore or any type workarounds allowed (AC 7) - ensures genuine type safety
+    - TypeScript 5.9 strict mode compatibility required - project standard
+    - Follow existing schema export pattern from schemas/index.ts - consistency with codebase
+    - RxDB 16.20.0 API compatibility - no breaking changes to RxDB usage patterns
+    - Create new types.ts file in src/services/database/ - centralized type definitions
+    - Export AppDatabase type for use throughout application - enables typed database imports
+    - Migration interface up/down methods must accept typed database parameter
+    - Maintain singleton pattern for VersionTracker, MigrationRunner, BackupService
+    - Document type changes in database-migrations.md with examples
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>RxDatabase&lt;Collections&gt;</name>
+      <kind>Generic Type from rxdb package</kind>
+      <signature>interface RxDatabase&lt;Collections = any&gt;</signature>
+      <path>node_modules/rxdb/dist/types/types/rx-database.d.ts</path>
+      <note>RxDB's typed database interface. Collections generic parameter specifies collection map for type-safe access to db.collectionName properties.</note>
+    </interface>
+    <interface>
+      <name>RxCollection&lt;RxDocumentType&gt;</name>
+      <kind>Generic Type from rxdb package</kind>
+      <signature>interface RxCollection&lt;RxDocumentType&gt;</signature>
+      <path>node_modules/rxdb/dist/types/types/rx-collection.d.ts</path>
+      <note>RxDB's typed collection interface. RxDocumentType parameter specifies document shape for type-safe CRUD operations.</note>
+    </interface>
+    <interface>
+      <name>DatabaseCollections (to be created)</name>
+      <kind>Interface mapping collection names to typed RxCollections</kind>
+      <signature>interface DatabaseCollections { metadata: RxCollection&lt;MetadataDocument&gt;, _emails?: RxCollection&lt;EmailDocument&gt;, ... }</signature>
+      <path>src/services/database/types.ts (new file)</path>
+      <note>Maps collection names to their RxCollection types. Optional collections use ? for conditional access. Enables db.metadata type inference.</note>
+    </interface>
+    <interface>
+      <name>AppDatabase (to be created)</name>
+      <kind>Type alias for typed RxDatabase</kind>
+      <signature>type AppDatabase = RxDatabase&lt;DatabaseCollections&gt;</signature>
+      <path>src/services/database/types.ts (new file)</path>
+      <note>Application-specific typed database. Replaces generic RxDatabase in method signatures for compile-time type safety.</note>
+    </interface>
+    <interface>
+      <name>Migration (to be updated)</name>
+      <kind>Interface for migration functions</kind>
+      <signature>interface Migration { up: (db: AppDatabase) =&gt; Promise&lt;void&gt;, down: (db: AppDatabase) =&gt; Promise&lt;void&gt; }</signature>
+      <path>src/services/database/migrations/types.ts</path>
+      <note>Migration interface needs db parameter type changed from RxDatabase to AppDatabase for typed collection access in migrations.</note>
+    </interface>
+  </interfaces>
+  <tests>
+    <standards>
+      Unit tests use Vitest 4.0.7 with @testing-library/react. Test files colocated with source in __tests__ directories. Target >80% line coverage, >70% branch coverage (ADR-012). All tests must use async/await patterns for database operations. Tests use fake-indexeddb 6.2.4 for mocking RxDB storage. Type refactoring must not modify test implementations - only type annotations if needed. Tests validate backward compatibility by passing without changes.
+    </standards>
+    <locations>
+      - src/services/database/__tests__/versionTracker.test.ts (11 passing, 1 skipped)
+      - src/services/database/__tests__/migrationRunner.test.ts (12 passing)
+      - src/services/database/__tests__/backup.test.ts (6 passing)
+      - src/services/database/migrations/__tests__/example-migration.test.ts (8 passing)
+      - Total existing: 37 tests (36 passing, 1 skipped)
+    </locations>
+    <ideas>
+      - AC1: Verify TypeScript compiler accepts AppDatabase type without errors
+      - AC2: Run versionTracker.test.ts - all tests pass, validate typed db.metadata access
+      - AC3: Run migrationRunner.test.ts - all tests pass, validate Migration interface compatibility
+      - AC4: Run backup.test.ts - all tests pass, validate dynamic collection access still works
+      - AC5: Run example-migration.test.ts - all tests pass, validate typed db._emails with type guards
+      - AC6,7: Run npm run test - verify all 37 tests pass, confirm no @ts-ignore added
+      - AC8: Manual verification - database-migrations.md updated with typed code examples
+      - Type safety validation: Run tsc --noEmit to confirm zero type errors across codebase
+      - Regression test: Import AppDatabase in test files, verify type inference works
+    </ideas>
+  </tests>
+</story-context>

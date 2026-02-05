@@ -1,0 +1,470 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>5</storyId>
+    <title>OAuth 2.0 Integration for Outlook</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-20</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/1-5-oauth-2-0-integration-for-outlook.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>user</asA>
+    <iWant>to securely connect my Outlook account</iWant>
+    <soThat>Claine can access my Microsoft emails with the same security standards as Gmail</soThat>
+    <tasks>
+      <task id="planning-setup">
+        <title>Planning & Setup</title>
+        <subtasks>
+          <subtask>Research Microsoft Graph OAuth 2.0 documentation</subtask>
+          <subtask>Review Microsoft Identity Platform documentation</subtask>
+          <subtask>Study Graph API scopes for email access (Mail.Read, Mail.Send)</subtask>
+          <subtask>Understand token lifetime and refresh behavior</subtask>
+          <subtask>Review Microsoft Graph SDK for JavaScript</subtask>
+        </subtasks>
+      </task>
+      <task id="sdk-integration">
+        <title>Microsoft Graph SDK Integration</title>
+        <subtasks>
+          <subtask>Add @microsoft/microsoft-graph-client package</subtask>
+          <subtask>Add @azure/msal-browser for MSAL (Microsoft Authentication Library)</subtask>
+          <subtask>Configure OAuth client credentials in .env</subtask>
+        </subtasks>
+      </task>
+      <task id="oauth-service">
+        <title>Outlook OAuth Service Implementation</title>
+        <subtasks>
+          <subtask>Implement src/services/auth/outlookOAuth.ts</subtask>
+          <subtask>Reuse PKCE utilities from pkce.ts</subtask>
+          <subtask>Create authorization URL with Microsoft endpoints</subtask>
+          <subtask>Handle redirect to Microsoft consent screen</subtask>
+          <subtask>Implement authorization code exchange for tokens</subtask>
+          <subtask>Show connection success confirmation</subtask>
+        </subtasks>
+      </task>
+      <task id="token-storage">
+        <title>Token Storage Integration (Reuse Existing)</title>
+        <subtasks>
+          <subtask>Reuse tokenStorageService from Story 1.4</subtask>
+          <subtask>Reuse tokenEncryptionService from Story 1.4</subtask>
+          <subtask>Add provider identifier to distinguish Gmail vs Outlook tokens</subtask>
+          <subtask>Verify existing authToken.schema.ts supports multi-provider</subtask>
+        </subtasks>
+      </task>
+      <task id="token-refresh">
+        <title>Token Refresh Integration (Reuse Existing)</title>
+        <subtasks>
+          <subtask>Register Outlook tokens with tokenRefreshService</subtask>
+          <subtask>Configure refresh threshold (Microsoft tokens expire in 1 hour)</subtask>
+          <subtask>Handle Microsoft token rotation</subtask>
+          <subtask>Reuse existing re-auth prompts and callbacks</subtask>
+        </subtasks>
+      </task>
+      <task id="error-handling">
+        <title>Error Handling</title>
+        <subtasks>
+          <subtask>Handle invalid_grant error → trigger re-auth</subtask>
+          <subtask>Handle invalid_client error → show clear message</subtask>
+          <subtask>Handle consent_required error → redirect to consent</subtask>
+          <subtask>Handle interaction_required error → show MFA instructions</subtask>
+          <subtask>Handle network errors gracefully</subtask>
+          <subtask>Trigger user notifications via existing callback system</subtask>
+        </subtasks>
+      </task>
+      <task id="security">
+        <title>Security Configuration</title>
+        <subtasks>
+          <subtask>Add Microsoft OAuth endpoints to CSP headers (login.microsoftonline.com, graph.microsoft.com)</subtask>
+          <subtask>Update vite-plugin-csp.ts for development</subtask>
+          <subtask>Update vercel.json for production</subtask>
+          <subtask>Add Outlook client credentials to .env.example</subtask>
+          <subtask>Audit code for token leakage in logs</subtask>
+        </subtasks>
+      </task>
+      <task id="testing">
+        <title>Testing</title>
+        <subtasks>
+          <subtask>Test Outlook OAuth service methods</subtask>
+          <subtask>Test authorization URL generation</subtask>
+          <subtask>Test token exchange flow</subtask>
+          <subtask>Test error handling for Microsoft Graph errors</subtask>
+          <subtask>Test full OAuth flow or defer to Story 1.6</subtask>
+          <subtask>Verify tokens encrypted using existing tests</subtask>
+        </subtasks>
+      </task>
+      <task id="documentation">
+        <title>Documentation & Cleanup</title>
+        <subtasks>
+          <subtask>Update .env.example with Outlook credentials</subtask>
+          <subtask>Document how to obtain Microsoft Graph client credentials</subtask>
+          <subtask>Document Microsoft Graph scopes used</subtask>
+          <subtask>Clean up debug logging</subtask>
+          <subtask>Verify all acceptance criteria met</subtask>
+        </subtasks>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC1">
+      <title>Outlook OAuth 2.0 flow implemented using Microsoft Graph SDK</title>
+      <description>Complete Microsoft Graph OAuth 2.0 authorization code flow with PKCE</description>
+    </criterion>
+    <criterion id="AC2">
+      <title>User redirected to Microsoft consent screen</title>
+      <description>Redirect user to login.microsoftonline.com for authorization</description>
+    </criterion>
+    <criterion id="AC3">
+      <title>Connection success confirmation shown to user</title>
+      <description>Display confirmation when Outlook account successfully connected</description>
+    </criterion>
+    <criterion id="AC4">
+      <title>OAuth tokens stored using existing tokenStorage service</title>
+      <description>Reuse tokenStorageService from Story 1.4 with RxDB + encryption</description>
+    </criterion>
+    <criterion id="AC5">
+      <title>Token encryption uses existing tokenEncryptionService</title>
+      <description>No new encryption implementation - reuse AES-GCM service from Story 1.4</description>
+    </criterion>
+    <criterion id="AC6">
+      <title>Encrypted tokens stored with provider identifier</title>
+      <description>Distinguish 'outlook' vs 'gmail' tokens using provider field</description>
+    </criterion>
+    <criterion id="AC7">
+      <title>Token refresh scheduler reused from Story 1.4</title>
+      <description>Reuse tokenRefreshService for automatic token refresh</description>
+    </criterion>
+    <criterion id="AC8">
+      <title>Automatic token refresh triggered before expiration</title>
+      <description>Microsoft Graph tokens expire in 1 hour - refresh 5 minutes before</description>
+    </criterion>
+    <criterion id="AC9">
+      <title>Refresh token rotation implemented</title>
+      <description>Microsoft Graph rotates refresh tokens - handle rotation correctly</description>
+    </criterion>
+    <criterion id="AC10">
+      <title>User prompted to re-authenticate ONLY if refresh token expired</title>
+      <description>Reuse re-auth flow from Story 1.4, only on refresh token expiry</description>
+    </criterion>
+    <criterion id="AC11">
+      <title>OAuth error handling covers Microsoft Graph error codes</title>
+      <description>Handle invalid_grant, invalid_client, consent_required, interaction_required errors</description>
+    </criterion>
+    <criterion id="AC12">
+      <title>Network errors during OAuth handled gracefully</title>
+      <description>Catch and handle fetch failures, timeouts, network errors</description>
+    </criterion>
+    <criterion id="AC13">
+      <title>Token refresh failures trigger user notification</title>
+      <description>Reuse callback system from tokenRefreshService for notifications</description>
+    </criterion>
+    <criterion id="AC14">
+      <title>Microsoft OAuth endpoints added to CSP headers</title>
+      <description>Add login.microsoftonline.com and graph.microsoft.com to CSP (dev + production)</description>
+    </criterion>
+    <criterion id="AC15">
+      <title>HTTPS-only enforced for OAuth redirects</title>
+      <description>Reuse existing HSTS headers from Story 1.4</description>
+    </criterion>
+    <criterion id="AC16">
+      <title>Security audit: No token leakage in console/network logs</title>
+      <description>Verify no plaintext tokens in console.log or error messages</description>
+    </criterion>
+    <criterion id="AC17">
+      <title>Outlook client credentials stored in .env</title>
+      <description>Add VITE_MICROSOFT_CLIENT_ID, VITE_MICROSOFT_CLIENT_SECRET, VITE_MICROSOFT_REDIRECT_URI, VITE_MICROSOFT_SCOPES</description>
+    </criterion>
+    <criterion id="AC18">
+      <title>Unit tests for Outlook OAuth service</title>
+      <description>Test authorization URL generation, token exchange, error handling</description>
+    </criterion>
+    <criterion id="AC19">
+      <title>Integration test: Full OAuth flow with Microsoft Graph</title>
+      <description>Test complete OAuth flow (or defer to Story 1.6 like Gmail)</description>
+    </criterion>
+    <criterion id="AC20">
+      <title>Security test: Verify tokens encrypted at rest</title>
+      <description>Reuse tokenEncryption tests from Story 1.4</description>
+    </criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/epics/epic-1-foundation-core-infrastructure.md</path>
+        <title>Epic 1: Foundation & Core Infrastructure</title>
+        <section>Story 1.5: OAuth 2.0 Integration for Outlook</section>
+        <snippet>Outlook OAuth 2.0 flow using Microsoft Graph SDK. User redirected to Microsoft consent screen. OAuth tokens stored securely with token refresh mechanism and error handling.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>Claine Architecture</title>
+        <section>Security & Privacy</section>
+        <snippet>OAuth tokens encrypted using Web Crypto API (AES-GCM 256-bit). No tokens stored in localStorage. CSP headers configured to prevent XSS attacks.</snippet>
+      </doc>
+      <doc>
+        <path>docs/brownfield/security-privacy-architecture.md</path>
+        <title>Security & Privacy Architecture</title>
+        <section>OAuth Token Security</section>
+        <snippet>Token encryption at rest using AES-GCM. PKCE for authorization code flow. Automatic token refresh before expiration. No token leakage in logs or network traces.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/1-4-oauth-2-0-pkce-integration-for-gmail.md</path>
+        <title>Story 1.4: OAuth 2.0 PKCE Integration for Gmail</title>
+        <section>Complete OAuth Infrastructure</section>
+        <snippet>Established src/services/auth/ directory with tokenEncryptionService, tokenStorageService, tokenRefreshService, and PKCE utilities. All services are provider-agnostic and ready for reuse.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/1-4-oauth-2-0-pkce-integration-for-gmail-review.md</path>
+        <title>Code Review: Story 1.4</title>
+        <section>Review Summary</section>
+        <snippet>44 unit tests passing. AES-GCM 256-bit encryption with PBKDF2 (100,000 iterations). Token refresh scheduler (1-minute intervals, 5-minute threshold). Security headers configured (CSP, HSTS).</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>src/services/auth/types.ts</path>
+        <kind>types</kind>
+        <symbol>OAuthTokens, PKCEPair, StoredTokens, EncryptedTokenData</symbol>
+        <lines>1-158</lines>
+        <reason>TypeScript interfaces for OAuth tokens, PKCE, and encryption - reuse for Outlook</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/auth/pkce.ts</path>
+        <kind>service</kind>
+        <symbol>generatePKCEPair, generateCodeVerifier, generateCodeChallenge</symbol>
+        <lines>1-145</lines>
+        <reason>RFC 7636 PKCE implementation - REUSE for Outlook (Microsoft supports PKCE)</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/auth/tokenEncryption.ts</path>
+        <kind>service</kind>
+        <symbol>TokenEncryptionService</symbol>
+        <lines>1-255</lines>
+        <reason>AES-GCM 256-bit encryption service - REUSE for Outlook tokens (provider-agnostic)</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/auth/tokenStorage.ts</path>
+        <kind>service</kind>
+        <symbol>TokenStorageService</symbol>
+        <lines>1-297</lines>
+        <reason>RxDB token storage service - REUSE for Outlook tokens (multi-account support)</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/auth/tokenRefresh.ts</path>
+        <kind>service</kind>
+        <symbol>TokenRefreshService</symbol>
+        <lines>1-273</lines>
+        <reason>Token refresh scheduler - REUSE for Outlook (works for any provider)</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/auth/gmailOAuth.ts</path>
+        <kind>service</kind>
+        <symbol>GmailOAuthService</symbol>
+        <lines>1-330</lines>
+        <reason>Gmail OAuth implementation - USE AS REFERENCE for Outlook OAuth service structure</reason>
+      </artifact>
+      <artifact>
+        <path>src/services/database/schemas/authToken.schema.ts</path>
+        <kind>schema</kind>
+        <symbol>authTokenSchema, AuthTokenDocument</symbol>
+        <lines>1-96</lines>
+        <reason>RxDB schema for encrypted tokens - already multi-account capable, no changes needed</reason>
+      </artifact>
+      <artifact>
+        <path>vite-plugin-csp.ts</path>
+        <kind>config</kind>
+        <symbol>cspHeadersPlugin</symbol>
+        <lines>1-63</lines>
+        <reason>Development CSP headers - ADD Microsoft OAuth endpoints (login.microsoftonline.com, graph.microsoft.com)</reason>
+      </artifact>
+      <artifact>
+        <path>vercel.json</path>
+        <kind>config</kind>
+        <symbol>CSP headers</symbol>
+        <lines>20-23</lines>
+        <reason>Production CSP headers - ADD Microsoft OAuth endpoints</reason>
+      </artifact>
+      <artifact>
+        <path>.env.example</path>
+        <kind>config</kind>
+        <symbol>OAuth credentials</symbol>
+        <lines>23-48</lines>
+        <reason>Environment variable template - ADD Outlook/Microsoft Graph credentials section</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <package name="react" version="19.2"/>
+        <package name="react-dom" version="19.2"/>
+        <package name="rxdb" version="^16.20.0"/>
+        <package name="rxjs" version="^7.8.2"/>
+        <package name="zustand" version="^5.0.8"/>
+      </node>
+      <add>
+        <package name="@microsoft/microsoft-graph-client" version="^3.0.7" notes="Microsoft Graph SDK for JavaScript"/>
+        <package name="@azure/msal-browser" version="^3.11.1" notes="Microsoft Authentication Library for SPAs"/>
+      </add>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>
+      <category>Architecture</category>
+      <rule>MUST reuse existing OAuth infrastructure from Story 1.4 (tokenEncryptionService, tokenStorageService, tokenRefreshService)</rule>
+      <rationale>90% code reuse - only create new outlookOAuth.ts service</rationale>
+    </constraint>
+    <constraint>
+      <category>Security</category>
+      <rule>MUST use PKCE for authorization code flow (Microsoft supports PKCE)</rule>
+      <rationale>Follow same security pattern as Gmail OAuth implementation</rationale>
+    </constraint>
+    <constraint>
+      <category>Security</category>
+      <rule>MUST NOT create new encryption code - reuse tokenEncryptionService</rule>
+      <rationale>Consistent encryption approach, same AES-GCM 256-bit standard</rationale>
+    </constraint>
+    <constraint>
+      <category>Token Storage</category>
+      <rule>MUST use existing authToken.schema.ts RxDB schema</rule>
+      <rationale>Schema already supports multi-account, provider-agnostic</rationale>
+    </constraint>
+    <constraint>
+      <category>Token Storage</category>
+      <rule>MUST add provider identifier to distinguish Gmail vs Outlook tokens</rule>
+      <rationale>Enable multi-provider support in same storage collection</rationale>
+    </constraint>
+    <constraint>
+      <category>Token Refresh</category>
+      <rule>Microsoft Graph tokens expire in ~1 hour (same as Gmail)</rule>
+      <rationale>Use same 5-minute refresh threshold as Gmail</rationale>
+    </constraint>
+    <constraint>
+      <category>Error Handling</category>
+      <rule>MUST handle Microsoft-specific OAuth errors: invalid_grant, invalid_client, consent_required, interaction_required</rule>
+      <rationale>Microsoft Graph has different error codes than Google OAuth</rationale>
+    </constraint>
+    <constraint>
+      <category>Security Headers</category>
+      <rule>MUST add Microsoft OAuth endpoints to CSP headers (dev and production)</rule>
+      <rationale>Allow requests to login.microsoftonline.com and graph.microsoft.com</rationale>
+    </constraint>
+    <constraint>
+      <category>Testing</category>
+      <rule>Follow same testing pattern as Story 1.4: Unit tests for OAuth service, integration test deferred to Story 1.6</rule>
+      <rationale>Consistent with Gmail OAuth testing approach</rationale>
+    </constraint>
+    <constraint>
+      <category>Logging</category>
+      <rule>MUST NOT log tokens in console or error messages (security audit requirement)</rule>
+      <rationale>Follow same security logging standards as Story 1.4</rationale>
+    </constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>OutlookOAuthService</name>
+      <kind>class</kind>
+      <signature>
+export class OutlookOAuthService {
+  async initiateAuth(): Promise<void>
+  handleCallback(callbackUrl: string): { code: string; state: string }
+  async exchangeCodeForTokens(code: string, state: string): Promise<OAuthTokens>
+  async refreshAccessToken(refreshToken: string): Promise<OAuthTokens>
+  getConfig(): Omit<OAuthConfig, 'clientSecret'>
+}
+      </signature>
+      <path>src/services/auth/outlookOAuth.ts (NEW)</path>
+      <notes>Mirror GmailOAuthService structure from Story 1.4, adapted for Microsoft Graph endpoints</notes>
+    </interface>
+    <interface>
+      <name>TokenStorageService.storeTokens</name>
+      <kind>function</kind>
+      <signature>async storeTokens(accountId: string, tokens: OAuthTokens, provider?: string): Promise<void></signature>
+      <path>src/services/auth/tokenStorage.ts</path>
+      <notes>REUSE existing method, optionally add provider parameter ('outlook' vs 'gmail')</notes>
+    </interface>
+    <interface>
+      <name>TokenEncryptionService.encrypt</name>
+      <kind>function</kind>
+      <signature>async encrypt(tokens: StoredTokens): Promise<EncryptedTokenData></signature>
+      <path>src/services/auth/tokenEncryption.ts</path>
+      <notes>REUSE existing encryption - provider-agnostic, works for any OAuth tokens</notes>
+    </interface>
+    <interface>
+      <name>TokenRefreshService.refreshAccountTokens</name>
+      <kind>function</kind>
+      <signature>async refreshAccountTokens(accountId: string): Promise<void></signature>
+      <path>src/services/auth/tokenRefresh.ts</path>
+      <notes>REUSE existing scheduler - provider-agnostic, works for any OAuth provider</notes>
+    </interface>
+    <interface>
+      <name>Microsoft Graph OAuth Endpoints</name>
+      <kind>REST API</kind>
+      <signature>
+Authorization: https://login.microsoftonline.com/common/oauth2/v2.0/authorize
+Token: https://login.microsoftonline.com/common/oauth2/v2.0/token
+Scopes: Mail.Read, Mail.Send, offline_access
+      </signature>
+      <path>External Microsoft Graph API</path>
+      <notes>Use Microsoft Graph OAuth 2.0 endpoints instead of Google endpoints</notes>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      <framework>Vitest 4.0</framework>
+      <pattern>Unit tests in src/**/__tests__/ directories</pattern>
+      <coverage>Follow Story 1.4 pattern: 20+ tests for OAuth service covering PKCE, authorization, token exchange, error handling</coverage>
+      <security>Reuse encryption tests from Story 1.4 - no new encryption code needed</security>
+    </standards>
+    <locations>
+      <location>src/services/auth/__tests__/outlookOAuth.test.ts (NEW)</location>
+      <location>src/services/auth/__tests__/tokenEncryption.test.ts (EXISTING - reuse)</location>
+      <location>src/services/auth/__tests__/pkce.test.ts (EXISTING - reuse)</location>
+    </locations>
+    <ideas>
+      <test ac="AC1" priority="high">
+        <description>Test OutlookOAuthService initialization and config validation</description>
+        <approach>Unit test: Verify Microsoft Graph endpoints, client ID/secret validation</approach>
+      </test>
+      <test ac="AC2" priority="high">
+        <description>Test authorization URL generation with Microsoft endpoints</description>
+        <approach>Unit test: Verify URL contains login.microsoftonline.com, correct scopes (Mail.Read, Mail.Send), PKCE challenge</approach>
+      </test>
+      <test ac="AC4,AC5,AC6" priority="high">
+        <description>Test token storage integration with provider identifier</description>
+        <approach>Integration test: Store Outlook tokens, verify encryption reused, provider field set correctly</approach>
+      </test>
+      <test ac="AC7,AC8,AC9" priority="high">
+        <description>Test token refresh scheduler integration</description>
+        <approach>Integration test: Register Outlook tokens with tokenRefreshService, verify refresh triggered</approach>
+      </test>
+      <test ac="AC11" priority="high">
+        <description>Test Microsoft Graph error handling</description>
+        <approach>Unit test: Mock invalid_grant, invalid_client, consent_required, interaction_required errors, verify correct handling</approach>
+      </test>
+      <test ac="AC14" priority="medium">
+        <description>Test CSP headers include Microsoft endpoints</description>
+        <approach>Integration test: Verify vite-plugin-csp.ts and vercel.json contain login.microsoftonline.com and graph.microsoft.com</approach>
+      </test>
+      <test ac="AC16" priority="high">
+        <description>Security audit: No token leakage</description>
+        <approach>Code audit + test: Grep for console.log in outlookOAuth.ts, verify no plaintext tokens in error messages</approach>
+      </test>
+      <test ac="AC18" priority="high">
+        <description>Unit tests for Outlook OAuth service</description>
+        <approach>20+ tests covering: authorization URL, token exchange, refresh, error handling (follow Story 1.4 pattern)</approach>
+      </test>
+      <test ac="AC19" priority="medium">
+        <description>Integration test: Full OAuth flow</description>
+        <approach>E2E test with browser redirect (or defer to Story 1.6 like Gmail)</approach>
+      </test>
+      <test ac="AC20" priority="low">
+        <description>Security test: Tokens encrypted at rest</description>
+        <approach>REUSE existing tokenEncryption.test.ts tests - no new tests needed</approach>
+      </test>
+    </ideas>
+  </tests>
+</story-context>

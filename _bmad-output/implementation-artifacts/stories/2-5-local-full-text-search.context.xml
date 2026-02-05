@@ -1,0 +1,195 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>5</storyId>
+    <title>Local Full-Text Search</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-12-05</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/2-5-local-full-text-search.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>user</asA>
+    <iWant>to search my emails locally with instant results</iWant>
+    <soThat>I can find any email quickly without network dependency</soThat>
+    <tasks>
+      <task id="1" title="Install and Configure Lunr.js">
+        <subtask id="1.1">Install lunr package (npm install lunr @types/lunr)</subtask>
+        <subtask id="1.2">Create search service module structure</subtask>
+        <subtask id="1.3">Configure TypeScript types for Lunr.js</subtask>
+      </task>
+      <task id="2" title="Create Search Index Service">
+        <subtask id="2.1">Create SearchIndexService class with singleton pattern</subtask>
+        <subtask id="2.2">Implement buildIndex(emails) method to create Lunr index from emails</subtask>
+        <subtask id="2.3">Configure index fields: subject (boost 10), from.name (boost 5), from.email (boost 5), body.text (boost 1), to/cc names and emails (boost 2)</subtask>
+        <subtask id="2.4">Implement search(query) method returning ranked results</subtask>
+        <subtask id="2.5">Implement getDocument(id) method to retrieve original email data</subtask>
+      </task>
+      <task id="3" title="Implement Index Persistence">
+        <subtask id="3.1">Create SearchIndex schema for storing serialized index in RxDB</subtask>
+        <subtask id="3.2">Implement saveIndex() method to persist serialized Lunr index</subtask>
+        <subtask id="3.3">Implement loadIndex() method to restore index from storage</subtask>
+        <subtask id="3.4">Add index metadata (version, lastBuilt, documentCount)</subtask>
+        <subtask id="3.5">Implement shouldRebuild() check based on age and document count delta</subtask>
+      </task>
+      <task id="4" title="Implement Incremental Index Updates">
+        <subtask id="4.1">Implement addDocument(email) method for single email addition</subtask>
+        <subtask id="4.2">Implement removeDocument(emailId) method for email deletion</subtask>
+        <subtask id="4.3">Implement updateDocument(email) method for email updates</subtask>
+        <subtask id="4.4">Hook into sync service to update index on new emails</subtask>
+        <subtask id="4.5">Batch updates for performance (debounce rapid additions)</subtask>
+      </task>
+      <task id="5" title="Create Search Hook">
+        <subtask id="5.1">Create useSearch hook returning { query, setQuery, results, isSearching, error }</subtask>
+        <subtask id="5.2">Implement debounced search (300ms delay for typing)</subtask>
+        <subtask id="5.3">Return search results with relevance scores</subtask>
+        <subtask id="5.4">Handle empty query state</subtask>
+        <subtask id="5.5">Track search performance metrics (&lt;100ms target)</subtask>
+      </task>
+      <task id="6" title="Create Search UI Components">
+        <subtask id="6.1">Create SearchInput component with keyboard focus (/)</subtask>
+        <subtask id="6.2">Create SearchResults container with virtualized list for performance</subtask>
+        <subtask id="6.3">Create SearchResultItem with highlighted matches and preview snippet</subtask>
+        <subtask id="6.4">Implement search operators help tooltip (AND, OR, "exact")</subtask>
+        <subtask id="6.5">Show "No results" state with suggestions</subtask>
+      </task>
+      <task id="7" title="Create Command Palette Integration">
+        <subtask id="7.1">Create CommandPalette component (Cmd+K to open)</subtask>
+        <subtask id="7.2">Integrate search into command palette</subtask>
+        <subtask id="7.3">Add keyboard navigation in results (up/down arrows, Enter to select)</subtask>
+        <subtask id="7.4">Implement recent searches history (last 10)</subtask>
+        <subtask id="7.5">Support quick actions from search (archive, mark read, etc.)</subtask>
+      </task>
+      <task id="8" title="Add Search to Header/Navigation">
+        <subtask id="8.1">Add search icon/button to header</subtask>
+        <subtask id="8.2">Create searchStore for global search state (isOpen, query, results)</subtask>
+        <subtask id="8.3">Implement global keyboard shortcut (/) to focus search</subtask>
+        <subtask id="8.4">Navigate to /search route when search is active</subtask>
+        <subtask id="8.5">Persist search query in URL for shareability</subtask>
+      </task>
+      <task id="9" title="Implement Search Result Highlighting">
+        <subtask id="9.1">Create highlightMatches(text, query) utility function</subtask>
+        <subtask id="9.2">Create HighlightedText component for rendering matched terms</subtask>
+        <subtask id="9.3">Generate context snippet (50 chars before/after match)</subtask>
+        <subtask id="9.4">Handle multiple match highlighting</subtask>
+        <subtask id="9.5">Sanitize HTML in snippets to prevent XSS</subtask>
+      </task>
+      <task id="10" title="Testing">
+        <subtask id="10.1">Write unit tests for SearchIndexService (build, search, incremental)</subtask>
+        <subtask id="10.2">Write unit tests for useSearch hook</subtask>
+        <subtask id="10.3">Write unit tests for search highlighting</subtask>
+        <subtask id="10.4">Write E2E test for search flow (type query, see results, click result)</subtask>
+        <subtask id="10.5">Write performance benchmark test (100ms target)</subtask>
+        <subtask id="10.6">Test offline search functionality</subtask>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC1" category="Search Performance">Search results return in &lt;100ms for 100K emails</criterion>
+    <criterion id="AC2" category="Search Performance">Search works completely offline without network dependency</criterion>
+    <criterion id="AC3" category="Search Features">Users can search by subject, sender email/name, body content, and recipients</criterion>
+    <criterion id="AC4" category="Search Features">Search supports operators: AND (default), OR, exact phrases ("quoted text")</criterion>
+    <criterion id="AC5" category="Search Features">Search results are ranked by relevance with matched terms highlighted</criterion>
+    <criterion id="AC6" category="Search UI">Search input accessible via keyboard shortcut (/) and command palette (Cmd+K)</criterion>
+    <criterion id="AC7" category="Search UI">Search results show preview snippet with highlighted matches</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/architecture.md" title="Architecture Decision Document" section="Cross-Cutting Concerns - Search Implementation">
+        Use Lunr.js for client-side full-text search. Build index on initial sync. Incremental updates on new emails. Store index in IndexedDB for persistence. Rebuild weekly (background task).
+      </doc>
+      <doc path="docs/technical-decisions/adr-008-search-architecture.md" title="ADR-008: Search Architecture" section="Full document">
+        Selected RxDB FlexSearch Plugin (Premium) for 10x faster performance. Story references Lunr.js as per architecture.md cross-cutting concerns. Target: search latency P95 &lt;100ms for 10K+ emails, BM25 ranking, fuzzy matching, highlight search terms.
+      </doc>
+      <doc path="docs/PRD.md" title="Product Requirements Document" section="FR008, NFR001">
+        FR008: Local full-text search with instant results (&lt;100ms) across all stored messages. NFR001: Sub-50ms input latency for 95% of user interactions.
+      </doc>
+      <doc path="docs/epics/epic-2-offline-first-email-client-with-attributes.md" title="Epic 2" section="Story 2.5">
+        Search input in UI (keyboard shortcut: cmd/ctrl+k). Full-text search across sender, subject, body. Results returned in &lt;100ms. Search highlights matching terms. Filters: date range, sender, has attachment.
+      </doc>
+      <doc path="docs/testing.md" title="Testing Infrastructure" section="Performance Benchmarks">
+        Performance tests tagged with @perf. Query 1000 emails sorted threshold: &lt;100ms (NFR001). Mock email data available in src/services/sync/__mocks__/mockEmailData.ts.
+      </doc>
+    </docs>
+    <code>
+      <artifact path="src/services/database/schemas/email.schema.ts" kind="schema" symbol="EmailDocument, emailSchema" reason="Email document structure - search will index fields: subject, from.name, from.email, body.text/html, to[].name/email. Use EmailDocument interface for type safety."/>
+      <artifact path="src/services/database/init.ts" kind="service" symbol="initDatabase, getDatabase" reason="Database initialization and access. Use getDatabase() to get RxDB instance. New SearchIndex collection can be added via migrations."/>
+      <artifact path="src/services/logger/index.ts" kind="service" symbol="logger" reason="Logger service for search operations. Use logger.debug('search', message) pattern for search logging."/>
+      <artifact path="src/hooks/useEmails.ts" kind="hook" symbol="useEmails, useEmail" reason="Pattern reference for creating useSearch hook. Shows RxDB reactive query subscription pattern."/>
+      <artifact path="src/store/emailListStore.ts" kind="store" symbol="useEmailListStore" reason="Pattern reference for creating searchStore. Shows Zustand store with localStorage persistence."/>
+      <artifact path="src/services/sync/__mocks__/mockEmailData.ts" kind="test-helper" symbol="generateMockEmails" reason="Mock email data generator for search tests. Can generate 100K+ emails for performance testing."/>
+      <artifact path="src/shared/components/ui/button.tsx" kind="component" reason="Existing shadcn/ui components. Use same pattern for search UI components."/>
+      <artifact path="src/components/email/VirtualEmailList.tsx" kind="component" reason="Virtualization pattern using react-window. Use same approach for SearchResults virtualization."/>
+    </code>
+    <dependencies>
+      <existing>
+        <dep name="react" version="19.2" usage="Core UI framework"/>
+        <dep name="zustand" version="^5.0.8" usage="State management for searchStore"/>
+        <dep name="rxdb" version="^16.20.0" usage="Local database for email storage and optional index persistence"/>
+        <dep name="dompurify" version="^3.3.0" usage="HTML sanitization for search result snippets (XSS prevention)"/>
+        <dep name="@tanstack/react-virtual" version="^3.13.12" usage="Virtualization for SearchResults list"/>
+        <dep name="lucide-react" version="^0.552.0" usage="Icons for search UI (Search, X, etc.)"/>
+        <dep name="tailwindcss" version="^4.1.16" usage="Styling for search components"/>
+        <dep name="class-variance-authority" version="^0.7.1" usage="Component variant styling"/>
+        <dep name="clsx" version="^2.1.1" usage="Conditional class name merging"/>
+        <dep name="tailwind-merge" version="^3.3.1" usage="Tailwind class merging utility"/>
+      </existing>
+      <toInstall>
+        <dep name="lunr" version="^2.3.9" usage="Full-text search index (architecture.md specifies Lunr.js)"/>
+        <dep name="@types/lunr" version="^2.3.7" dev="true" usage="TypeScript types for Lunr.js"/>
+      </toInstall>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint category="architecture">Search service must be in src/services/search/ per architecture project structure</constraint>
+    <constraint category="architecture">Search hook must be in src/hooks/useSearch.ts per naming conventions</constraint>
+    <constraint category="architecture">Search store must be in src/store/searchStore.ts per naming conventions</constraint>
+    <constraint category="architecture">Search components must be in src/components/search/ directory</constraint>
+    <constraint category="performance">Search must complete in &lt;100ms for 100K emails (FR008)</constraint>
+    <constraint category="performance">Index build must complete in &lt;5s for 100K emails</constraint>
+    <constraint category="offline">Search must work 100% offline - no network requests allowed</constraint>
+    <constraint category="security">HTML snippets must be sanitized with DOMPurify to prevent XSS (as per architecture.md)</constraint>
+    <constraint category="ux">Debounce search input by 300ms to avoid excessive queries</constraint>
+    <constraint category="library">Use Lunr.js as specified in architecture.md cross-cutting concerns</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface name="EmailDocument" kind="type" path="src/services/database/schemas/email.schema.ts">
+      Email document with fields: id, subject, from (EmailAddress), to (EmailAddress[]), body (EmailBody), timestamp, snippet. Search will index these fields.
+    </interface>
+    <interface name="logger" kind="function" path="src/services/logger/index.ts">
+      logger.debug(category, message, context?) - Use 'search' category for search operations.
+    </interface>
+    <interface name="getDatabase" kind="function" path="src/services/database/init.ts">
+      Returns typed AppDatabase instance with collections. New searchIndex collection needs migration.
+    </interface>
+    <interface name="lunr.Index" kind="library" signature="lunr(function() { this.ref('id'); this.field('subject', {boost: 10}); ... })">
+      Lunr.js index builder. Configure fields with boost values. Search with index.search(query).
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Vitest for unit tests. Playwright for E2E tests. Tag performance tests with @perf. Place unit tests in __tests__ directories adjacent to source files. Mock external dependencies. Use generateMockEmails() for test data.
+    </standards>
+    <locations>
+      <location>src/services/search/__tests__/searchIndexService.test.ts</location>
+      <location>src/hooks/__tests__/useSearch.test.ts</location>
+      <location>src/components/search/__tests__/SearchInput.test.tsx</location>
+      <location>e2e/search.spec.ts</location>
+    </locations>
+    <ideas>
+      <idea ac="AC1">@perf test: Build index with 100K emails, measure time &lt;5s. Search 100 queries, measure p95 &lt;100ms.</idea>
+      <idea ac="AC2">Test search works in offline mode: disconnect network, verify search still returns results.</idea>
+      <idea ac="AC3">Test search finds emails by subject, from.name, from.email, body.text, to[].email - verify all fields indexed.</idea>
+      <idea ac="AC4">Test Lunr operators: AND ("budget meeting"), OR ("budget OR meeting"), exact ("\"budget meeting\"").</idea>
+      <idea ac="AC5">Test results sorted by relevance score. Test highlighted matches contain &lt;mark&gt; tags.</idea>
+      <idea ac="AC6">E2E: Press /, verify search input focused. Press Cmd+K, verify command palette opens.</idea>
+      <idea ac="AC7">Test snippet generation: result.highlights.body contains 50 chars before/after match.</idea>
+    </ideas>
+  </tests>
+</story-context>

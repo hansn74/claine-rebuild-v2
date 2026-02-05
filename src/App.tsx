@@ -163,6 +163,52 @@ function useGlobalShortcuts({
   }, [enabled, onShowHelp])
 }
 
+/**
+ * Story 2.18 (AC 8): Toast notification for background send results.
+ * Shown on app startup when the service worker sent emails while the tab was closed.
+ */
+function BackgroundSendToast({
+  result,
+  onDismiss,
+}: {
+  result: { status: 'sent' | 'failed'; recipients: string; error?: string }
+  onDismiss: () => void
+}) {
+  useEffect(() => {
+    const timer = setTimeout(onDismiss, result.status === 'sent' ? 4000 : 6000)
+    return () => clearTimeout(timer)
+  }, [onDismiss, result.status])
+
+  const isSent = result.status === 'sent'
+
+  return (
+    <div
+      className={cn(
+        'flex items-center gap-3 px-4 py-2.5 bg-white rounded-xl shadow-md animate-in fade-in slide-in-from-top-2',
+        isSent ? 'border border-slate-200' : 'border border-red-200'
+      )}
+      role={isSent ? 'status' : 'alert'}
+      aria-live={isSent ? 'polite' : 'assertive'}
+    >
+      <span
+        className={cn('w-2 h-2 rounded-full flex-shrink-0', isSent ? 'bg-green-500' : 'bg-red-500')}
+      />
+      <span className="text-sm text-slate-700">
+        {isSent
+          ? `Email to ${result.recipients} sent in background`
+          : `Failed to send to ${result.recipients}`}
+      </span>
+      <button
+        onClick={onDismiss}
+        className="ml-2 text-slate-400 hover:text-slate-600 text-sm"
+        aria-label="Dismiss"
+      >
+        &times;
+      </button>
+    </div>
+  )
+}
+
 function App() {
   const { initialized, loading, error, setInitialized, setLoading, setError } = useDatabaseStore()
   const activeAccountId = useAccountStore((state) => state.activeAccountId)
@@ -193,6 +239,10 @@ function App() {
   const [demoMode, setDemoMode] = useState(false)
   // Account settings modal state
   const [showAccountSettings, setShowAccountSettings] = useState(false)
+  // Story 2.18: Background send result notifications (AC 8)
+  const [bgSendResults, setBgSendResults] = useState<
+    Array<{ id: string; status: 'sent' | 'failed'; recipients: string; error?: string }>
+  >([])
 
   // Subscribe to folder unread counts (Story 2.9)
   useFolderCounts()
@@ -270,6 +320,36 @@ function App() {
 
         // Initialize debug helpers for development testing
         initDebugHelpers()
+
+        // Story 2.18 (Task 2.2): Register service worker for Background Sync
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker
+            .register('/sw.js', { scope: '/' })
+            .then((reg) => {
+              logger.info('app', 'Service worker registered', { scope: reg.scope })
+            })
+            .catch((err) => {
+              logger.warn('app', 'Service worker registration failed', { error: err })
+            })
+        }
+
+        // Story 2.18 (Task 4.3, AC 8): Show background send results from previous session
+        import('@/services/sync/backgroundSyncResults').then(async ({ backgroundSyncResults }) => {
+          const results = await backgroundSyncResults.getUnacknowledgedResults()
+          if (results.length > 0) {
+            logger.info('app', 'Background send results found', { count: results.length })
+            setBgSendResults(
+              results.map((r) => ({
+                id: r.queueItemId,
+                status: r.status,
+                recipients: r.recipients,
+                error: r.error,
+              }))
+            )
+            await backgroundSyncResults.acknowledgeResults(results.map((r) => r.queueItemId))
+          }
+        })
+
         setInitialized(true)
       } catch (err) {
         // Story 1.20: Database health signal on failure
@@ -819,6 +899,21 @@ function App() {
 
           {/* Undo toast (fixed position, bottom-right) - outside main container for proper fixed positioning */}
           <UndoToast />
+
+          {/* Story 2.18 (AC 8): Background send result notifications */}
+          {bgSendResults.length > 0 && (
+            <div className="fixed top-4 left-1/2 -translate-x-1/2 z-40 flex flex-col gap-2">
+              {bgSendResults.map((result) => (
+                <BackgroundSendToast
+                  key={result.id}
+                  result={result}
+                  onDismiss={() =>
+                    setBgSendResults((prev) => prev.filter((r) => r.id !== result.id))
+                  }
+                />
+              ))}
+            </div>
+          )}
 
           <div className="h-screen flex flex-col">
             {/* Re-auth notifications (fixed position, top-right) */}

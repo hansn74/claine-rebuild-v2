@@ -1,0 +1,421 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Story Context: 2-2-thread-detail-view-with-conversation-history
+  Generated: 2025-11-28
+  Purpose: Provides complete technical context for dev agent implementation
+-->
+<story-context>
+  <metadata>
+    <epic_id>2</epic_id>
+    <story_id>2.2</story_id>
+    <story_title>Thread Detail View with Conversation History</story_title>
+    <status>ready-for-dev</status>
+    <estimated_effort>8 hours</estimated_effort>
+    <prerequisites>Story 2.1 complete (Virtualized Inbox Rendering)</prerequisites>
+  </metadata>
+
+  <user_story>
+    <as_a>user</as_a>
+    <i_want>to see full conversation threads</i_want>
+    <so_that>I can understand email context and history</so_that>
+  </user_story>
+
+  <acceptance_criteria>
+    <ac id="1">Thread detail view shows all messages in conversation order (chronological, oldest first)</ac>
+    <ac id="2">Messages grouped by sender/time proximity (messages from same sender within 5 minutes grouped)</ac>
+    <ac id="3">Quoted text collapsed by default with expand option (detect > or blockquote patterns)</ac>
+    <ac id="4">Attachments displayed with icons and download buttons</ac>
+    <ac id="5">Inline images rendered with lazy loading (only load when visible in viewport)</ac>
+    <ac id="6">Email headers accessible (from, to, cc, bcc, date) - expandable header section</ac>
+  </acceptance_criteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/PRD.md" relevance="high">Product requirements - FR006, FR031, FR033, NFR001</doc>
+      <doc path="docs/architecture.md" relevance="high">Architecture decisions - RxDB, DOMPurify, lazy loading patterns</doc>
+      <doc path="docs/epics/epic-2-offline-first-email-client-with-attributes.md" relevance="high">Epic 2 overview and story requirements</doc>
+      <doc path="docs/stories/2-1-virtualized-inbox-rendering.md" relevance="high">Previous story - patterns and learnings to follow</doc>
+      <doc path="docs/research/email-xss-prevention-research.md" relevance="high">Security research - DOMPurify implementation guidance</doc>
+    </docs>
+
+    <existing_code>
+      <!-- Database Schemas -->
+      <file path="src/services/database/schemas/email.schema.ts" relevance="critical">
+        <description>Email document schema with EmailAddress, EmailBody, Attachment types</description>
+        <key_types>
+          - EmailDocument: Full email structure with from, to, cc, bcc, body, attachments
+          - EmailAddress: { name: string, email: string }
+          - EmailBody: { html?: string, text?: string }
+          - Attachment: { id, filename, mimeType, size, isInline, contentId? }
+        </key_types>
+        <indexes>timestamp, folder, [accountId, timestamp], threadId</indexes>
+      </file>
+
+      <file path="src/services/database/schemas/thread.schema.ts" relevance="high">
+        <description>Thread document schema for conversation grouping</description>
+        <key_types>
+          - ThreadDocument: { id, subject, participants, messageCount, lastMessageDate, snippet, read, accountId }
+        </key_types>
+        <note>Query emails by threadId to get all messages in a thread</note>
+      </file>
+
+      <file path="src/services/database/init.ts" relevance="medium">
+        <description>Database initialization with getDatabase() function</description>
+        <usage>import { getDatabase } from '@/services/database/init'</usage>
+      </file>
+
+      <!-- Existing Components -->
+      <file path="src/components/email/EmailDetail.tsx" relevance="critical">
+        <description>Current single email display - to be extended/replaced by ThreadDetailView</description>
+        <features>
+          - Displays email header (from, to, cc, date)
+          - Shows attachments with icons and size
+          - Renders HTML body with dangerouslySetInnerHTML (needs sanitization)
+          - formatFullDate() and formatAddress() helper functions
+        </features>
+        <note>Use as reference for styling and layout patterns</note>
+      </file>
+
+      <file path="src/components/email/VirtualEmailList.tsx" relevance="high">
+        <description>Virtualized email list from Story 2.1</description>
+        <patterns>
+          - Uses @tanstack/react-virtual for virtualization
+          - Uses useEmails hook for reactive data
+          - Uses useEmailListStore for scroll persistence
+          - LoadingState, ErrorState, EmptyState components
+          - Logger integration: logger.debug('ui', 'message', context)
+        </patterns>
+      </file>
+
+      <file path="src/components/email/EmailRow.tsx" relevance="medium">
+        <description>Memoized email row component</description>
+        <patterns>
+          - React.memo for performance optimization
+          - cn() utility for conditional classnames
+          - formatDate() for relative timestamps
+          - getSenderDisplay() for sender name/email
+          - Accessibility: role="button", tabIndex, onKeyDown
+        </patterns>
+      </file>
+
+      <!-- Hooks -->
+      <file path="src/hooks/useEmails.ts" relevance="high">
+        <description>Reactive email queries from RxDB</description>
+        <exports>
+          - useEmails(options): { emails, loading, error, count }
+          - useEmail(emailId): { email, loading, error }
+        </exports>
+        <pattern>
+          Subscribe to RxDB observable for real-time updates
+          Uses db.emails.find({ selector, sort }).$.subscribe()
+        </pattern>
+        <note>Create similar useThread hook following this pattern</note>
+      </file>
+
+      <!-- Store -->
+      <file path="src/store/emailListStore.ts" relevance="medium">
+        <description>Zustand store for email list UI state</description>
+        <pattern>
+          - Zustand create() with localStorage persistence
+          - Logger integration for state changes
+          - Expose store for E2E testing in DEV mode
+        </pattern>
+      </file>
+
+      <!-- Logger -->
+      <file path="src/services/logger/index.ts" relevance="medium">
+        <usage>import { logger } from '@/services/logger'</usage>
+        <examples>
+          - logger.debug('ui', 'Component rendered', { count: 5 })
+          - logger.info('sync', 'Sync completed', { duration: 100 })
+          - logger.error('db', 'Query failed', { error })
+        </examples>
+      </file>
+
+      <!-- Utilities -->
+      <file path="src/shared/utils/cn.ts" relevance="medium">
+        <usage>import { cn } from '@shared/utils/cn'</usage>
+        <description>Conditional classname utility (clsx + tailwind-merge)</description>
+      </file>
+    </existing_code>
+
+    <test_patterns>
+      <unit_tests>
+        <file path="src/components/email/__tests__/VirtualEmailList.test.tsx">
+          <patterns>
+            - Mock useEmails hook with vi.mock()
+            - Mock stores with vi.mock()
+            - Mock logger to suppress output
+            - generateMockEmails(count) helper function
+            - Test loading, empty, error states
+            - Test virtualized rendering structure
+          </patterns>
+        </file>
+      </unit_tests>
+
+      <e2e_tests>
+        <file path="e2e/email-list-performance.spec.ts">
+          <patterns>
+            - generateMockEmailScript() for injecting test data
+            - setupPerformancePage() helper
+            - page.evaluate() for DOM queries
+            - Performance thresholds config object
+            - @perf tag for filtering
+            - waitForSelector with timeout and catch fallback
+          </patterns>
+        </file>
+      </e2e_tests>
+
+      <testing_standards>
+        - Vitest for unit tests with @testing-library/react
+        - Playwright for E2E tests
+        - Run: npm run test (unit), npm run test:e2e (e2e)
+        - Coverage: npm run test:coverage
+        - Target: All ACs must have corresponding tests
+      </testing_standards>
+    </test_patterns>
+  </artifacts>
+
+  <dependencies>
+    <installed>
+      <dep name="@tanstack/react-virtual" version="^3.13.12">Virtualization library</dep>
+      <dep name="rxdb" version="^16.20.0">Reactive database</dep>
+      <dep name="rxjs" version="^7.8.2">Reactive extensions for RxDB subscriptions</dep>
+      <dep name="zustand" version="^5.0.8">State management</dep>
+      <dep name="react" version="19.2">React framework</dep>
+      <dep name="clsx" version="^2.1.1">Classname utility</dep>
+      <dep name="tailwind-merge" version="^3.3.1">Tailwind class merging</dep>
+      <dep name="lucide-react" version="^0.552.0">Icons</dep>
+    </installed>
+
+    <to_install>
+      <dep name="dompurify" version="latest">HTML sanitization for XSS prevention</dep>
+      <dep name="@types/dompurify" version="latest" dev="true">TypeScript types for DOMPurify</dep>
+    </to_install>
+  </dependencies>
+
+  <implementation_guidance>
+    <task id="1" title="Create Thread Data Hook">
+      <files>
+        <new>src/hooks/useThread.ts</new>
+        <modify>src/hooks/index.ts (update exports if exists)</modify>
+      </files>
+      <guidance>
+        Follow useEmails.ts pattern exactly:
+        - Query emails by threadId using db.emails.find({ selector: { threadId } })
+        - Sort by timestamp ASC (oldest first for chronological order)
+        - Return { emails, loading, error, threadSubject }
+        - Use RxDB observable subscription for reactivity
+      </guidance>
+      <code_reference>
+        See story file Technical Notes section for useThread implementation pattern
+      </code_reference>
+    </task>
+
+    <task id="2" title="Create ThreadDetailView Component">
+      <files>
+        <new>src/components/email/ThreadDetailView.tsx</new>
+        <modify>src/components/email/index.ts</modify>
+      </files>
+      <guidance>
+        - Use useThread hook to fetch thread emails
+        - Display thread header: subject, participant count, message count
+        - Render ThreadMessage components for each email
+        - Handle empty/loading/error states like VirtualEmailList
+        - Use logger.debug('ui', ...) for performance tracking
+      </guidance>
+    </task>
+
+    <task id="3" title="Create ThreadMessage Component">
+      <files>
+        <new>src/components/email/ThreadMessage.tsx</new>
+      </files>
+      <guidance>
+        - Display sender avatar (first letter of name/email)
+        - Collapsible message body (collapsed by default except last message)
+        - Relative timestamp formatting (reuse formatDate from EmailRow)
+        - Use React.memo for performance
+        - Accessibility: proper ARIA for expandable sections
+      </guidance>
+    </task>
+
+    <task id="4" title="Implement Message Grouping">
+      <files>
+        <new>src/utils/threadGrouping.ts</new>
+        <modify>src/components/email/ThreadDetailView.tsx</modify>
+      </files>
+      <guidance>
+        - Group messages from same sender within 5 minutes
+        - Return MessageGroup[] with sender and messages array
+        - Show group header with sender info only once per group
+        - Visual separation between groups (border, margin)
+      </guidance>
+      <code_reference>
+        See story file Technical Notes for groupMessagesBySender() implementation
+      </code_reference>
+    </task>
+
+    <task id="5" title="Implement Quoted Text Handling">
+      <files>
+        <new>src/utils/quotedTextParser.ts</new>
+        <new>src/components/email/QuotedText.tsx</new>
+      </files>
+      <guidance>
+        - Detect > prefixed lines in plain text
+        - Detect blockquote elements in HTML using DOMParser
+        - Return { mainContent, quotedContent, hasQuotedText }
+        - QuotedText component: collapsed by default with "Show quoted text" link
+        - Use state to toggle expand/collapse
+      </guidance>
+      <code_reference>
+        See story file Technical Notes for parseQuotedText() implementation
+      </code_reference>
+    </task>
+
+    <task id="6" title="Implement Attachment Display">
+      <files>
+        <new>src/components/email/AttachmentList.tsx</new>
+        <new>src/components/email/AttachmentItem.tsx</new>
+      </files>
+      <guidance>
+        - Display file icon based on MIME type (use lucide-react icons)
+        - Show filename truncated with full name on hover
+        - Format file size (KB/MB)
+        - Download button (placeholder - actual download in Story 2.8)
+        - Hover states and accessibility
+      </guidance>
+      <mime_type_icons>
+        - application/pdf: FileText
+        - image/*: Image
+        - text/*: FileText
+        - application/zip: Archive
+        - default: File
+      </mime_type_icons>
+    </task>
+
+    <task id="7" title="Implement Inline Image Lazy Loading">
+      <files>
+        <new>src/components/email/InlineImage.tsx</new>
+        <new>src/utils/inlineImageHandler.ts</new>
+      </files>
+      <guidance>
+        - Use IntersectionObserver for viewport detection
+        - Show skeleton placeholder while loading
+        - Handle load errors with fallback UI
+        - Map contentId to inline attachment src
+        - Use React refs for observer cleanup
+      </guidance>
+      <code_reference>
+        See story file Technical Notes for InlineImage component implementation
+      </code_reference>
+    </task>
+
+    <task id="8" title="Implement Expandable Headers">
+      <files>
+        <new>src/components/email/ExpandableHeader.tsx</new>
+      </files>
+      <guidance>
+        - Compact view: From, Date only
+        - Expanded view: From, To, CC, BCC, Date
+        - Toggle on click with visual indicator (chevron icon)
+        - Persist expanded state per message during session (useState)
+        - Accessibility: aria-expanded attribute
+      </guidance>
+    </task>
+
+    <task id="9" title="HTML Sanitization">
+      <files>
+        <new>src/utils/sanitizeHtml.ts</new>
+      </files>
+      <guidance>
+        - Install dompurify: npm install dompurify && npm install -D @types/dompurify
+        - Configure ALLOWED_TAGS for email content (p, br, strong, em, a, img, ul, ol, li, table, blockquote, etc.)
+        - Strip dangerous elements: script, iframe, object, embed, form
+        - Block dangerous attributes: onerror, onclick, onload
+        - ALLOW_DATA_ATTR: false for security
+      </guidance>
+      <security_note>
+        Critical: All HTML email content MUST be sanitized before rendering with dangerouslySetInnerHTML
+        Reference: docs/research/email-xss-prevention-research.md
+      </security_note>
+      <code_reference>
+        See story file Technical Notes for sanitizeEmailHtml() implementation
+      </code_reference>
+    </task>
+
+    <task id="10" title="Update EmailList Integration">
+      <files>
+        <modify>src/components/email/EmailList.tsx</modify>
+      </files>
+      <guidance>
+        - Pass threadId instead of single email to detail view
+        - Update selection logic to work with threads
+        - Ensure scroll position preservation still works
+      </guidance>
+    </task>
+
+    <task id="11" title="Testing and Performance">
+      <files>
+        <new>src/components/email/__tests__/ThreadDetailView.test.tsx</new>
+        <new>src/components/email/__tests__/ThreadMessage.test.tsx</new>
+        <new>src/components/email/__tests__/QuotedText.test.tsx</new>
+        <new>src/components/email/__tests__/AttachmentList.test.tsx</new>
+        <new>e2e/thread-detail-view.spec.ts</new>
+      </files>
+      <guidance>
+        - Test each component independently
+        - Mock RxDB queries in unit tests
+        - Test quoted text parsing with various formats
+        - E2E: test thread navigation and expansion
+        - Performance: measure render time for 20-message thread (target: &lt;50ms)
+      </guidance>
+    </task>
+  </implementation_guidance>
+
+  <constraints>
+    <performance>
+      - NFR001: Sub-50ms UI interactions
+      - Thread with 20 messages must render in &lt;50ms
+      - Use React.memo for message components
+      - Lazy load images with IntersectionObserver
+    </performance>
+    <security>
+      - All HTML content MUST be sanitized with DOMPurify
+      - No inline scripts, iframes, forms allowed
+      - Block data: URIs in src attributes
+    </security>
+    <accessibility>
+      - Expandable sections need aria-expanded
+      - Keyboard navigation for message expansion
+      - Focus management when expanding/collapsing
+    </accessibility>
+  </constraints>
+
+  <learnings_from_previous_story>
+    <story id="2.1" title="Virtualized Inbox Rendering">
+      <learning>Logger Service: Use `import { logger } from '@/services/logger'` with 'ui' category for component logs</learning>
+      <learning>Performance Logging: Log render times for debugging performance issues</learning>
+      <learning>ErrorBoundary: Wrap components in ErrorBoundary for graceful error handling</learning>
+      <learning>Store pattern: Follow existing emailListStore pattern for any UI state persistence</learning>
+      <learning>Memoization: Use React.memo and useCallback for performance-critical components</learning>
+      <learning>Test patterns: Generate mock data with helper functions, mock hooks and stores</learning>
+    </story>
+  </learnings_from_previous_story>
+
+  <definition_of_done>
+    <item>All acceptance criteria (AC 1-6) validated</item>
+    <item>All tasks completed with subtasks checked off</item>
+    <item>Thread displays all messages in chronological order</item>
+    <item>Message grouping by sender/time working</item>
+    <item>Quoted text collapsed with expand option</item>
+    <item>Attachments displayed with icons</item>
+    <item>Inline images lazy loaded</item>
+    <item>Email headers expandable</item>
+    <item>HTML properly sanitized with DOMPurify</item>
+    <item>Unit tests passing</item>
+    <item>E2E tests created</item>
+    <item>Performance benchmark: &lt;50ms render for 20-message thread</item>
+    <item>No TypeScript errors</item>
+    <item>No new ESLint warnings</item>
+  </definition_of_done>
+</story-context>

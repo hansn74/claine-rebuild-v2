@@ -125,6 +125,9 @@ export function useQueueProcessor(config: QueueProcessorConfig = {}): void {
       // Small delay to ensure network is stable
       const timer = setTimeout(() => {
         processQueue()
+
+        // Story 2.18 (Task 6.2): Re-register Background Sync on network recovery
+        sendQueueService.registerBackgroundSync()
       }, 2000)
 
       return () => clearTimeout(timer)
@@ -132,6 +135,53 @@ export function useQueueProcessor(config: QueueProcessorConfig = {}): void {
 
     wasOnlineRef.current = isOnline
   }, [isOnline, opts.enabled, processQueue])
+
+  // Story 2.18 (Task 2.8): Fallback for non-Chromium browsers without Background Sync
+  // Process queue on visibility change (tab becomes visible) and focus events.
+  // Debounced to avoid redundant DB queries from rapid tab/window switching.
+  useEffect(() => {
+    if (!opts.enabled) return
+
+    const hasBackgroundSync = 'serviceWorker' in navigator && 'SyncManager' in window
+
+    // Only needed when Background Sync is NOT available
+    if (hasBackgroundSync) return
+
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null
+
+    const debouncedProcessQueue = () => {
+      if (debounceTimer !== null) {
+        clearTimeout(debounceTimer)
+      }
+      debounceTimer = setTimeout(() => {
+        debounceTimer = null
+        processQueue()
+      }, 1000)
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        logger.debug('queueProcessor', 'Tab visible (no Background Sync), processing queue')
+        debouncedProcessQueue()
+      }
+    }
+
+    const handleFocus = () => {
+      logger.debug('queueProcessor', 'Window focused (no Background Sync), processing queue')
+      debouncedProcessQueue()
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('focus', handleFocus)
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('focus', handleFocus)
+      if (debounceTimer !== null) {
+        clearTimeout(debounceTimer)
+      }
+    }
+  }, [opts.enabled, processQueue])
 
   // Set up polling interval for periodic processing
   useEffect(() => {
