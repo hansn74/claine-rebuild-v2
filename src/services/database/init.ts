@@ -4,6 +4,7 @@ import { getRxStorageDexie } from 'rxdb/plugins/storage-dexie'
 import { RxDBUpdatePlugin } from 'rxdb/plugins/update'
 import { RxDBQueryBuilderPlugin } from 'rxdb/plugins/query-builder'
 import { RxDBDevModePlugin } from 'rxdb/plugins/dev-mode'
+import { RxDBMigrationSchemaPlugin } from 'rxdb/plugins/migration-schema'
 import { wrappedValidateAjvStorage } from 'rxdb/plugins/validate-ajv'
 import type { AppDatabase } from './types'
 import {
@@ -27,6 +28,7 @@ import { logger } from '@/services/logger'
 // Add required plugins (must be synchronous)
 addRxPlugin(RxDBUpdatePlugin)
 addRxPlugin(RxDBQueryBuilderPlugin)
+addRxPlugin(RxDBMigrationSchemaPlugin)
 
 // Enable dev-mode in development for better error messages and schema validation
 // Note: Dev-mode + AJV caused hangs with Dexie storage, but works with memory storage
@@ -163,13 +165,25 @@ export async function initDatabase(dbName: string = DATABASE_NAME): Promise<AppD
         collectionsToCreate.contacts = { schema: contactSchema }
       }
       if (!typedDb.sendQueue) {
-        collectionsToCreate.sendQueue = { schema: sendQueueSchema }
+        collectionsToCreate.sendQueue = {
+          schema: sendQueueSchema,
+          migrationStrategies: {
+            // v0 → v1: Added idempotencyKey and lastProcessedBy for Story 2.18 background sync
+            1: (oldDoc: any) => oldDoc,
+          },
+        }
       }
       if (!typedDb.searchIndex) {
         collectionsToCreate.searchIndex = { schema: searchIndexSchema }
       }
       if (!typedDb.modifiers) {
-        collectionsToCreate.modifiers = { schema: modifierSchema }
+        collectionsToCreate.modifiers = {
+          schema: modifierSchema,
+          migrationStrategies: {
+            // v0 → v1: Added optional threadId for Story 2.19 thread-level dependency grouping
+            1: (oldDoc: any) => oldDoc,
+          },
+        }
       }
 
       if (Object.keys(collectionsToCreate).length > 0) {

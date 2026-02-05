@@ -85,6 +85,10 @@ export interface SendQueueDocument {
   // Error tracking
   error?: string // Last error message if failed
 
+  // Story 2.18: Idempotency and duplicate prevention (Task 3)
+  idempotencyKey?: string // Unique key to prevent duplicate sends
+  lastProcessedBy?: 'app' | 'sw' // Which context last processed this item
+
   // Timestamps
   createdAt: number // Unix timestamp (ms) when queued
   updatedAt: number // Unix timestamp (ms) of last update
@@ -101,7 +105,7 @@ export interface SendQueueDocument {
  * - ['status', 'createdAt']: Compound index for pending queue processing
  */
 export const sendQueueSchema: RxJsonSchema<SendQueueDocument> = {
-  version: 0,
+  version: 1,
   primaryKey: 'id',
   type: 'object',
   properties: {
@@ -267,6 +271,15 @@ export const sendQueueSchema: RxJsonSchema<SendQueueDocument> = {
     error: {
       type: 'string',
       maxLength: 2000,
+    },
+    idempotencyKey: {
+      type: 'string',
+      maxLength: 100,
+    },
+    lastProcessedBy: {
+      type: 'string',
+      enum: ['app', 'sw'],
+      maxLength: 10,
     },
     createdAt: {
       type: 'number',
