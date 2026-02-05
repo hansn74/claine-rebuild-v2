@@ -27,21 +27,28 @@ export interface SettingsState {
   logLevel: 'debug' | 'info' | 'warn' | 'error' | null
   /** Theme preference */
   theme: 'light' | 'dark' | 'system'
+  /** Whether to show keyboard shortcut hints on buttons (Story 2.23) */
+  showKeyboardHints: boolean
 
   // Actions
   setErrorTrackingEnabled: (enabled: boolean) => void
   setLogLevel: (level: SettingsState['logLevel']) => void
   setTheme: (theme: SettingsState['theme']) => void
+  setShowKeyboardHints: (show: boolean) => void
   resetSettings: () => void
 }
 
 /**
  * Default settings values
  */
-const DEFAULT_SETTINGS: Pick<SettingsState, 'errorTrackingEnabled' | 'logLevel' | 'theme'> = {
+const DEFAULT_SETTINGS: Pick<
+  SettingsState,
+  'errorTrackingEnabled' | 'logLevel' | 'theme' | 'showKeyboardHints'
+> = {
   errorTrackingEnabled: true,
   logLevel: null, // Use environment default
   theme: 'system',
+  showKeyboardHints: true, // Story 2.23: Show hints by default
 }
 
 /**
@@ -63,7 +70,7 @@ function loadPersistedSettings(): Partial<SettingsState> {
  * Persist settings to localStorage
  */
 function persistSettings(
-  settings: Pick<SettingsState, 'errorTrackingEnabled' | 'logLevel' | 'theme'>
+  settings: Pick<SettingsState, 'errorTrackingEnabled' | 'logLevel' | 'theme' | 'showKeyboardHints'>
 ): void {
   try {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings))
@@ -84,6 +91,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
     errorTrackingEnabled: persisted.errorTrackingEnabled ?? DEFAULT_SETTINGS.errorTrackingEnabled,
     logLevel: persisted.logLevel ?? DEFAULT_SETTINGS.logLevel,
     theme: persisted.theme ?? DEFAULT_SETTINGS.theme,
+    showKeyboardHints: persisted.showKeyboardHints ?? DEFAULT_SETTINGS.showKeyboardHints,
 
     /**
      * Set error tracking enabled/disabled
@@ -109,6 +117,14 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
     setTheme: (theme: SettingsState['theme']) => {
       set({ theme })
       persistSettings({ ...get(), theme })
+    },
+
+    /**
+     * Set keyboard hints visibility (Story 2.23)
+     */
+    setShowKeyboardHints: (show: boolean) => {
+      set({ showKeyboardHints: show })
+      persistSettings({ ...get(), showKeyboardHints: show })
     },
 
     /**

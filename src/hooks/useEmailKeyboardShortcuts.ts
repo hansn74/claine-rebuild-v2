@@ -7,6 +7,9 @@
  * Story 2.11: Keyboard Shortcuts & Power User Features
  * Task 4: Implement Action Shortcuts (e, #, r, f)
  *
+ * Story 2.23: Keyboard Shortcut Discoverability
+ * Task 6: Integrate tracking into action handlers
+ *
  * Custom hook for email action keyboard shortcuts.
  * Now integrated with react-hotkeys-hook via useActionShortcuts.
  *
@@ -21,12 +24,14 @@
  * - Scope-aware (inbox/reading scopes)
  * - Uses react-hotkeys-hook for consistent behavior
  * - Integrates with ShortcutContext
+ * - Tracks keyboard vs mouse usage for nudge tooltips
  */
 
 import { useCallback, useEffect, useMemo } from 'react'
 import { useEmailStore } from '@/store/emailStore'
 import { useSelectionStore } from '@/store/selectionStore'
 import { useActionShortcuts } from './useEmailShortcut'
+import { useShortcutNudge } from './useShortcutNudge'
 import { logger } from '@/services/logger'
 import type { EmailDocument } from '@/services/database/schemas/email.schema'
 
@@ -106,6 +111,9 @@ export function useEmailKeyboardShortcuts({
   const selectedIds = useSelectionStore((state) => state.selectedIds)
   const hasSelection = useMemo(() => selectedIds.size > 0, [selectedIds])
 
+  // Story 2.23: Track keyboard usage for nudge system
+  const { recordKeyboardAction } = useShortcutNudge()
+
   /**
    * Get the IDs to act on (selected or focused)
    */
@@ -136,6 +144,8 @@ export function useEmailKeyboardShortcuts({
     const targetIds = getTargetIds()
     if (targetIds.length === 0) return
 
+    // Story 2.23: Track keyboard usage
+    recordKeyboardAction('archive')
     logger.info('keyboard', 'Archive shortcut triggered', { count: targetIds.length })
 
     if (targetIds.length === 1) {
@@ -153,7 +163,7 @@ export function useEmailKeyboardShortcuts({
     } else {
       await archiveEmails(targetIds)
     }
-  }, [getTargetIds, archiveEmail, archiveEmails, emails, setSelectedEmail])
+  }, [getTargetIds, archiveEmail, archiveEmails, emails, setSelectedEmail, recordKeyboardAction])
 
   /**
    * Handle delete shortcut (# key)
@@ -163,6 +173,8 @@ export function useEmailKeyboardShortcuts({
     const targetIds = getTargetIds()
     if (targetIds.length === 0) return
 
+    // Story 2.23: Track keyboard usage
+    recordKeyboardAction('delete')
     logger.info('keyboard', 'Delete shortcut triggered', { count: targetIds.length })
 
     if (targetIds.length === 1) {
@@ -180,7 +192,7 @@ export function useEmailKeyboardShortcuts({
     } else {
       await deleteEmails(targetIds)
     }
-  }, [getTargetIds, deleteEmail, deleteEmails, emails, setSelectedEmail])
+  }, [getTargetIds, deleteEmail, deleteEmails, emails, setSelectedEmail, recordKeyboardAction])
 
   /**
    * Handle toggle read shortcut (u key)
@@ -189,12 +201,14 @@ export function useEmailKeyboardShortcuts({
     const targetIds = getTargetIds()
     if (targetIds.length === 0) return
 
+    // Story 2.23: Track keyboard usage
+    recordKeyboardAction('toggleRead')
     logger.info('keyboard', 'Toggle read shortcut triggered', { count: targetIds.length })
 
     for (const id of targetIds) {
       await toggleReadStatus(id)
     }
-  }, [getTargetIds, toggleReadStatus])
+  }, [getTargetIds, toggleReadStatus, recordKeyboardAction])
 
   /**
    * Handle mark as read shortcut (Shift+I)
@@ -203,9 +217,11 @@ export function useEmailKeyboardShortcuts({
     const targetIds = getTargetIds()
     if (targetIds.length === 0) return
 
+    // Story 2.23: Track keyboard usage
+    recordKeyboardAction('markRead')
     logger.info('keyboard', 'Mark read shortcut triggered', { count: targetIds.length })
     await markAsRead(targetIds)
-  }, [getTargetIds, markAsRead])
+  }, [getTargetIds, markAsRead, recordKeyboardAction])
 
   /**
    * Handle mark as unread shortcut (Shift+U)
@@ -214,9 +230,11 @@ export function useEmailKeyboardShortcuts({
     const targetIds = getTargetIds()
     if (targetIds.length === 0) return
 
+    // Story 2.23: Track keyboard usage
+    recordKeyboardAction('markUnread')
     logger.info('keyboard', 'Mark unread shortcut triggered', { count: targetIds.length })
     await markAsUnread(targetIds)
-  }, [getTargetIds, markAsUnread])
+  }, [getTargetIds, markAsUnread, recordKeyboardAction])
 
   /**
    * Handle reply shortcut (r key)
@@ -226,9 +244,11 @@ export function useEmailKeyboardShortcuts({
     const targetIds = getTargetIds()
     if (targetIds.length === 0) return
 
+    // Story 2.23: Track keyboard usage
+    recordKeyboardAction('reply')
     logger.info('keyboard', 'Reply shortcut triggered', { emailId: targetIds[0] })
     onReply?.(targetIds[0])
-  }, [getTargetIds, onReply])
+  }, [getTargetIds, onReply, recordKeyboardAction])
 
   /**
    * Handle forward shortcut (f key)
@@ -238,9 +258,11 @@ export function useEmailKeyboardShortcuts({
     const targetIds = getTargetIds()
     if (targetIds.length === 0) return
 
+    // Story 2.23: Track keyboard usage
+    recordKeyboardAction('forward')
     logger.info('keyboard', 'Forward shortcut triggered', { emailId: targetIds[0] })
     onForward?.(targetIds[0])
-  }, [getTargetIds, onForward])
+  }, [getTargetIds, onForward, recordKeyboardAction])
 
   /**
    * Handle star shortcut (s key)
@@ -249,9 +271,11 @@ export function useEmailKeyboardShortcuts({
     const targetIds = getTargetIds()
     if (targetIds.length === 0) return
 
+    // Story 2.23: Track keyboard usage
+    recordKeyboardAction('star')
     logger.info('keyboard', 'Star shortcut triggered', { emailId: targetIds[0] })
     onStar?.(targetIds[0])
-  }, [getTargetIds, onStar])
+  }, [getTargetIds, onStar, recordKeyboardAction])
 
   /**
    * Handle select shortcut (x key)

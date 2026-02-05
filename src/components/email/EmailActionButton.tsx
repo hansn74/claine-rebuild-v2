@@ -4,12 +4,25 @@
  * Story 2.6: Email Actions (Archive, Delete, Mark Read/Unread)
  * Task 4.2: Create individual EmailActionButton component
  *
+ * Story 2.23: Keyboard Shortcut Discoverability
+ * Task 3: Add ShortcutHint support and nudge tracking
+ *
  * Individual action button with icon, label, and tooltip.
  * Supports different variants and sizes.
  */
 
-import { forwardRef, type ReactNode, type ButtonHTMLAttributes } from 'react'
+import {
+  forwardRef,
+  useState,
+  type MouseEvent,
+  type ReactNode,
+  type ButtonHTMLAttributes,
+} from 'react'
 import { cn } from '@/utils/cn'
+import { ShortcutHint } from '@/components/common/ShortcutHint'
+import { ShortcutNudgeTooltip } from '@/components/common/ShortcutNudgeTooltip'
+import { useShortcutNudge } from '@/hooks/useShortcutNudge'
+import type { ShortcutScope } from '@/types/shortcuts'
 
 interface EmailActionButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   /** Icon to display */
@@ -26,6 +39,12 @@ interface EmailActionButtonProps extends ButtonHTMLAttributes<HTMLButtonElement>
   destructive?: boolean
   /** Whether button is loading */
   loading?: boolean
+  /** Keyboard shortcut key to display (e.g., 'e' for archive) */
+  shortcutKey?: string
+  /** Scopes where the shortcut hint should be visible */
+  shortcutScopes?: ShortcutScope[]
+  /** Action ID for tracking (e.g., 'archive', 'delete') */
+  actionId?: string
 }
 
 /**
@@ -36,7 +55,10 @@ interface EmailActionButtonProps extends ButtonHTMLAttributes<HTMLButtonElement>
  * <EmailActionButton
  *   icon={<Archive className="w-4 h-4" />}
  *   label="Archive"
- *   tooltip="Archive email (e)"
+ *   tooltip="Archive email"
+ *   shortcutKey="e"
+ *   shortcutScopes={['inbox', 'reading']}
+ *   actionId="archive"
  *   onClick={handleArchive}
  * />
  * ```
@@ -53,11 +75,37 @@ export const EmailActionButton = forwardRef<HTMLButtonElement, EmailActionButton
       loading = false,
       disabled,
       className,
+      shortcutKey,
+      shortcutScopes,
+      actionId,
+      onClick,
       ...props
     },
     ref
   ) => {
     const isDisabled = disabled || loading
+    const { recordMouseAction, shouldShowNudge, markNudgeShown } = useShortcutNudge()
+    // Track if nudge was dismissed during this component's lifetime
+    const [nudgeDismissed, setNudgeDismissed] = useState(false)
+
+    // Derive showNudge from shouldShowNudge without useEffect
+    const showNudge = !nudgeDismissed && actionId && shortcutKey ? shouldShowNudge(actionId) : false
+
+    // Handle click with mouse action tracking
+    const handleClick = (e: MouseEvent<HTMLButtonElement>) => {
+      if (actionId) {
+        recordMouseAction(actionId)
+      }
+      onClick?.(e)
+    }
+
+    // Handle nudge dismiss
+    const handleNudgeDismiss = () => {
+      if (actionId) {
+        markNudgeShown(actionId)
+      }
+      setNudgeDismissed(true)
+    }
 
     // Base classes
     const baseClasses =
@@ -83,25 +131,45 @@ export const EmailActionButton = forwardRef<HTMLButtonElement, EmailActionButton
       icon: 'h-8 w-8 p-0',
     }
 
+    // Build tooltip with shortcut hint
+    const tooltipWithShortcut = shortcutKey ? `${tooltip} (${shortcutKey})` : tooltip
+
     return (
-      <button
-        ref={ref}
-        type="button"
-        disabled={isDisabled}
-        title={tooltip}
-        aria-label={label || tooltip}
-        className={cn(baseClasses, variantClasses[variant], sizeClasses[size], className)}
-        {...props}
-      >
-        {loading ? (
-          <span className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
-        ) : (
-          <>
-            {icon}
-            {label && size !== 'icon' && <span>{label}</span>}
-          </>
+      <div className="relative inline-block">
+        <button
+          ref={ref}
+          type="button"
+          disabled={isDisabled}
+          title={tooltipWithShortcut}
+          aria-label={label || tooltip}
+          className={cn(baseClasses, variantClasses[variant], sizeClasses[size], className)}
+          onClick={handleClick}
+          {...props}
+        >
+          {loading ? (
+            <span className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
+          ) : (
+            <>
+              {icon}
+              {label && size !== 'icon' && (
+                <>
+                  <span>{label}</span>
+                  {shortcutKey && (
+                    <ShortcutHint shortcutKey={shortcutKey} scopes={shortcutScopes} />
+                  )}
+                </>
+              )}
+            </>
+          )}
+        </button>
+        {showNudge && shortcutKey && (
+          <ShortcutNudgeTooltip
+            actionName={label || tooltip}
+            shortcutKey={shortcutKey}
+            onDismiss={handleNudgeDismiss}
+          />
         )}
-      </button>
+      </div>
     )
   }
 )

@@ -36,9 +36,13 @@ import { logger } from '@/services/logger'
 import { searchHistoryService } from '@/services/search'
 import { getOperatorSearchHints } from '@/services/search/searchOperatorParser'
 import { getAttributeSearchHints } from '@/services/search/attributeSearchParser'
+import { useActiveScope } from '@/context/ShortcutContext'
+import { useCommandUsage } from '@/hooks/useCommandUsage'
+import type { ShortcutScope } from '@/types/shortcuts'
 
 /**
  * Story 2.11: Task 5.3 - Command definitions with shortcut hints
+ * Story 2.23: Added scopes for context-aware ranking
  */
 interface CommandItem {
   id: string
@@ -47,6 +51,8 @@ interface CommandItem {
   shortcut?: string
   icon: React.ReactNode
   category: 'navigation' | 'actions' | 'compose' | 'settings'
+  /** Scopes where this command is most relevant (Story 2.23) */
+  scopes?: ShortcutScope[]
   action?: () => void
 }
 
@@ -69,6 +75,7 @@ const COMMAND_ICONS = {
 
 /**
  * Story 2.11: Task 5.3 - Available commands for the command palette
+ * Story 2.23: Added scopes for context-aware ranking
  */
 const QUICK_COMMANDS: CommandItem[] = [
   // Compose
@@ -79,6 +86,7 @@ const QUICK_COMMANDS: CommandItem[] = [
     shortcut: 'c',
     icon: COMMAND_ICONS.compose,
     category: 'compose',
+    scopes: ['global', 'inbox', 'reading'],
   },
   // Navigation
   {
@@ -88,6 +96,7 @@ const QUICK_COMMANDS: CommandItem[] = [
     shortcut: 'g i',
     icon: COMMAND_ICONS.inbox,
     category: 'navigation',
+    scopes: ['global', 'inbox'],
   },
   {
     id: 'goto-sent',
@@ -96,6 +105,7 @@ const QUICK_COMMANDS: CommandItem[] = [
     shortcut: 'g t',
     icon: COMMAND_ICONS.sent,
     category: 'navigation',
+    scopes: ['global', 'inbox'],
   },
   {
     id: 'goto-drafts',
@@ -104,6 +114,7 @@ const QUICK_COMMANDS: CommandItem[] = [
     shortcut: 'g d',
     icon: COMMAND_ICONS.drafts,
     category: 'navigation',
+    scopes: ['global', 'inbox'],
   },
   // Actions
   {
@@ -113,6 +124,7 @@ const QUICK_COMMANDS: CommandItem[] = [
     shortcut: 'e',
     icon: COMMAND_ICONS.archive,
     category: 'actions',
+    scopes: ['inbox', 'reading'],
   },
   {
     id: 'delete',
@@ -121,6 +133,7 @@ const QUICK_COMMANDS: CommandItem[] = [
     shortcut: '#',
     icon: COMMAND_ICONS.delete,
     category: 'actions',
+    scopes: ['inbox', 'reading'],
   },
   {
     id: 'reply',
@@ -129,6 +142,7 @@ const QUICK_COMMANDS: CommandItem[] = [
     shortcut: 'r',
     icon: COMMAND_ICONS.reply,
     category: 'actions',
+    scopes: ['reading'],
   },
   {
     id: 'forward',
@@ -137,6 +151,7 @@ const QUICK_COMMANDS: CommandItem[] = [
     shortcut: 'f',
     icon: COMMAND_ICONS.forward,
     category: 'actions',
+    scopes: ['reading'],
   },
   {
     id: 'star',
@@ -145,6 +160,7 @@ const QUICK_COMMANDS: CommandItem[] = [
     shortcut: 's',
     icon: COMMAND_ICONS.star,
     category: 'actions',
+    scopes: ['inbox', 'reading'],
   },
   // Settings
   {
@@ -154,6 +170,7 @@ const QUICK_COMMANDS: CommandItem[] = [
     shortcut: '?',
     icon: COMMAND_ICONS.shortcuts,
     category: 'settings',
+    scopes: ['global'],
   },
 ]
 
@@ -242,48 +259,63 @@ export const CommandPalette = memo(function CommandPalette({
   const prevOpenRef = useRef(open)
   const prevResultsLengthRef = useRef(results.length)
 
+  // Story 2.23: Context-aware command ranking
+  const activeScope = useActiveScope()
+  const { recordCommandUsage, getRecentCommands } = useCommandUsage()
+
   /**
    * Story 2.11: Task 5.3 - Build action handlers map for commands
+   * Story 2.23: Record command usage for context-aware ranking
    */
   const commandHandlers = useMemo(
     () => ({
       compose: () => {
+        recordCommandUsage('compose')
         onCompose?.()
         onClose()
       },
       'goto-inbox': () => {
+        recordCommandUsage('goto-inbox')
         onNavigate?.('inbox')
         onClose()
       },
       'goto-sent': () => {
+        recordCommandUsage('goto-sent')
         onNavigate?.('sent')
         onClose()
       },
       'goto-drafts': () => {
+        recordCommandUsage('goto-drafts')
         onNavigate?.('drafts')
         onClose()
       },
       archive: () => {
+        recordCommandUsage('archive')
         onArchive?.()
         onClose()
       },
       delete: () => {
+        recordCommandUsage('delete')
         onDelete?.()
         onClose()
       },
       reply: () => {
+        recordCommandUsage('reply')
         onReply?.()
         onClose()
       },
       forward: () => {
+        recordCommandUsage('forward')
         onForward?.()
         onClose()
       },
       star: () => {
+        recordCommandUsage('star')
         onStar?.()
         onClose()
       },
       'show-shortcuts': () => {
+        recordCommandUsage('show-shortcuts')
         onShowShortcuts?.()
         onClose()
       },
@@ -298,13 +330,15 @@ export const CommandPalette = memo(function CommandPalette({
       onStar,
       onShowShortcuts,
       onClose,
+      recordCommandUsage,
     ]
   )
 
   /**
    * Story 2.11: Task 5.4 - Filtered commands based on query
+   * Story 2.23: Context-aware ranking (recent → scope-relevant → alphabetical)
    * In search mode: no commands shown
-   * In actions mode: filter commands by query
+   * In actions mode: filter commands by query, then rank
    */
   const filteredCommands = useMemo(() => {
     // Search mode: no quick actions
@@ -312,8 +346,33 @@ export const CommandPalette = memo(function CommandPalette({
       return []
     }
     // Actions mode: filter commands by query
-    return filterCommands(QUICK_COMMANDS, query)
-  }, [mode, query])
+    const filtered = filterCommands(QUICK_COMMANDS, query)
+
+    // Get recent commands for ranking
+    const recentCommandIds = getRecentCommands()
+
+    // Sort: recent first, then scope-relevant, then alphabetical
+    return filtered.sort((a, b) => {
+      const aRecentIndex = recentCommandIds.indexOf(a.id)
+      const bRecentIndex = recentCommandIds.indexOf(b.id)
+      const aIsRecent = aRecentIndex !== -1
+      const bIsRecent = bRecentIndex !== -1
+
+      // Recent commands come first (ordered by recency)
+      if (aIsRecent && !bIsRecent) return -1
+      if (!aIsRecent && bIsRecent) return 1
+      if (aIsRecent && bIsRecent) return aRecentIndex - bRecentIndex
+
+      // Then scope-relevant commands
+      const aInScope = a.scopes?.includes(activeScope) ?? false
+      const bInScope = b.scopes?.includes(activeScope) ?? false
+      if (aInScope && !bInScope) return -1
+      if (!aInScope && bInScope) return 1
+
+      // Finally alphabetical
+      return a.name.localeCompare(b.name)
+    })
+  }, [mode, query, activeScope, getRecentCommands])
 
   /**
    * Story 2.22: Task 4.2/4.3 - Dynamic operator/attribute hints
