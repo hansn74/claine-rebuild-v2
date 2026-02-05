@@ -1,7 +1,7 @@
 /**
  * Search Service Module
  *
- * Provides full-text search functionality using Lunr.js.
+ * Provides full-text search functionality using MiniSearch.
  *
  * Usage:
  *   import { searchIndexService } from '@/services/search'
@@ -22,6 +22,9 @@ export { searchIndexService, SearchIndexService } from './searchIndexService'
 // Index persistence
 export { indexStorageService } from './indexStorage'
 
+// Search history
+export { searchHistoryService } from './searchHistoryService'
+
 // Type definitions
 export type {
   SearchResult,
@@ -29,7 +32,6 @@ export type {
   SearchHighlights,
   SearchableDocument,
   SearchIndexMetadata,
-  SearchIndexDocument,
   SearchIndexStats,
   SearchPerformanceMetrics,
   IndexRebuildConfig,

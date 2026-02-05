@@ -1,11 +1,11 @@
 /**
  * useSearch Hook
  *
- * Story 2.5: Local Full-Text Search
- * Task 5: Create Search Hook
+ * Story 2.21: Replace Lunr.js with MiniSearch
  *
  * React hook for performing full-text search with debounced input.
  * Returns enriched results with relevance scores and highlighted snippets.
+ * MiniSearch provides built-in prefix search and fuzzy matching.
  *
  * Performance Targets:
  * - Search completes in <100ms (FR008)
@@ -23,6 +23,7 @@ import {
   containsSearchTerms,
 } from '@/utils/searchHighlight'
 import { logger } from '@/services/logger'
+import { searchHistoryService } from '@/services/search'
 
 /**
  * Return type for useSearch hook
@@ -60,61 +61,6 @@ const DEFAULT_OPTIONS: Required<UseSearchOptions> = {
   debounceMs: 300,
   maxResults: 50,
   logPerformance: import.meta.env.DEV,
-}
-
-/**
- * Convert search query to use wildcards for partial matching
- * - Adds * suffix to terms that don't already have wildcards
- * - Preserves quoted phrases (exact match)
- * - Preserves field-specific searches (e.g., subject:budget)
- */
-function addWildcards(query: string): string {
-  // Don't add wildcards if query already has them or is very short
-  if (query.includes('*') || query.length < 2) {
-    return query
-  }
-
-  // Split on spaces but preserve quoted phrases
-  const parts: string[] = []
-  let current = ''
-  let inQuotes = false
-
-  for (const char of query) {
-    if (char === '"') {
-      inQuotes = !inQuotes
-      current += char
-    } else if (char === ' ' && !inQuotes) {
-      if (current) {
-        parts.push(current)
-        current = ''
-      }
-    } else {
-      current += char
-    }
-  }
-  if (current) {
-    parts.push(current)
-  }
-
-  // Add wildcards to non-quoted, non-field terms
-  return parts
-    .map((part) => {
-      // Skip quoted phrases
-      if (part.startsWith('"') && part.endsWith('"')) {
-        return part
-      }
-      // Skip field-specific searches (e.g., subject:budget)
-      if (part.includes(':')) {
-        return part
-      }
-      // Skip if already has wildcard
-      if (part.includes('*')) {
-        return part
-      }
-      // Add wildcard for partial matching
-      return `${part}*`
-    })
-    .join(' ')
 }
 
 /**
@@ -213,9 +159,8 @@ export function useSearch(options: UseSearchOptions = {}): UseSearchResult {
       const startTime = performance.now()
 
       try {
-        // Execute search with wildcards for partial matching
-        const wildcardQuery = addWildcards(searchQuery)
-        const searchResults = searchIndexService.search(wildcardQuery)
+        // MiniSearch has built-in prefix search and fuzzy matching
+        const searchResults = searchIndexService.search(searchQuery)
         const duration = performance.now() - startTime
 
         // Check if this is still the latest query (prevent stale results)
@@ -242,6 +187,11 @@ export function useSearch(options: UseSearchOptions = {}): UseSearchResult {
 
         setResults(enrichedResults)
         setSearchTime(duration)
+
+        // Record successful search in history
+        if (enrichedResults.length > 0) {
+          searchHistoryService.addToHistory(searchQuery)
+        }
 
         // Log performance
         if (logPerformance) {

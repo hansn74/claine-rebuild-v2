@@ -16,6 +16,7 @@ vi.mock('@/services/logger', () => ({
 vi.mock('@/services/sync/healthRegistry', () => ({
   healthRegistry: {
     setDatabaseHealth: vi.fn(),
+    setSearchIndexHealth: vi.fn(),
     connectActionQueue: vi.fn(),
     connectSendQueue: vi.fn(),
     connectNetworkStatus: vi.fn(),

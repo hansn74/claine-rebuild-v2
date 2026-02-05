@@ -1,8 +1,8 @@
 /**
  * Search Index Service Tests
  *
- * Story 2.5: Local Full-Text Search
- * Tests for the search index service functionality
+ * Story 2.21: Replace Lunr.js with MiniSearch
+ * Tests for the search index service functionality with MiniSearch
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
@@ -117,7 +117,8 @@ describe('SearchIndexService', () => {
     it('should find emails by subject', () => {
       const results = service.search('budget')
       expect(results.length).toBeGreaterThan(0)
-      expect(results[0].id).toBe('1') // Budget Meeting should rank highest
+      // Budget Meeting should rank highest (subject boost: 10 vs body boost: 1)
+      expect(results[0].id).toBe('1')
     })
 
     it('should find emails by body content', () => {
@@ -167,8 +168,7 @@ describe('SearchIndexService', () => {
       expect(results.length).toBeGreaterThan(0)
     })
 
-    it('should search in sender email field by full email address', () => {
-      // Clear any existing index first
+    it('should search in sender email field', () => {
       service.clear()
 
       const emails = [
@@ -176,10 +176,18 @@ describe('SearchIndexService', () => {
       ]
       service.buildIndex(emails)
 
-      // Lunr indexes the full email, wildcard search works
-      const results = service.search('specialtest*')
+      // MiniSearch prefix search matches "specialtest" prefix
+      const results = service.search('specialtest')
       expect(results.length).toBeGreaterThan(0)
       expect(results[0].id).toBe('5')
+    })
+
+    it('should return match and terms in results', () => {
+      const results = service.search('budget')
+      expect(results.length).toBeGreaterThan(0)
+      expect(results[0].match).toBeDefined()
+      expect(results[0].terms).toBeDefined()
+      expect(results[0].terms.length).toBeGreaterThan(0)
     })
   })
 
@@ -200,8 +208,8 @@ describe('SearchIndexService', () => {
     })
   })
 
-  describe('addDocument', () => {
-    it('should queue document for indexing', () => {
+  describe('addDocument (incremental)', () => {
+    it('should add document to index incrementally', () => {
       service.buildIndex([])
       const email = createMockEmail({ id: 'new-email', subject: 'New Email' })
 
@@ -211,73 +219,66 @@ describe('SearchIndexService', () => {
       const doc = service.getDocument('new-email')
       expect(doc).toBeDefined()
       expect(doc?.subject).toBe('New Email')
+
+      // Document should be searchable immediately (no rebuild needed)
+      const results = service.search('New Email')
+      expect(results.length).toBeGreaterThan(0)
+      expect(results[0].id).toBe('new-email')
     })
 
-    it('should mark index for rebuild', () => {
+    it('should add 50 documents incrementally without rebuild', () => {
       service.buildIndex([])
-      service.addDocument(createMockEmail())
 
-      expect(service.needsRebuild()).toBe(true)
+      for (let i = 0; i < 50; i++) {
+        service.addDocument(createMockEmail({ id: `inc-${i}`, subject: `Incremental Email ${i}` }))
+      }
+
+      const stats = service.getStats()
+      expect(stats.documentCount).toBe(50)
+
+      // All should be searchable
+      const results = service.search('Incremental')
+      expect(results.length).toBe(50)
+    })
+
+    it('should not add document when index not initialized', () => {
+      // No buildIndex called
+      service.addDocument(createMockEmail({ id: 'no-index' }))
+      expect(service.getDocument('no-index')).toBeUndefined()
     })
   })
 
-  describe('removeDocument', () => {
-    it('should mark document for removal', () => {
-      const email = createMockEmail({ id: 'to-remove' })
+  describe('removeDocument (discard)', () => {
+    it('should remove document from index', () => {
+      const email = createMockEmail({ id: 'to-remove', subject: 'Remove Me' })
       service.buildIndex([email])
 
       service.removeDocument('to-remove')
 
-      expect(service.needsRebuild()).toBe(true)
+      // Document should no longer be retrievable
+      expect(service.getDocument('to-remove')).toBeUndefined()
+      expect(service.getStats().documentCount).toBe(0)
+
+      // Document should no longer be searchable
+      const results = service.search('Remove Me')
+      expect(results).toHaveLength(0)
     })
   })
 
-  describe('updateDocument', () => {
-    it('should queue updated document', () => {
-      const email = createMockEmail({ id: 'to-update', subject: 'Original' })
+  describe('updateDocument (replace)', () => {
+    it('should update document in index', () => {
+      const email = createMockEmail({ id: 'to-update', subject: 'Original Subject' })
       service.buildIndex([email])
 
-      service.updateDocument({ ...email, subject: 'Updated' })
+      service.updateDocument({ ...email, subject: 'Updated Subject' })
 
-      // Note: getDocument returns from pending queue for updated documents
-      // which takes priority over the original documents map
       const doc = service.getDocument('to-update')
-      expect(doc?.subject).toBe('Updated')
-    })
+      expect(doc?.subject).toBe('Updated Subject')
 
-    it('should reflect update after applying pending changes', () => {
-      const email = createMockEmail({ id: 'to-update-2', subject: 'Original' })
-      service.buildIndex([email])
-
-      service.updateDocument({ ...email, subject: 'Updated' })
-      service.applyPendingChanges()
-
-      const doc = service.getDocument('to-update-2')
-      expect(doc?.subject).toBe('Updated')
-    })
-  })
-
-  describe('applyPendingChanges', () => {
-    it('should rebuild index with pending documents', () => {
-      service.buildIndex([createMockEmail({ id: '1' })])
-      service.addDocument(createMockEmail({ id: '2', subject: 'New Document' }))
-
-      service.applyPendingChanges()
-
-      const stats = service.getStats()
-      expect(stats.documentCount).toBe(2)
-      expect(stats.needsRebuild).toBe(false)
-    })
-
-    it('should apply pending removals', () => {
-      service.buildIndex([createMockEmail({ id: '1' }), createMockEmail({ id: '2' })])
-      service.removeDocument('1')
-
-      service.applyPendingChanges()
-
-      const stats = service.getStats()
-      expect(stats.documentCount).toBe(1)
-      expect(service.getDocument('1')).toBeUndefined()
+      // Should find by new subject
+      const results = service.search('Updated Subject')
+      expect(results.length).toBeGreaterThan(0)
+      expect(results[0].id).toBe('to-update')
     })
   })
 
@@ -301,15 +302,52 @@ describe('SearchIndexService', () => {
       expect(stats.documentCount).toBe(3)
       expect(stats.indexBuilt).toBe(true)
       expect(stats.lastBuilt).toBeDefined()
-      expect(stats.needsRebuild).toBe(false)
+    })
+  })
+
+  describe('fuzzy matching', () => {
+    it('should find "meeting" when searching for "meetng" (typo)', () => {
+      const emails = [
+        createMockEmail({ id: 'meeting-email', subject: 'Important Meeting Tomorrow' }),
+      ]
+      service.buildIndex(emails)
+
+      const results = service.search('meetng')
+      expect(results.length).toBeGreaterThan(0)
+      expect(results[0].id).toBe('meeting-email')
     })
 
-    it('should report needsRebuild when pending changes exist', () => {
-      service.buildIndex([])
-      service.addDocument(createMockEmail())
+    it('should find "received" when searching for "recieved" (typo)', () => {
+      const emails = [
+        createMockEmail({
+          id: 'received-email',
+          body: { text: 'I received your email yesterday' },
+        }),
+      ]
+      service.buildIndex(emails)
 
-      const stats = service.getStats()
-      expect(stats.needsRebuild).toBe(true)
+      const results = service.search('recieved')
+      expect(results.length).toBeGreaterThan(0)
+      expect(results[0].id).toBe('received-email')
+    })
+
+    it('should rank exact matches above fuzzy matches', () => {
+      const emails = [
+        createMockEmail({ id: 'exact', subject: 'budget review' }),
+        createMockEmail({ id: 'fuzzy', subject: 'budge review' }),
+      ]
+      service.buildIndex(emails)
+
+      const results = service.search('budget')
+      expect(results.length).toBe(2)
+      // Exact match should score higher
+      const exactMatch = results.find((r) => r.id === 'exact')
+      const fuzzyMatch = results.find((r) => r.id === 'fuzzy')
+      expect(exactMatch).toBeDefined()
+      expect(fuzzyMatch).toBeDefined()
+      if (exactMatch && fuzzyMatch) {
+        expect(exactMatch.score).toBeGreaterThan(fuzzyMatch.score)
+      }
     })
   })
 
@@ -348,6 +386,70 @@ describe('SearchIndexService', () => {
       // Should complete in under 100ms
       expect(duration).toBeLessThan(100)
       expect(results.length).toBeGreaterThan(0)
+    })
+
+    it('should search 10000 emails in under 100ms', () => {
+      const emails = Array.from({ length: 10000 }, (_, i) =>
+        createMockEmail({
+          id: `email-${i}`,
+          subject: `Email ${i} about various topics like budget and planning`,
+          body: { text: `Body content for email ${i} discussing quarterly reviews and meetings` },
+        })
+      )
+      service.buildIndex(emails)
+
+      const start = performance.now()
+      const results = service.search('budget quarterly')
+      const duration = performance.now() - start
+
+      expect(duration).toBeLessThan(100)
+      expect(results.length).toBeGreaterThan(0)
+    })
+  })
+
+  describe('regression: search results equivalent to Lunr for exact keywords', () => {
+    it('should find exact keyword in subject', () => {
+      const emails = [
+        createMockEmail({ id: '1', subject: 'Budget Meeting Q4' }),
+        createMockEmail({ id: '2', subject: 'Project Update' }),
+      ]
+      service.buildIndex(emails)
+
+      const results = service.search('Budget')
+      expect(results.length).toBe(1)
+      expect(results[0].id).toBe('1')
+    })
+
+    it('should find exact keyword in body', () => {
+      const emails = [
+        createMockEmail({ id: '1', body: { text: 'quarterly financial report' } }),
+        createMockEmail({ id: '2', body: { text: 'weekly status update' } }),
+      ]
+      service.buildIndex(emails)
+
+      const results = service.search('financial')
+      expect(results.length).toBe(1)
+      expect(results[0].id).toBe('1')
+    })
+
+    it('should apply field boosts correctly (subject > body)', () => {
+      const emails = [
+        createMockEmail({
+          id: 'subject-match',
+          subject: 'Budget',
+          body: { text: 'unrelated content' },
+        }),
+        createMockEmail({
+          id: 'body-match',
+          subject: 'Unrelated',
+          body: { text: 'budget discussion' },
+        }),
+      ]
+      service.buildIndex(emails)
+
+      const results = service.search('budget')
+      expect(results.length).toBe(2)
+      expect(results[0].id).toBe('subject-match')
     })
   })
 })

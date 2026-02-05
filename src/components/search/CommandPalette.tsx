@@ -33,6 +33,7 @@ import { useSearch } from '@/hooks/useSearch'
 import { SearchInput } from './SearchInput'
 import { SearchResults } from './SearchResults'
 import { logger } from '@/services/logger'
+import { searchHistoryService } from '@/services/search'
 
 /**
  * Story 2.11: Task 5.3 - Command definitions with shortcut hints
@@ -168,11 +169,7 @@ function filterCommands(commands: CommandItem[], query: string): CommandItem[] {
   )
 }
 
-/**
- * Recent search storage key
- */
-const RECENT_SEARCHES_KEY = 'claine_recent_searches'
-const MAX_RECENT_SEARCHES = 10
+// Recent search history is managed by searchHistoryService (max 20, localStorage)
 
 export interface CommandPaletteProps {
   /** Whether the palette is open */
@@ -195,33 +192,17 @@ export interface CommandPaletteProps {
 }
 
 /**
- * Get recent searches from localStorage
+ * Get recent searches from centralized searchHistoryService
  */
 function getRecentSearches(): string[] {
-  try {
-    const stored = localStorage.getItem(RECENT_SEARCHES_KEY)
-    return stored ? JSON.parse(stored) : []
-  } catch {
-    return []
-  }
+  return searchHistoryService.getHistory()
 }
 
 /**
- * Add a search to recent searches
+ * Add a search to recent searches via centralized service
  */
 function addRecentSearch(query: string): void {
-  if (!query.trim()) return
-
-  try {
-    const recent = getRecentSearches()
-    // Remove if already exists
-    const filtered = recent.filter((s) => s !== query)
-    // Add to front
-    const updated = [query, ...filtered].slice(0, MAX_RECENT_SEARCHES)
-    localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(updated))
-  } catch {
-    // Ignore storage errors
-  }
+  searchHistoryService.addToHistory(query)
 }
 
 /**
@@ -553,7 +534,17 @@ export const CommandPalette = memo(function CommandPalette({
                 <div className="p-3">
                   <div className="flex items-center gap-2 text-xs text-slate-500 mb-2">
                     <Clock className="w-3 h-3" />
-                    <span>Recent searches</span>
+                    <span className="flex-1">Recent searches</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        searchHistoryService.clearHistory()
+                        setRecentSearches([])
+                      }}
+                      className="text-xs text-slate-400 hover:text-slate-600 transition-colors"
+                    >
+                      Clear
+                    </button>
                   </div>
                   <div className="space-y-1">
                     {recentSearches.map((search, index) => (

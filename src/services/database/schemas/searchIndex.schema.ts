@@ -1,19 +1,18 @@
 import type { RxJsonSchema } from 'rxdb'
 
 /**
- * Search Index Document for persisting Lunr.js index in RxDB
+ * Search Index Document for persisting MiniSearch index in RxDB
  *
- * Stores serialized Lunr index and metadata for:
+ * Stores serialized MiniSearch index and metadata for:
  * - Faster startup (load existing index instead of rebuilding)
  * - Persistence across sessions
- * - Background rebuild scheduling
  *
  * Uses singleton pattern - only one index document with id='search-index'
  */
 export interface SearchIndexDocument {
   /** Primary key - always 'search-index' for singleton */
   id: string
-  /** Serialized Lunr index (JSON string) */
+  /** Serialized MiniSearch index (JSON string) */
   serializedIndex: string
   /** Schema version for migration compatibility */
   version: number

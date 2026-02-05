@@ -1,16 +1,16 @@
 /**
  * Index Storage Service
  *
- * Handles persistence of Lunr.js search index to RxDB.
+ * Handles persistence of MiniSearch index to RxDB.
  * Enables faster startup by loading existing index instead of rebuilding.
  *
  * Features:
- * - Save/load serialized Lunr index to IndexedDB via RxDB
+ * - Save/load serialized MiniSearch index to IndexedDB via RxDB
  * - Index metadata tracking (version, lastBuilt, documentCount)
- * - Rebuild decision logic based on age and document delta
+ * - Rebuild decision logic based on age
  */
 
-import lunr from 'lunr'
+import MiniSearch from 'minisearch'
 import { logger } from '@/services/logger'
 import { getDatabase, isDatabaseInitialized } from '@/services/database/init'
 import {
@@ -19,8 +19,10 @@ import {
   SEARCH_INDEX_SCHEMA_VERSION,
 } from '@/services/database/schemas/searchIndex.schema'
 import type { SearchIndexDocument } from '@/services/database/schemas/searchIndex.schema'
+import type { SearchableDocument } from './types'
 import type { IndexRebuildConfig } from './types'
 import { DEFAULT_REBUILD_CONFIG } from './types'
+import { SearchIndexService } from './searchIndexService'
 
 /**
  * IndexStorageService - Handles persistence of search index
@@ -30,13 +32,13 @@ import { DEFAULT_REBUILD_CONFIG } from './types'
  * import { indexStorageService } from '@/services/search/indexStorage'
  *
  * // Save index
- * await indexStorageService.saveIndex(lunrIndex, emails.length, accountIds)
+ * await indexStorageService.saveIndex(documentCount, accountIds)
  *
  * // Load index
  * const { index, metadata } = await indexStorageService.loadIndex()
  *
  * // Check if rebuild is needed
- * const shouldRebuild = await indexStorageService.shouldRebuild(currentDocCount)
+ * const shouldRebuild = await indexStorageService.shouldRebuild()
  * ```
  */
 class IndexStorageService {
@@ -70,24 +72,25 @@ class IndexStorageService {
   }
 
   /**
-   * Save Lunr index to RxDB
+   * Save MiniSearch index to RxDB
    *
-   * @param index - Lunr.js index to serialize and save
    * @param documentCount - Number of documents in the index
    * @param accountIds - Account IDs included in the index
    */
-  async saveIndex(
-    index: lunr.Index,
-    documentCount: number,
-    accountIds: string[] = []
-  ): Promise<void> {
+  async saveIndex(documentCount: number, accountIds: string[] = []): Promise<void> {
     const startTime = performance.now()
 
     try {
       await this.ensureCollection()
       const db = getDatabase()
 
-      // Serialize Lunr index to JSON
+      const index = SearchIndexService.getInstance().getIndex()
+      if (!index) {
+        logger.warn('search', 'Cannot save index - no index to serialize')
+        return
+      }
+
+      // MiniSearch is JSON-serializable
       const serializedIndex = JSON.stringify(index)
       const indexSizeBytes = new Blob([serializedIndex]).size
 
@@ -117,12 +120,12 @@ class IndexStorageService {
   }
 
   /**
-   * Load Lunr index from RxDB
+   * Load MiniSearch index from RxDB
    *
-   * @returns Deserialized Lunr index and metadata, or null if not found
+   * @returns Deserialized MiniSearch index and metadata, or null if not found
    */
   async loadIndex(): Promise<{
-    index: lunr.Index
+    index: MiniSearch<SearchableDocument>
     metadata: Omit<SearchIndexDocument, 'serializedIndex' | 'id'>
   } | null> {
     const startTime = performance.now()
@@ -149,8 +152,11 @@ class IndexStorageService {
         return null
       }
 
-      // Deserialize Lunr index
-      const index = lunr.Index.load(JSON.parse(indexDoc.serializedIndex))
+      // Deserialize MiniSearch index — must pass same options used during construction
+      const index = MiniSearch.loadJSON<SearchableDocument>(
+        indexDoc.serializedIndex,
+        SearchIndexService.getMiniSearchOptions()
+      )
 
       const duration = performance.now() - startTime
       logger.info('search', `Search index loaded in ${duration.toFixed(0)}ms`, {
@@ -177,15 +183,13 @@ class IndexStorageService {
   /**
    * Check if index should be rebuilt
    *
-   * @param currentDocumentCount - Current number of documents
+   * With MiniSearch incremental updates, the only rebuild trigger is age (7 days safety net).
+   *
    * @param config - Rebuild configuration (optional)
    * @returns true if rebuild is recommended
    */
-  async shouldRebuild(
-    currentDocumentCount: number,
-    config: IndexRebuildConfig = {}
-  ): Promise<boolean> {
-    const { maxAge, maxDocumentDelta, force } = { ...DEFAULT_REBUILD_CONFIG, ...config }
+  async shouldRebuild(config: IndexRebuildConfig = {}): Promise<boolean> {
+    const { maxAge, force } = { ...DEFAULT_REBUILD_CONFIG, ...config }
 
     // Force rebuild if requested
     if (force) {
@@ -218,16 +222,6 @@ class IndexStorageService {
         logger.debug('search', 'Index too old, rebuild needed', {
           ageMs: age,
           maxAgeMs: maxAge,
-        })
-        return true
-      }
-
-      // Check document count delta
-      const delta = Math.abs(currentDocumentCount - indexDoc.documentCount)
-      if (delta > maxDocumentDelta) {
-        logger.debug('search', 'Document count delta too large, rebuild needed', {
-          delta,
-          maxDelta: maxDocumentDelta,
         })
         return true
       }

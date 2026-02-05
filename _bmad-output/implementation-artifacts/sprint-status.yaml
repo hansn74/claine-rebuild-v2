@@ -116,7 +116,7 @@ development_status:
   2-20-pre-render-adjacent-email-thread-views: done
   # Correct-Course: Superhuman Analysis (2026-02-02) — Priority 2
   2-19-parallel-action-queue-processing: done
-  2-21-replace-lunr-with-minisearch: backlog
+  2-21-replace-lunr-with-minisearch: done
   2-22-search-operators-structured-queries: backlog
   # Correct-Course: Superhuman Analysis (2026-02-02) — Priority 3
   2-23-keyboard-shortcut-discoverability: backlog

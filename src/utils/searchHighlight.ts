@@ -42,7 +42,7 @@ export function parseSearchTerms(query: string): string[] {
     // match[1] is quoted phrase, match[2] is single word
     const term = match[1] || match[2]
     if (term && term.length > 0) {
-      // Skip Lunr operators
+      // Skip search operators
       const lowerTerm = term.toLowerCase()
       if (lowerTerm !== 'or' && lowerTerm !== 'and' && lowerTerm !== 'not') {
         // Remove field prefixes (e.g., "subject:" or "from:")

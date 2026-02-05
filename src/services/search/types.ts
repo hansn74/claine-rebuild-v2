@@ -2,22 +2,23 @@
  * Search Service Types
  *
  * Type definitions for the full-text search functionality.
- * Uses Lunr.js for client-side full-text search as specified in architecture.md.
+ * Uses MiniSearch for client-side full-text search with BM25 scoring.
  */
 
-import type lunr from 'lunr'
 import type { EmailDocument } from '@/services/database/schemas/email.schema'
 
 /**
- * Search result from Lunr.js with relevance score
+ * Search result from MiniSearch with relevance score
  */
 export interface SearchResult {
   /** Document ID (email ID) */
   id: string
-  /** Relevance score from Lunr (higher = more relevant) */
+  /** Relevance score from MiniSearch BM25 (higher = more relevant) */
   score: number
-  /** Match data containing which fields matched */
-  matchData: lunr.MatchData
+  /** Match data: field name → matched terms in that field */
+  match: Record<string, string[]>
+  /** Terms that matched the query */
+  terms: string[]
 }
 
 /**
@@ -26,7 +27,7 @@ export interface SearchResult {
 export interface EnrichedSearchResult {
   /** Full email document */
   email: EmailDocument
-  /** Relevance score from Lunr */
+  /** Relevance score from MiniSearch */
   score: number
   /** Highlighted snippets for matched fields */
   highlights: SearchHighlights
@@ -45,11 +46,11 @@ export interface SearchHighlights {
 }
 
 /**
- * Document format for indexing in Lunr
+ * Document format for indexing in MiniSearch
  * Flattened structure for efficient search
  */
 export interface SearchableDocument {
-  /** Email ID (used as ref in Lunr) */
+  /** Email ID (used as document ID in MiniSearch) */
   id: string
   /** Email subject (boost: 10) */
   subject: string
@@ -86,18 +87,6 @@ export interface SearchIndexMetadata {
 }
 
 /**
- * Persisted search index document for RxDB storage
- */
-export interface SearchIndexDocument {
-  /** Primary key - always 'search-index' for singleton */
-  id: string
-  /** Serialized Lunr index (JSON string) */
-  serializedIndex: string
-  /** Index metadata */
-  metadata: SearchIndexMetadata
-}
-
-/**
  * Search index statistics
  */
 export interface SearchIndexStats {
@@ -107,8 +96,6 @@ export interface SearchIndexStats {
   indexBuilt: boolean
   /** Timestamp of last build */
   lastBuilt: number | null
-  /** Whether index needs rebuild (stale) */
-  needsRebuild: boolean
 }
 
 /**
@@ -133,9 +120,7 @@ export interface SearchPerformanceMetrics {
 export interface IndexRebuildConfig {
   /** Maximum age of index before forced rebuild (ms) - default 7 days */
   maxAge?: number
-  /** Maximum document count delta before rebuild */
-  maxDocumentDelta?: number
-  /** Force rebuild regardless of age/delta */
+  /** Force rebuild regardless of age */
   force?: boolean
 }
 
@@ -144,6 +129,5 @@ export interface IndexRebuildConfig {
  */
 export const DEFAULT_REBUILD_CONFIG: Required<IndexRebuildConfig> = {
   maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-  maxDocumentDelta: 1000, // Rebuild if >1000 docs changed
   force: false,
 }
