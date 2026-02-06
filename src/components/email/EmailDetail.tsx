@@ -3,8 +3,12 @@
  * Displays full email content when selected
  *
  * AC4: Shows basic detail view of email
+ *
+ * Story 2.23: Sets activeScope to 'reading' when email is displayed
  */
 
+import { useEffect } from 'react'
+import { useShortcuts } from '@/context/ShortcutContext'
 import type { EmailDocument } from '@/services/database/schemas/email.schema'
 
 interface EmailDetailProps {
@@ -36,6 +40,16 @@ function formatAddress(addr: { name: string; email: string }): string {
 }
 
 export function EmailDetail({ email }: EmailDetailProps) {
+  const { setActiveScope } = useShortcuts()
+
+  // Story 2.23: Set scope to 'reading' when viewing an email
+  useEffect(() => {
+    if (email) {
+      setActiveScope('reading')
+    }
+    // Note: We don't reset to 'inbox' on unmount because VirtualEmailList handles that
+  }, [email, setActiveScope])
+
   // No email selected state
   if (!email) {
     return (

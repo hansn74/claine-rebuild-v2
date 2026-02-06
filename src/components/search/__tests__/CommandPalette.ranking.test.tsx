@@ -136,8 +136,9 @@ describe('CommandPalette Context-Aware Ranking', () => {
       expect(hasNavigationCommands).toBe(true)
     })
 
-    it('ranks inbox-scope actions above compose-only actions', () => {
-      mockActiveScope.mockReturnValue('inbox')
+    it('ranks reading-scope actions (archive) above reading-only actions (reply) alphabetically', () => {
+      // In reading scope, both Archive and Reply are available
+      mockActiveScope.mockReturnValue('reading')
 
       render(<CommandPalette open={true} onClose={vi.fn()} mode="actions" />)
 
@@ -145,7 +146,7 @@ describe('CommandPalette Context-Aware Ranking', () => {
         .getAllByRole('button')
         .filter((btn) => btn.getAttribute('data-index') !== null)
 
-      // Find indices of Archive (inbox scope) and Reply (reading scope only)
+      // Find indices of Archive and Reply (both reading scope)
       let archiveIndex = -1
       let replyIndex = -1
 
@@ -156,7 +157,9 @@ describe('CommandPalette Context-Aware Ranking', () => {
         if (name === 'Reply') replyIndex = index
       })
 
-      // Archive (inbox scope relevant) should come before Reply (reading scope only)
+      // Both should be present and Archive comes before Reply alphabetically
+      expect(archiveIndex).toBeGreaterThan(-1)
+      expect(replyIndex).toBeGreaterThan(-1)
       expect(archiveIndex).toBeLessThan(replyIndex)
     })
   })
@@ -179,7 +182,8 @@ describe('CommandPalette Context-Aware Ranking', () => {
     })
 
     it('shows Recent section header when recent commands exist', () => {
-      mockActiveScope.mockReturnValue('inbox')
+      // Use reading scope so 'archive' is in scope and can appear in Recent
+      mockActiveScope.mockReturnValue('reading')
       mockGetRecentCommands.mockReturnValue(['archive'])
 
       render(<CommandPalette open={true} onClose={vi.fn()} mode="actions" />)

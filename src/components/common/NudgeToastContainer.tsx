@@ -1,76 +1,40 @@
 /**
- * ShortcutNudgeTooltip Component
+ * NudgeToastContainer Component
  *
  * Story 2.23: Keyboard Shortcut Discoverability
- * Task 5.7: Create ShortcutNudgeTooltip component
  *
- * One-time tooltip that suggests using a keyboard shortcut
- * after repeated mouse usage. Auto-dismisses after 5 seconds.
- *
- * Uses Portal to render at document.body level to escape
- * overflow:hidden clipping on parent containers.
+ * Global container for nudge toasts rendered at App level.
+ * Uses Portal to ensure proper z-index stacking.
  */
 
-import { memo, useEffect, useState } from 'react'
+import { useEffect, memo } from 'react'
 import { createPortal } from 'react-dom'
 import { Lightbulb, X } from 'lucide-react'
+import { useNudgeStore } from '@/store/nudgeStore'
 
 const AUTO_DISMISS_MS = 5000
 
-export interface ShortcutNudgeTooltipProps {
-  /** The shortcut key to suggest (e.g., "e") */
-  shortcutKey: string
-  /** Action description (e.g., "archive") */
-  actionName: string
-  /** Called when the tooltip is dismissed */
-  onDismiss: () => void
-  /** Position relative to trigger element - ignored, now renders as fixed toast */
-  position?: 'top' | 'bottom' | 'left' | 'right'
-  /** Additional CSS classes */
-  className?: string
-}
-
 /**
- * ShortcutNudgeTooltip - Suggests keyboard shortcut after mouse usage
+ * NudgeToastContainer - Renders active nudge toast
  *
- * Renders as a toast notification in bottom-left corner (avoiding conflict
- * with UndoToast in bottom-right) using Portal for reliable display.
- *
- * Usage:
- * ```tsx
- * {showNudge && (
- *   <ShortcutNudgeTooltip
- *     shortcutKey="e"
- *     actionName="archive"
- *     onDismiss={() => markNudgeShown('archive')}
- *   />
- * )}
- * ```
+ * Place this component at the App level to ensure nudges
+ * survive component unmounts (e.g., when email is deleted).
  */
-export const ShortcutNudgeTooltip = memo(function ShortcutNudgeTooltip({
-  shortcutKey,
-  actionName,
-  onDismiss,
-}: ShortcutNudgeTooltipProps) {
-  const [isVisible, setIsVisible] = useState(true)
+export const NudgeToastContainer = memo(function NudgeToastContainer() {
+  const { activeNudge, dismissNudge } = useNudgeStore()
 
   // Auto-dismiss after 5 seconds
   useEffect(() => {
+    if (!activeNudge) return
+
     const timer = setTimeout(() => {
-      setIsVisible(false)
-      onDismiss()
+      dismissNudge()
     }, AUTO_DISMISS_MS)
 
     return () => clearTimeout(timer)
-  }, [onDismiss])
+  }, [activeNudge, dismissNudge])
 
-  // Handle manual dismiss
-  const handleDismiss = () => {
-    setIsVisible(false)
-    onDismiss()
-  }
-
-  if (!isVisible) {
+  if (!activeNudge) {
     return null
   }
 
@@ -92,7 +56,8 @@ export const ShortcutNudgeTooltip = memo(function ShortcutNudgeTooltip({
         fontSize: '14px',
         animation: 'nudge-fade-in 200ms ease-out',
       }}
-      role="tooltip"
+      role="alert"
+      aria-live="polite"
     >
       <Lightbulb style={{ width: 16, height: 16, color: '#facc15', flexShrink: 0 }} />
       <span>
@@ -106,13 +71,13 @@ export const ShortcutNudgeTooltip = memo(function ShortcutNudgeTooltip({
             fontFamily: 'monospace',
           }}
         >
-          {shortcutKey}
+          {activeNudge.shortcutKey}
         </kbd>{' '}
-        to {actionName} faster
+        to {activeNudge.actionName} faster
       </span>
       <button
         type="button"
-        onClick={handleDismiss}
+        onClick={dismissNudge}
         style={{
           marginLeft: '4px',
           padding: '2px',
@@ -136,6 +101,5 @@ export const ShortcutNudgeTooltip = memo(function ShortcutNudgeTooltip({
     </div>
   )
 
-  // Use portal to render at document.body level, escaping overflow:hidden
   return createPortal(tooltipContent, document.body)
 })

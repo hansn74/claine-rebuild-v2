@@ -11,17 +11,12 @@
  * Supports different variants and sizes.
  */
 
-import {
-  forwardRef,
-  useState,
-  type MouseEvent,
-  type ReactNode,
-  type ButtonHTMLAttributes,
-} from 'react'
+import { forwardRef, type MouseEvent, type ReactNode, type ButtonHTMLAttributes } from 'react'
 import { cn } from '@/utils/cn'
 import { ShortcutHint } from '@/components/common/ShortcutHint'
-import { ShortcutNudgeTooltip } from '@/components/common/ShortcutNudgeTooltip'
+import { HoverTooltip } from '@/components/common/HoverTooltip'
 import { useShortcutNudge } from '@/hooks/useShortcutNudge'
+import { useNudgeStore } from '@/store/nudgeStore'
 import type { ShortcutScope } from '@/types/shortcuts'
 
 interface EmailActionButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -85,26 +80,22 @@ export const EmailActionButton = forwardRef<HTMLButtonElement, EmailActionButton
   ) => {
     const isDisabled = disabled || loading
     const { recordMouseAction, shouldShowNudge, markNudgeShown } = useShortcutNudge()
-    // Track if nudge was dismissed during this component's lifetime
-    const [nudgeDismissed, setNudgeDismissed] = useState(false)
+    const { showNudge: triggerGlobalNudge } = useNudgeStore()
 
-    // Derive showNudge from shouldShowNudge without useEffect
-    const showNudge = !nudgeDismissed && actionId && shortcutKey ? shouldShowNudge(actionId) : false
-
-    // Handle click with mouse action tracking
+    // Handle click with mouse action tracking and nudge triggering
     const handleClick = (e: MouseEvent<HTMLButtonElement>) => {
       if (actionId) {
         recordMouseAction(actionId)
+
+        // Check if we should show a nudge after recordMouseAction increments the count
+        if (shortcutKey && shouldShowNudge(actionId)) {
+          // Trigger global nudge toast (survives component unmount)
+          triggerGlobalNudge(label || tooltip, shortcutKey)
+          // Mark as shown so it won't appear again
+          markNudgeShown(actionId)
+        }
       }
       onClick?.(e)
-    }
-
-    // Handle nudge dismiss
-    const handleNudgeDismiss = () => {
-      if (actionId) {
-        markNudgeShown(actionId)
-      }
-      setNudgeDismissed(true)
     }
 
     // Base classes
@@ -134,43 +125,33 @@ export const EmailActionButton = forwardRef<HTMLButtonElement, EmailActionButton
     // Build tooltip with shortcut hint
     const tooltipWithShortcut = shortcutKey ? `${tooltip} (${shortcutKey})` : tooltip
 
-    return (
-      <div className="relative inline-block">
-        <button
-          ref={ref}
-          type="button"
-          disabled={isDisabled}
-          title={tooltipWithShortcut}
-          aria-label={label || tooltip}
-          className={cn(baseClasses, variantClasses[variant], sizeClasses[size], className)}
-          onClick={handleClick}
-          {...props}
-        >
-          {loading ? (
-            <span className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
-          ) : (
-            <>
-              {icon}
-              {label && size !== 'icon' && (
-                <>
-                  <span>{label}</span>
-                  {shortcutKey && (
-                    <ShortcutHint shortcutKey={shortcutKey} scopes={shortcutScopes} />
-                  )}
-                </>
-              )}
-            </>
-          )}
-        </button>
-        {showNudge && shortcutKey && (
-          <ShortcutNudgeTooltip
-            actionName={label || tooltip}
-            shortcutKey={shortcutKey}
-            onDismiss={handleNudgeDismiss}
-          />
+    const button = (
+      <button
+        ref={ref}
+        type="button"
+        disabled={isDisabled}
+        aria-label={label || tooltip}
+        className={cn(baseClasses, variantClasses[variant], sizeClasses[size], className)}
+        onClick={handleClick}
+        {...props}
+      >
+        {loading ? (
+          <span className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
+        ) : (
+          <>
+            {icon}
+            {label && size !== 'icon' && (
+              <>
+                <span>{label}</span>
+                {shortcutKey && <ShortcutHint shortcutKey={shortcutKey} scopes={shortcutScopes} />}
+              </>
+            )}
+          </>
         )}
-      </div>
+      </button>
     )
+
+    return <HoverTooltip content={tooltipWithShortcut}>{button}</HoverTooltip>
   }
 )
 

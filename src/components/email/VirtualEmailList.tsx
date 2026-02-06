@@ -232,10 +232,13 @@ export function VirtualEmailList({
     scopes: ['inbox'],
   })
 
-  // Set inbox scope when this component is active
+  // Set inbox scope when this component is active AND no email is selected
+  // Story 2.23: When an email is selected, ThreadDetailView sets 'reading' scope - don't override
   useEffect(() => {
-    setActiveScope('inbox')
-  }, [setActiveScope])
+    if (!selectedEmailId) {
+      setActiveScope('inbox')
+    }
+  }, [setActiveScope, selectedEmailId])
 
   // Track previous selectedEmailId to only scroll when it actually changes
   const prevSelectedEmailIdRef = useRef<string | null>(null)

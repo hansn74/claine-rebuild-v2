@@ -25,6 +25,7 @@ import { useMemo, useCallback, useState, useEffect } from 'react'
 import { Mail, Users, MessageSquare, ArrowLeft, Tag } from 'lucide-react'
 import { cn } from '@/utils/cn'
 import { useThread } from '@/hooks/useThread'
+import { useShortcuts } from '@/context/ShortcutContext'
 import { groupMessagesBySender } from '@/utils/threadGrouping'
 import { ThreadMessage } from './ThreadMessage'
 import { EmailActionBar } from './EmailActionBar'
@@ -236,6 +237,14 @@ export function ThreadDetailView({
   // Fetch thread data
   const { emails, loading, error, threadSubject, participantCount, messageCount } =
     useThread(threadId)
+
+  // Story 2.23: Set scope to 'reading' when viewing a thread
+  const { setActiveScope } = useShortcuts()
+  useEffect(() => {
+    if (threadId) {
+      setActiveScope('reading')
+    }
+  }, [threadId, setActiveScope])
 
   // Email store actions
   const { archiveEmail, deleteEmail, toggleReadStatus, isActionLoading } = useEmailStore()

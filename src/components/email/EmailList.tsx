@@ -33,6 +33,7 @@
  */
 
 import { useCallback, useMemo, memo, useEffect, useRef } from 'react'
+import { useHotkeys } from 'react-hotkeys-hook'
 import { VirtualEmailList } from './VirtualEmailList'
 import { ThreadDetailView } from './ThreadDetailView'
 import { BulkActionBar } from './BulkActionBar'
@@ -333,6 +334,18 @@ export function EmailList({ accountId }: EmailListProps) {
   const handleBack = useCallback(() => {
     setSelectedEmail(null, null)
   }, [setSelectedEmail])
+
+  // Story 2.11: Escape key to deselect/go back to list view
+  useHotkeys(
+    'escape',
+    () => {
+      if (selectedThreadId) {
+        handleBack()
+      }
+    },
+    { enabled: !!selectedThreadId },
+    [selectedThreadId, handleBack]
+  )
 
   // Bulk action handlers
   const handleBulkArchive = useCallback(async () => {

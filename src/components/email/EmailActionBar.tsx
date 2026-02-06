@@ -87,11 +87,14 @@ export function EmailActionBar({
         <EmailActionButton
           icon={<Reply className={compact ? 'w-4 h-4' : 'w-4 h-4'} />}
           label={compact ? '' : 'Reply'}
-          tooltip="Reply (r)"
+          tooltip="Reply"
           onClick={onReply}
           disabled={isLoading}
           variant="ghost"
           size={compact ? 'icon' : 'sm'}
+          shortcutKey="r"
+          shortcutScopes={['reading']}
+          actionId="reply"
         />
       )}
 
@@ -100,11 +103,14 @@ export function EmailActionBar({
         <EmailActionButton
           icon={<ReplyAll className={compact ? 'w-4 h-4' : 'w-4 h-4'} />}
           label={compact ? '' : 'Reply All'}
-          tooltip="Reply All (Shift+r)"
+          tooltip="Reply All"
           onClick={onReplyAll}
           disabled={isLoading}
           variant="ghost"
           size={compact ? 'icon' : 'sm'}
+          shortcutKey="Shift+r"
+          shortcutScopes={['reading']}
+          actionId="replyAll"
         />
       )}
 
@@ -113,11 +119,14 @@ export function EmailActionBar({
         <EmailActionButton
           icon={<Forward className={compact ? 'w-4 h-4' : 'w-4 h-4'} />}
           label={compact ? '' : 'Forward'}
-          tooltip="Forward (f)"
+          tooltip="Forward"
           onClick={onForward}
           disabled={isLoading}
           variant="ghost"
           size={compact ? 'icon' : 'sm'}
+          shortcutKey="f"
+          shortcutScopes={['reading']}
+          actionId="forward"
         />
       )}
 
@@ -130,23 +139,29 @@ export function EmailActionBar({
       <EmailActionButton
         icon={<Archive className={compact ? 'w-4 h-4' : 'w-4 h-4'} />}
         label={compact ? '' : 'Archive'}
-        tooltip="Archive (e)"
+        tooltip="Archive"
         onClick={onArchive}
         disabled={isLoading}
         variant="ghost"
         size={compact ? 'icon' : 'sm'}
+        shortcutKey="e"
+        shortcutScopes={['inbox', 'reading']}
+        actionId="archive"
       />
 
       {/* Delete button */}
       <EmailActionButton
         icon={<Trash2 className={compact ? 'w-4 h-4' : 'w-4 h-4'} />}
         label={compact ? '' : 'Delete'}
-        tooltip="Delete (#)"
+        tooltip="Delete"
         onClick={onDelete}
         disabled={isLoading}
         variant="ghost"
         size={compact ? 'icon' : 'sm'}
         destructive
+        shortcutKey="#"
+        shortcutScopes={['inbox', 'reading']}
+        actionId="delete"
       />
 
       {/* Move to folder dropdown (AC 4) */}
@@ -170,11 +185,14 @@ export function EmailActionBar({
           )
         }
         label={compact ? '' : isRead ? 'Mark unread' : 'Mark read'}
-        tooltip={isRead ? 'Mark as unread (u)' : 'Mark as read (u)'}
+        tooltip={isRead ? 'Mark as unread' : 'Mark as read'}
         onClick={onToggleRead}
         disabled={isLoading}
         variant="ghost"
         size={compact ? 'icon' : 'sm'}
+        shortcutKey="u"
+        shortcutScopes={['inbox', 'reading']}
+        actionId="toggleRead"
       />
     </div>
   )

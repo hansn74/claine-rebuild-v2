@@ -124,7 +124,7 @@ const QUICK_COMMANDS: CommandItem[] = [
     shortcut: 'e',
     icon: COMMAND_ICONS.archive,
     category: 'actions',
-    scopes: ['inbox', 'reading'],
+    scopes: ['reading'],
   },
   {
     id: 'delete',
@@ -133,7 +133,7 @@ const QUICK_COMMANDS: CommandItem[] = [
     shortcut: '#',
     icon: COMMAND_ICONS.delete,
     category: 'actions',
-    scopes: ['inbox', 'reading'],
+    scopes: ['reading'],
   },
   {
     id: 'reply',
@@ -160,7 +160,7 @@ const QUICK_COMMANDS: CommandItem[] = [
     shortcut: 's',
     icon: COMMAND_ICONS.star,
     category: 'actions',
-    scopes: ['inbox', 'reading'],
+    scopes: ['reading'],
   },
   // Settings
   {
@@ -351,8 +351,16 @@ export const CommandPalette = memo(function CommandPalette({
     // Get recent commands for ranking
     const recentIds = getRecentCommands()
 
+    // Filter by scope: show commands that are global or match current scope
+    // Recent commands must also be in scope (don't show unusable commands)
+    const scopeFiltered = filtered.filter((cmd) => {
+      const isGlobal = cmd.scopes?.includes('global') ?? false
+      const isInScope = cmd.scopes?.includes(activeScope) ?? false
+      return isGlobal || isInScope
+    })
+
     // Sort: recent first, then scope-relevant, then alphabetical
-    const sorted = filtered.sort((a, b) => {
+    const sorted = scopeFiltered.sort((a, b) => {
       const aRecentIndex = recentIds.indexOf(a.id)
       const bRecentIndex = recentIds.indexOf(b.id)
       const aIsRecent = aRecentIndex !== -1

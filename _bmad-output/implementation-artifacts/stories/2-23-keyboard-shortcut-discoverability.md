@@ -213,13 +213,18 @@ Claude Opus 4.5 (claude-opus-4-5-20251101)
 - src/components/search/CommandPalette.tsx: Context-aware ranking + "Recent" section header (Code Review Fix)
 - src/components/email/EmailActionButton.tsx: Shortcut hint and nudge integration
 - src/hooks/useEmailKeyboardShortcuts.ts: Keyboard action tracking
+- src/components/email/VirtualEmailList.tsx: Conditional scope setting (only when no email selected)
+- src/components/email/ThreadDetailView.tsx: Sets 'reading' scope when viewing a thread (E2E fix)
+- src/components/email/EmailActionBar.tsx: Added shortcutKey, shortcutScopes, actionId props to action buttons
 
 ### File List
 
 **New Files:**
 
 - src/components/common/ShortcutHint.tsx
-- src/components/common/ShortcutNudgeTooltip.tsx
+- src/components/common/ShortcutNudgeTooltip.tsx (legacy, replaced by global system)
+- src/components/common/NudgeToastContainer.tsx (E2E fix - global nudge toast)
+- src/store/nudgeStore.ts (E2E fix - global nudge state)
 - src/hooks/useCommandUsage.ts
 - src/hooks/useShortcutNudge.ts
 - src/components/common/**tests**/ShortcutHint.test.tsx
@@ -231,5 +236,6 @@ Claude Opus 4.5 (claude-opus-4-5-20251101)
 
 - src/store/settingsStore.ts
 - src/components/search/CommandPalette.tsx
-- src/components/email/EmailActionButton.tsx
+- src/components/email/EmailActionButton.tsx (uses global nudge store)
 - src/hooks/useEmailKeyboardShortcuts.ts
+- src/App.tsx (renders NudgeToastContainer)

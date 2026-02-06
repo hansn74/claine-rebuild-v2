@@ -22,6 +22,7 @@ import {
 import { ConflictIndicator } from '@/components/conflicts'
 import { PerformanceMonitor } from '@/components/dev'
 import { ComposeLoadingFallback, SearchLoadingFallback } from '@/components/common'
+import { NudgeToastContainer } from '@/components/common/NudgeToastContainer'
 import { WelcomeScreen } from '@/components/onboarding/WelcomeScreen'
 import { useOnboardingState } from '@/hooks/useOnboardingState'
 import { initializeReAuthNotifications } from '@/services/auth/notificationIntegration'
@@ -899,6 +900,9 @@ function App() {
 
           {/* Undo toast (fixed position, bottom-right) - outside main container for proper fixed positioning */}
           <UndoToast />
+
+          {/* Story 2.23: Keyboard shortcut nudge toasts (fixed position, bottom-left) */}
+          <NudgeToastContainer />
 
           {/* Story 2.18 (AC 8): Background send result notifications */}
           {bgSendResults.length > 0 && (
