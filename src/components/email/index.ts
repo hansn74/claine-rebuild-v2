@@ -29,3 +29,10 @@ export { MoveToFolderDropdown } from './MoveToFolderDropdown'
 
 // Story 3.3: Priority Scoring
 export { PriorityBadge } from './PriorityBadge'
+
+// Story 3.5: Explainability UI
+export { PriorityExplainPopover } from './PriorityExplainPopover'
+
+// Story 3.4: Priority-Based Inbox View
+export { PrioritySectionHeader } from './PrioritySectionHeader'
+export { ViewModeToggle } from './ViewModeToggle'

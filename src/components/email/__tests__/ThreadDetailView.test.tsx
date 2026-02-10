@@ -25,6 +25,13 @@ vi.mock('@/services/logger', () => ({
   },
 }))
 
+// Mock ShortcutContext (Story 2.23: ThreadDetailView now sets activeScope)
+vi.mock('@/context/ShortcutContext', () => ({
+  useShortcuts: () => ({
+    setActiveScope: vi.fn(),
+  }),
+}))
+
 import { useThread } from '@/hooks/useThread'
 
 const mockUseThread = vi.mocked(useThread)
@@ -204,6 +211,54 @@ describe('ThreadDetailView', () => {
       render(<ThreadDetailView threadId="thread-1" />)
 
       expect(screen.getByText('Thread not found')).toBeInTheDocument()
+    })
+  })
+
+  describe('Priority Badge in Header', () => {
+    it('should show PriorityBadge when email has aiMetadata with priority', () => {
+      const mockEmails = [
+        generateMockEmail({
+          aiMetadata: {
+            triageScore: 85,
+            priority: 'high',
+            suggestedAttributes: {},
+            confidence: 87,
+            reasoning: 'Test reasoning',
+            modelVersion: 'test-v1',
+            processedAt: Date.now() - 3600000,
+          },
+        }),
+      ]
+
+      mockUseThread.mockReturnValue({
+        emails: mockEmails,
+        loading: false,
+        error: null,
+        threadSubject: 'Priority Thread',
+        participantCount: 1,
+        messageCount: 1,
+      })
+
+      render(<ThreadDetailView threadId="thread-1" />)
+
+      expect(screen.getByLabelText('Priority: Urgent. Click for details')).toBeInTheDocument()
+    })
+
+    it('should not show PriorityBadge when email has no aiMetadata', () => {
+      const mockEmails = [generateMockEmail()]
+
+      mockUseThread.mockReturnValue({
+        emails: mockEmails,
+        loading: false,
+        error: null,
+        threadSubject: 'No Priority Thread',
+        participantCount: 1,
+        messageCount: 1,
+      })
+
+      render(<ThreadDetailView threadId="thread-1" />)
+
+      expect(screen.queryByLabelText(/Priority:/)).not.toBeInTheDocument()
     })
   })
 

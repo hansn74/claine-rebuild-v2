@@ -23,6 +23,7 @@
 
 import { useMemo, useCallback, useState, useEffect } from 'react'
 import { Mail, Users, MessageSquare, ArrowLeft, Tag } from 'lucide-react'
+import { PriorityBadge } from './PriorityBadge'
 import { cn } from '@/utils/cn'
 import { useThread } from '@/hooks/useThread'
 import { useShortcuts } from '@/context/ShortcutContext'
@@ -39,7 +40,7 @@ import {
   buildForwardContext,
 } from '@/utils/composeHelpers'
 import { AttributePanel, AttributeTagList } from './attributes'
-import type { Attachment } from '@/services/database/schemas/email.schema'
+import type { Attachment, EmailDocument } from '@/services/database/schemas/email.schema'
 import type { EmailAttributeValues } from '@/types/attributes'
 
 interface ThreadDetailViewProps {
@@ -120,6 +121,7 @@ function ThreadHeader({
   showAttributeToggle,
   emailId,
   currentFolder,
+  aiMetadata,
 }: {
   subject: string
   participantCount: number
@@ -140,6 +142,7 @@ function ThreadHeader({
   showAttributeToggle?: boolean
   emailId?: string
   currentFolder?: string
+  aiMetadata?: EmailDocument['aiMetadata']
 }) {
   return (
     <div className="sticky top-0 z-10 bg-white border-b border-slate-200 px-4 py-3">
@@ -176,6 +179,14 @@ function ThreadHeader({
               {messageCount} message{messageCount !== 1 ? 's' : ''}
             </span>
           </div>
+          {/* Priority badge (Story 3.5) */}
+          {aiMetadata?.priority && (
+            <PriorityBadge
+              priority={aiMetadata.priority}
+              aiMetadata={aiMetadata}
+              className="mt-2"
+            />
+          )}
           {/* Attribute tags */}
           <AttributeTagList
             attributes={attributes}
@@ -423,6 +434,7 @@ export function ThreadDetailView({
         showAttributeToggle={true}
         emailId={firstEmailId}
         currentFolder={firstEmail?.folder}
+        aiMetadata={firstEmail?.aiMetadata}
       />
 
       {/* Attribute panel (collapsible) */}

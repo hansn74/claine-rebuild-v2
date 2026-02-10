@@ -194,7 +194,9 @@ export const EmailRow = memo(function EmailRow({
       {/* Indicators: priority, attributes, attachments, starred */}
       <div className="flex items-center gap-1.5 flex-shrink-0">
         {/* Priority badge (Story 3.3) */}
-        {email.aiMetadata?.priority && <PriorityBadge priority={email.aiMetadata.priority} />}
+        {email.aiMetadata?.priority && (
+          <PriorityBadge priority={email.aiMetadata.priority} aiMetadata={email.aiMetadata} />
+        )}
 
         {/* Attribute tags (Story 2.14) */}
         {hasAttributes && (
