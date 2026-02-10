@@ -17,6 +17,7 @@
 import { memo, useMemo, useCallback, MouseEvent } from 'react'
 import { cn } from '@shared/utils/cn'
 import { AttributeTagList } from './attributes'
+import { PriorityBadge } from './PriorityBadge'
 import { useSelectionStore } from '@/store/selectionStore'
 import type { EmailDocument } from '@/services/database/schemas/email.schema'
 
@@ -190,8 +191,11 @@ export const EmailRow = memo(function EmailRow({
         {email.snippet || ''}
       </span>
 
-      {/* Indicators: attributes, attachments, starred */}
+      {/* Indicators: priority, attributes, attachments, starred */}
       <div className="flex items-center gap-1.5 flex-shrink-0">
+        {/* Priority badge (Story 3.3) */}
+        {email.aiMetadata?.priority && <PriorityBadge priority={email.aiMetadata.priority} />}
+
         {/* Attribute tags (Story 2.14) */}
         {hasAttributes && (
           <AttributeTagList

@@ -57,6 +57,8 @@ import { useFolderCounts } from '@/hooks/useFolderCounts'
 import { useLabelSync } from '@/hooks/useLabelSync'
 import { useSearchIndex } from '@/hooks/useSearchIndex'
 import { useNetworkStatus } from '@/hooks/useNetworkStatus'
+import { useInitializeAI } from '@/hooks/useInitializeAI'
+import { usePriorityScoring } from '@/hooks/usePriorityScoring'
 import { cn } from '@/utils/cn'
 import { loadDemoData, clearDemoData, isDemoDataLoaded } from '@/utils/demoData'
 import { initDebugHelpers } from '@/utils/debugHelpers'
@@ -253,6 +255,12 @@ function App() {
 
   // Build and maintain search index for full-text search (Story 2.5)
   useSearchIndex()
+
+  // Story 3.2b: Initialize AI subsystem (capability detection, inference service, analysis wiring)
+  const { aiAvailable } = useInitializeAI()
+
+  // Story 3.3: Auto-score visible emails when AI is available
+  usePriorityScoring({ enabled: aiAvailable, accountId: activeAccountId })
 
   // Story 1.20: Bridge network status to health registry
   const { isOnline: networkIsOnline } = useNetworkStatus()

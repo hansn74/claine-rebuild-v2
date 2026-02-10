@@ -65,3 +65,15 @@ export {
 
 export { useModifierActions, useBulkModifierActions } from './useModifierActions'
 export type { ActionResult } from './useModifierActions'
+
+// Story 3.1: AI Model Loading
+export { useModelLoader } from './useModelLoader'
+export type { UseModelLoaderReturn } from './useModelLoader'
+
+// Story 3.2b: AI Initialization
+export { useInitializeAI } from './useInitializeAI'
+export type { UseInitializeAIReturn } from './useInitializeAI'
+
+// Story 3.3: Priority Scoring
+export { usePriorityScoring } from './usePriorityScoring'
+export type { UsePriorityScoringOptions } from './usePriorityScoring'

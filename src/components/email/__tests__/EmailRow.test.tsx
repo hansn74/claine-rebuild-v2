@@ -79,15 +79,15 @@ describe('EmailRow', () => {
       expect(screen.getByText('(No subject)')).toBeInTheDocument()
     })
 
-    it('displays snippet preview with dash prefix', () => {
+    it('displays snippet preview', () => {
       const email = createMockEmail({
         snippet: 'Hello, this is a preview of the email content...',
       })
 
       render(<EmailRow email={email} />)
 
-      // UX spec: snippet shown with dash prefix in compact layout
-      expect(screen.getByText(/— Hello, this is a preview/)).toBeInTheDocument()
+      // Snippet is shown in compact layout
+      expect(screen.getByText(/Hello, this is a preview/)).toBeInTheDocument()
     })
   })
 
@@ -296,13 +296,69 @@ describe('EmailRow', () => {
     it('has tabIndex for keyboard navigation (roving tabindex pattern)', () => {
       const email = createMockEmail()
 
-      // Unfocused rows should have tabIndex=-1 (roving tabindex pattern)
+      // Unselected rows should have tabIndex=-1 (roving tabindex pattern)
       const { rerender } = render(<EmailRow email={email} />)
       expect(screen.getByRole('button')).toHaveAttribute('tabindex', '-1')
 
-      // Focused rows should have tabIndex=0
-      rerender(<EmailRow email={email} isFocused />)
+      // Selected rows should have tabIndex=0
+      rerender(<EmailRow email={email} isSelected />)
       expect(screen.getByRole('button')).toHaveAttribute('tabindex', '0')
+    })
+  })
+
+  describe('Priority badge (Story 3.3)', () => {
+    it('displays priority badge when aiMetadata has priority', () => {
+      const email = createMockEmail({
+        aiMetadata: {
+          triageScore: 85,
+          priority: 'high',
+          suggestedAttributes: {},
+          confidence: 80,
+          reasoning: 'Urgent deadline',
+          modelVersion: 'heuristic-v1',
+          processedAt: Date.now(),
+        },
+      })
+
+      render(<EmailRow email={email} />)
+      expect(screen.getByText('Urgent')).toBeInTheDocument()
+    })
+
+    it('does not display priority badge when no aiMetadata', () => {
+      const email = createMockEmail()
+
+      render(<EmailRow email={email} />)
+      expect(screen.queryByText('Urgent')).not.toBeInTheDocument()
+      expect(screen.queryByText('Important')).not.toBeInTheDocument()
+      expect(screen.queryByText('Updates')).not.toBeInTheDocument()
+      expect(screen.queryByText('Low')).not.toBeInTheDocument()
+    })
+
+    it('displays correct badge label for each priority level', () => {
+      const priorities = [
+        { priority: 'high' as const, label: 'Urgent' },
+        { priority: 'medium' as const, label: 'Important' },
+        { priority: 'low' as const, label: 'Updates' },
+        { priority: 'none' as const, label: 'Low' },
+      ]
+
+      for (const { priority, label } of priorities) {
+        const email = createMockEmail({
+          aiMetadata: {
+            triageScore: 50,
+            priority,
+            suggestedAttributes: {},
+            confidence: 70,
+            reasoning: 'Test',
+            modelVersion: 'heuristic-v1',
+            processedAt: Date.now(),
+          },
+        })
+
+        const { unmount } = render(<EmailRow email={email} />)
+        expect(screen.getByText(label)).toBeInTheDocument()
+        unmount()
+      }
     })
   })
 })

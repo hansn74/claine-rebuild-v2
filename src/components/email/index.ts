@@ -26,3 +26,6 @@ export { DeleteConfirmDialog } from './DeleteConfirmDialog'
 // Story 2.9: Email Folders & Labels components
 export { FolderSidebar } from './FolderSidebar'
 export { MoveToFolderDropdown } from './MoveToFolderDropdown'
+
+// Story 3.3: Priority Scoring
+export { PriorityBadge } from './PriorityBadge'
