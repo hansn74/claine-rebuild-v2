@@ -14,6 +14,7 @@ import { render, screen } from '@testing-library/react'
 import { VirtualEmailList } from '../VirtualEmailList'
 import * as useEmailsModule from '@/hooks/useEmails'
 import * as emailListStoreModule from '@/store/emailListStore'
+import * as usePriorityGroupedModule from '@/hooks/usePriorityGroupedEmails'
 import type { EmailDocument } from '@/services/database/schemas/email.schema'
 
 // Mock the useEmails hook
@@ -71,6 +72,28 @@ vi.mock('@/hooks/useAttributes', () => ({
   })),
 }))
 
+// Mock viewModeStore
+const mockToggleSection = vi.fn()
+let mockViewMode: 'chronological' | 'priority' = 'chronological'
+vi.mock('@/store/viewModeStore', () => ({
+  useViewModeStore: vi.fn((selector) => {
+    const state = {
+      viewMode: mockViewMode,
+      collapsedSections: new Set<string>(),
+      toggleSection: mockToggleSection,
+      toggleViewMode: vi.fn(),
+      setViewMode: vi.fn(),
+      isSectionCollapsed: vi.fn(() => false),
+    }
+    return selector ? selector(state) : state
+  }),
+}))
+
+// Mock usePriorityGroupedEmails
+vi.mock('@/hooks/usePriorityGroupedEmails', () => ({
+  usePriorityGroupedEmails: vi.fn(() => []),
+}))
+
 /**
  * Generate mock emails for testing
  * @param count Number of mock emails to generate
@@ -101,10 +124,12 @@ describe('VirtualEmailList', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    mockViewMode = 'chronological'
     vi.mocked(emailListStoreModule.useEmailListStore).mockReturnValue({
       scrollOffset: 0,
       setScrollOffset: mockSetScrollOffset,
     })
+    vi.mocked(usePriorityGroupedModule.usePriorityGroupedEmails).mockReturnValue([])
   })
 
   describe('Loading state', () => {
@@ -320,6 +345,82 @@ describe('VirtualEmailList', () => {
           sortOrder: 'desc',
         })
       )
+    })
+  })
+
+  describe('Story 3.4: Priority view', () => {
+    it('shows ViewModeToggle for inbox folder', () => {
+      const mockEmails = generateMockEmails(3)
+      vi.mocked(useEmailsModule.useEmails).mockReturnValue({
+        emails: mockEmails,
+        loading: false,
+        error: null,
+        count: mockEmails.length,
+      })
+
+      render(<VirtualEmailList folder="Inbox" />)
+
+      // ViewModeToggle renders a button with aria-label
+      expect(screen.getByLabelText('Switch to priority view')).toBeInTheDocument()
+    })
+
+    it('does not show ViewModeToggle for sent folder', () => {
+      const mockEmails = generateMockEmails(3)
+      vi.mocked(useEmailsModule.useEmails).mockReturnValue({
+        emails: mockEmails,
+        loading: false,
+        error: null,
+        count: mockEmails.length,
+      })
+
+      render(<VirtualEmailList folder="Sent" />)
+
+      expect(screen.queryByLabelText('Switch to priority view')).not.toBeInTheDocument()
+      expect(screen.queryByLabelText('Switch to chronological view')).not.toBeInTheDocument()
+    })
+
+    it('does not show ViewModeToggle for drafts folder', () => {
+      const mockEmails = generateMockEmails(3)
+      vi.mocked(useEmailsModule.useEmails).mockReturnValue({
+        emails: mockEmails,
+        loading: false,
+        error: null,
+        count: mockEmails.length,
+      })
+
+      render(<VirtualEmailList folder="Drafts" />)
+
+      expect(screen.queryByLabelText('Switch to priority view')).not.toBeInTheDocument()
+    })
+
+    it('does not show ViewModeToggle for trash folder', () => {
+      const mockEmails = generateMockEmails(3)
+      vi.mocked(useEmailsModule.useEmails).mockReturnValue({
+        emails: mockEmails,
+        loading: false,
+        error: null,
+        count: mockEmails.length,
+      })
+
+      render(<VirtualEmailList folder="Trash" />)
+
+      expect(screen.queryByLabelText('Switch to priority view')).not.toBeInTheDocument()
+    })
+
+    it('renders virtualized structure in priority mode', () => {
+      mockViewMode = 'priority'
+      const mockEmails = generateMockEmails(5)
+      vi.mocked(useEmailsModule.useEmails).mockReturnValue({
+        emails: mockEmails,
+        loading: false,
+        error: null,
+        count: mockEmails.length,
+      })
+
+      const { container } = render(<VirtualEmailList folder="Inbox" />)
+
+      // Should still render the virtualized container
+      expect(container.querySelector('.overflow-auto')).toBeInTheDocument()
     })
   })
 })

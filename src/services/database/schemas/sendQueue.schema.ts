@@ -105,7 +105,7 @@ export interface SendQueueDocument {
  * - ['status', 'createdAt']: Compound index for pending queue processing
  */
 export const sendQueueSchema: RxJsonSchema<SendQueueDocument> = {
-  version: 1,
+  version: 0,
   primaryKey: 'id',
   type: 'object',
   properties: {

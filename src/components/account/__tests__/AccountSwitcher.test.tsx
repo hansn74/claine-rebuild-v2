@@ -61,8 +61,9 @@ describe('AccountSwitcher', () => {
       expect(screen.getByText('Connect Account')).toBeInTheDocument()
     })
 
-    it('calls onConnectAccount when button clicked', () => {
-      const mockOnConnect = vi.fn()
+    it('shows provider selection when connect button clicked', () => {
+      const mockOnConnectGmail = vi.fn()
+      const mockOnConnectOutlook = vi.fn()
       vi.mocked(accountStoreModule.useAccountStore).mockImplementation((selector) => {
         const state = {
           accounts: [],
@@ -72,10 +73,23 @@ describe('AccountSwitcher', () => {
         return selector(state as accountStoreModule.AccountState)
       })
 
-      render(<AccountSwitcher onConnectAccount={mockOnConnect} />)
+      render(
+        <AccountSwitcher
+          onConnectGmail={mockOnConnectGmail}
+          onConnectOutlook={mockOnConnectOutlook}
+        />
+      )
 
+      // Click to open dropdown
       fireEvent.click(screen.getByText('Connect Account'))
-      expect(mockOnConnect).toHaveBeenCalledTimes(1)
+
+      // Provider selection should appear
+      expect(screen.getByText('Gmail')).toBeInTheDocument()
+      expect(screen.getByText('Outlook')).toBeInTheDocument()
+
+      // Click Gmail provider
+      fireEvent.click(screen.getByText('Gmail'))
+      expect(mockOnConnectGmail).toHaveBeenCalledTimes(1)
     })
   })
 

@@ -10,6 +10,16 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { PriorityExplainPopover } from '../PriorityExplainPopover'
 import type { Priority } from '@/services/ai/priorityDisplay'
 
+vi.mock('@/services/ai/priorityFeedbackService', () => ({
+  priorityFeedbackService: {
+    recordOverride: vi.fn().mockResolvedValue(undefined),
+  },
+}))
+
+vi.mock('@/services/ai/priorityOverride', () => ({
+  clearPriorityOverride: vi.fn().mockResolvedValue(undefined),
+}))
+
 function createMockAIMetadata(overrides: Record<string, unknown> = {}) {
   return {
     triageScore: 85,
@@ -44,6 +54,8 @@ describe('PriorityExplainPopover', () => {
     priority: 'high' as Priority,
     triggerRect: createMockTriggerRect(),
     onClose: vi.fn(),
+    emailId: 'email-1',
+    onPriorityChange: vi.fn(),
   }
 
   beforeEach(() => {
@@ -63,7 +75,8 @@ describe('PriorityExplainPopover', () => {
 
   it('displays the priority label', () => {
     render(<PriorityExplainPopover {...defaultProps} />)
-    expect(screen.getByText('Urgent')).toBeInTheDocument()
+    const urgentElements = screen.getAllByText('Urgent')
+    expect(urgentElements.length).toBeGreaterThanOrEqual(1)
   })
 
   it('displays the confidence percentage', () => {
@@ -137,7 +150,9 @@ describe('PriorityExplainPopover', () => {
         aiMetadata={createMockAIMetadata({ priority: 'medium' })}
       />
     )
-    expect(screen.getByText('Important')).toBeInTheDocument()
+    // Header label — current priority button is disabled in the picker
+    const importantButtons = screen.getAllByText('Important')
+    expect(importantButtons.length).toBeGreaterThanOrEqual(1)
 
     rerender(
       <PriorityExplainPopover
@@ -146,7 +161,8 @@ describe('PriorityExplainPopover', () => {
         aiMetadata={createMockAIMetadata({ priority: 'low' })}
       />
     )
-    expect(screen.getByText('Updates')).toBeInTheDocument()
+    const updatesButtons = screen.getAllByText('Updates')
+    expect(updatesButtons.length).toBeGreaterThanOrEqual(1)
   })
 
   it('shows "Just now" for very recent analysis', () => {
@@ -180,5 +196,51 @@ describe('PriorityExplainPopover', () => {
     const mousedownRemove = removeSpy.mock.calls.filter((c) => c[0] === 'mousedown')
     expect(keydownRemove.length).toBeGreaterThanOrEqual(1)
     expect(mousedownRemove.length).toBeGreaterThanOrEqual(1)
+  })
+
+  // Story 3.6: Priority picker tests
+  describe('Priority picker (Story 3.6)', () => {
+    it('renders "Change priority" section', () => {
+      render(<PriorityExplainPopover {...defaultProps} />)
+      expect(screen.getByText('Change priority')).toBeInTheDocument()
+    })
+
+    it('renders all four priority buttons', () => {
+      render(<PriorityExplainPopover {...defaultProps} />)
+      const buttons = screen.getAllByRole('button')
+      // Filter to just the priority picker buttons (aria-label starts with "Set priority to")
+      const pickerButtons = buttons.filter((b) =>
+        b.getAttribute('aria-label')?.startsWith('Set priority to')
+      )
+      expect(pickerButtons).toHaveLength(4)
+    })
+
+    it('disables the current priority button', () => {
+      render(<PriorityExplainPopover {...defaultProps} priority="high" />)
+      const urgentButton = screen.getByLabelText('Set priority to Urgent')
+      expect(urgentButton).toBeDisabled()
+    })
+
+    it('calls recordOverride on priority selection', async () => {
+      const { priorityFeedbackService } = await import('@/services/ai/priorityFeedbackService')
+      const onPriorityChange = vi.fn()
+      render(<PriorityExplainPopover {...defaultProps} onPriorityChange={onPriorityChange} />)
+
+      const updatesButton = screen.getByLabelText('Set priority to Updates')
+      fireEvent.click(updatesButton)
+
+      expect(priorityFeedbackService.recordOverride).toHaveBeenCalledWith('email-1', 'low')
+    })
+
+    it('shows "Reset to AI" link for user overrides', () => {
+      const metadata = createMockAIMetadata({ modelVersion: 'user-override-v1' })
+      render(<PriorityExplainPopover {...defaultProps} aiMetadata={metadata} />)
+      expect(screen.getByText('Reset to AI')).toBeInTheDocument()
+    })
+
+    it('does not show "Reset to AI" for AI-assigned priorities', () => {
+      render(<PriorityExplainPopover {...defaultProps} />)
+      expect(screen.queryByText('Reset to AI')).not.toBeInTheDocument()
+    })
   })
 })

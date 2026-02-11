@@ -10,6 +10,7 @@ import { useState } from 'react'
 import { useAccountStore, MAX_ACCOUNTS, type Account } from '@/store/accountStore'
 import { disconnectAccount } from '@/services/auth/accountManager'
 import { Button } from '@shared/components/ui/button'
+import { AICapabilityStatus } from '@/components/settings/AICapabilityStatus'
 
 export interface AccountSettingsProps {
   /** Called when settings panel should be closed */
@@ -96,6 +97,11 @@ export function AccountSettings({
             />
           ))
         )}
+      </div>
+
+      {/* AI Features Status */}
+      <div className="px-4 py-3 border-t border-slate-200">
+        <AICapabilityStatus />
       </div>
 
       {/* Footer */}

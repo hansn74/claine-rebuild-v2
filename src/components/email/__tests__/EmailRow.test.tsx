@@ -315,7 +315,7 @@ describe('EmailRow', () => {
           suggestedAttributes: {},
           confidence: 80,
           reasoning: 'Urgent deadline',
-          modelVersion: 'heuristic-v1',
+          modelVersion: 'test-model-v1',
           processedAt: Date.now(),
         },
       })
@@ -350,7 +350,7 @@ describe('EmailRow', () => {
             suggestedAttributes: {},
             confidence: 70,
             reasoning: 'Test',
-            modelVersion: 'heuristic-v1',
+            modelVersion: 'test-model-v1',
             processedAt: Date.now(),
           },
         })

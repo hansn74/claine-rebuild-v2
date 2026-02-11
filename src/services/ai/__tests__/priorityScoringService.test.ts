@@ -64,7 +64,7 @@ describe('PriorityScoringService', () => {
       signals: [],
       modelVersion: 'test-v1',
       processedAt: Date.now(),
-      provider: 'heuristic',
+      provider: 'local',
     })
   })
 
@@ -116,7 +116,7 @@ describe('PriorityScoringService', () => {
           suggestedAttributes: {},
           confidence: 70,
           reasoning: 'AI scored',
-          modelVersion: 'heuristic-v1',
+          modelVersion: 'test-model-v1',
           processedAt: Date.now(),
         },
       })
@@ -163,7 +163,7 @@ describe('PriorityScoringService', () => {
             suggestedAttributes: {},
             confidence: 70,
             reasoning: 'AI',
-            modelVersion: 'heuristic-v1',
+            modelVersion: 'test-model-v1',
             processedAt: Date.now(),
           },
         }),
@@ -191,7 +191,7 @@ describe('PriorityScoringService', () => {
           signals: [],
           modelVersion: 'test-v1',
           processedAt: Date.now(),
-          provider: 'heuristic',
+          provider: 'local',
         }
       })
 

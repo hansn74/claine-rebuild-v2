@@ -77,3 +77,7 @@ export type { UseInitializeAIReturn } from './useInitializeAI'
 // Story 3.3: Priority Scoring
 export { usePriorityScoring } from './usePriorityScoring'
 export type { UsePriorityScoringOptions } from './usePriorityScoring'
+
+// Story 3.4: Priority-Based Inbox View
+export { usePriorityGroupedEmails } from './usePriorityGroupedEmails'
+export type { PriorityVirtualItem } from './usePriorityGroupedEmails'

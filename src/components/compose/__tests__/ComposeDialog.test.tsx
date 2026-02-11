@@ -78,6 +78,18 @@ vi.mock('@/services/logger', () => ({
   },
 }))
 
+// Mock useDraft hook
+vi.mock('@/hooks/useDraft', () => ({
+  useDraft: vi.fn(() => ({
+    draft: null,
+    draftId: null,
+    isLoading: false,
+    createDraft: vi.fn().mockResolvedValue('mock-draft-id'),
+    updateDraft: vi.fn().mockResolvedValue(undefined),
+    deleteDraft: vi.fn().mockResolvedValue(undefined),
+  })),
+}))
+
 describe('ComposeDialog', () => {
   const mockOnClose = vi.fn()
   const mockOnSend = vi.fn()
@@ -307,17 +319,20 @@ describe('ComposeDialog', () => {
   })
 
   describe('saving indicator', () => {
-    it('should show "Saving..." when isSaving is true', () => {
+    it('should not show "Saving..." without user edits', () => {
+      // Saving indicator only shows after user has edited
       render(<ComposeDialog {...defaultProps} isSaving={true} />)
 
-      expect(screen.getByText('Saving...')).toBeInTheDocument()
+      // Saving text should not appear when no edits have been made
+      expect(screen.queryByText('Saving...')).not.toBeInTheDocument()
     })
 
-    it('should show last saved time when available', () => {
+    it('should not show last saved time without user edits', () => {
       const lastSaved = new Date()
       render(<ComposeDialog {...defaultProps} lastSaved={lastSaved} />)
 
-      expect(screen.getByText(/saved/i)).toBeInTheDocument()
+      // Saved text should not appear when no edits have been made
+      expect(screen.queryByText(/saved/i)).not.toBeInTheDocument()
     })
   })
 

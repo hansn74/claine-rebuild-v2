@@ -46,6 +46,15 @@ vi.mock('@/context/ShortcutContext', () => ({
   })),
 }))
 
+// Mock useThread hook (ThreadDetailView uses this)
+vi.mock('@/hooks/useThread', () => ({
+  useThread: vi.fn(() => ({
+    emails: [],
+    loading: false,
+    error: null,
+  })),
+}))
+
 // Mock attribute filter store
 vi.mock('@/store/attributeFilterStore', () => ({
   useAttributeFilterStore: vi.fn((selector) => {
@@ -75,13 +84,22 @@ vi.mock('@/hooks/useAttributes', () => ({
 
 // Mock stores used by EmailList
 vi.mock('@/store/emailStore', () => ({
-  useEmailStore: vi.fn(() => ({
-    archiveEmails: vi.fn(),
-    deleteEmails: vi.fn(),
-    markAsRead: vi.fn(),
-    markAsUnread: vi.fn(),
-    isActionLoading: false,
-  })),
+  useEmailStore: vi.fn((selector) => {
+    const state = {
+      selectedEmailId: null,
+      selectedThreadId: null,
+      setSelectedEmail: vi.fn(),
+      archiveEmails: vi.fn(),
+      archiveEmail: vi.fn(),
+      deleteEmails: vi.fn(),
+      deleteEmail: vi.fn(),
+      markAsRead: vi.fn(),
+      markAsUnread: vi.fn(),
+      toggleReadStatus: vi.fn(),
+      isActionLoading: false,
+    }
+    return selector ? selector(state) : state
+  }),
 }))
 
 vi.mock('@/store/selectionStore', () => ({
@@ -106,6 +124,31 @@ vi.mock('@/hooks/useEmailKeyboardShortcuts', () => ({
 
 vi.mock('@/hooks/useUndoAction', () => ({
   useUndoAction: vi.fn(),
+}))
+
+// Mock pre-render manager
+vi.mock('@/hooks/usePreRenderManager', () => ({
+  usePreRenderManager: vi.fn(() => ({
+    nextThreadId: null,
+    prevThreadId: null,
+    nextReady: false,
+    prevReady: false,
+    setNextReady: vi.fn(),
+    setPrevReady: vi.fn(),
+    consumeNext: vi.fn(),
+    consumePrev: vi.fn(),
+  })),
+}))
+
+// Mock compose store
+vi.mock('@/store/composeStore', () => ({
+  useComposeStore: vi.fn((selector) => {
+    const state = {
+      openComposeWithContext: vi.fn(),
+      openDraft: vi.fn(),
+    }
+    return selector ? selector(state) : state
+  }),
 }))
 
 // Mock email data

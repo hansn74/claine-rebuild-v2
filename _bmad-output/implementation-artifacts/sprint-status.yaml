@@ -86,6 +86,7 @@ development_status:
   # Correct-Course: Superhuman Analysis (2026-02-02) — Priority 2
   1-18-batched-reactive-query-triggers: done
   1-20-subsystem-health-tracking: done
+  1-21-fix-pre-existing-test-failures: done
   # Correct-Course: Superhuman Analysis (2026-02-02) — Priority 3
   1-15-adaptive-sync-polling-intervals: done
   1-16-sync-bankruptcy-detection: done
@@ -123,12 +124,12 @@ development_status:
   epic-2-retrospective: optional
 
   # Epic 3: AI Triage & Attribute Suggestions
-  epic-3: contexted
-  3-1-local-llm-integration-ollama: drafted
-  3-2-email-analysis-engine: backlog
-  3-2b-implement-ai-capability-detection-and-graceful-degradation: backlog
-  3-3-priority-scoring-model: backlog
-  3-4-priority-based-inbox-view: backlog
+  epic-3: in-progress
+  3-1-local-llm-integration-ollama: done
+  3-2-email-analysis-engine: done
+  3-2b-implement-ai-capability-detection-and-graceful-degradation: done
+  3-3-priority-scoring-model: done
+  3-4-priority-based-inbox-view: done
   3-5-explainability-ui-why-this-priority: backlog
   3-6-manual-priority-adjustment-feedback-loop: backlog
   3-7-smart-notifications-high-priority-only: backlog

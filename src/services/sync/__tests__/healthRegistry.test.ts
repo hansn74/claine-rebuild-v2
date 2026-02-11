@@ -49,7 +49,7 @@ describe('HealthRegistry', () => {
       const snapshot = registry.getSnapshot()
 
       expect(snapshot.overallState).toBe('healthy')
-      expect(snapshot.subsystems.size).toBe(6)
+      expect(snapshot.subsystems.size).toBe(7) // 6 original + 1 for AI
 
       for (const [, health] of snapshot.subsystems) {
         expect(health.state).toBe('healthy')

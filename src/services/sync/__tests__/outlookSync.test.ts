@@ -166,7 +166,7 @@ describe('OutlookSyncService', () => {
         )
       )
 
-      // Mock Graph API delta messages response
+      // Mock Graph API messages response (initial sync uses filter, not delta)
       vi.mocked(global.fetch).mockResolvedValueOnce(
         new Response(
           JSON.stringify({
@@ -174,6 +174,16 @@ describe('OutlookSyncService', () => {
               createMockGraphMessage('msg-1'),
               createMockGraphMessage('msg-2', { isRead: true }),
             ],
+          }),
+          { status: 200 }
+        )
+      )
+
+      // Mock the delta endpoint call that gets the initial deltaLink
+      vi.mocked(global.fetch).mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            value: [],
             '@odata.deltaLink':
               'https://graph.microsoft.com/v1.0/me/messages/delta?$skiptoken=abc123',
           }),
@@ -783,14 +793,16 @@ describe('OutlookSyncService', () => {
         scope: 'Mail.Read',
       })
 
-      // Mock responses for both accounts
-      for (let i = 0; i < 4; i++) {
-        if (i % 2 === 0) {
-          vi.mocked(global.fetch).mockResolvedValueOnce(
-            new Response(JSON.stringify({ value: [] }), { status: 200 })
-          )
-        } else {
-          vi.mocked(global.fetch).mockResolvedValueOnce(
+      // Use mockImplementation to handle any number of fetch calls for concurrent sync
+      // Each account makes: 1) folders, 2) messages, 3) delta endpoint = 3 calls each
+      vi.mocked(global.fetch).mockImplementation((url) => {
+        const urlString = typeof url === 'string' ? url : url.toString()
+        if (urlString.includes('/mailFolders')) {
+          // Folders endpoint
+          return Promise.resolve(new Response(JSON.stringify({ value: [] }), { status: 200 }))
+        } else if (urlString.includes('/messages/delta')) {
+          // Delta endpoint for deltaLink
+          return Promise.resolve(
             new Response(
               JSON.stringify({
                 value: [],
@@ -799,8 +811,18 @@ describe('OutlookSyncService', () => {
               { status: 200 }
             )
           )
+        } else {
+          // Messages list endpoint
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                value: [],
+              }),
+              { status: 200 }
+            )
+          )
         }
-      }
+      })
 
       // Start syncs for different accounts
       const sync1 = outlookSync.startSync('account-1')
@@ -907,12 +929,12 @@ describe('OutlookSyncService', () => {
 
       await outlookSync.startSync(testAccountId)
 
-      // Verify folder names are correctly mapped
+      // Verify folder names are correctly mapped (lowercased for consistency with Gmail)
       const inboxEmail = await db.emails?.findOne('outlook-msg-inbox').exec()
-      expect(inboxEmail?.folder).toBe('Inbox')
+      expect(inboxEmail?.folder).toBe('inbox')
 
       const sentEmail = await db.emails?.findOne('outlook-msg-sent').exec()
-      expect(sentEmail?.folder).toBe('Sent Items')
+      expect(sentEmail?.folder).toBe('sent items')
     })
   })
 })

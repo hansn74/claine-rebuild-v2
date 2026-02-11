@@ -23,6 +23,7 @@ import { ConflictIndicator } from '@/components/conflicts'
 import { PerformanceMonitor } from '@/components/dev'
 import { ComposeLoadingFallback, SearchLoadingFallback } from '@/components/common'
 import { NudgeToastContainer } from '@/components/common/NudgeToastContainer'
+import { FeedbackToastContainer } from '@/components/common/FeedbackToastContainer'
 import { WelcomeScreen } from '@/components/onboarding/WelcomeScreen'
 import { useOnboardingState } from '@/hooks/useOnboardingState'
 import { initializeReAuthNotifications } from '@/services/auth/notificationIntegration'
@@ -911,6 +912,9 @@ function App() {
 
           {/* Story 2.23: Keyboard shortcut nudge toasts (fixed position, bottom-left) */}
           <NudgeToastContainer />
+
+          {/* Story 3.6: AI learned feedback toasts (fixed position, bottom-center) */}
+          <FeedbackToastContainer />
 
           {/* Story 2.18 (AC 8): Background send result notifications */}
           {bgSendResults.length > 0 && (

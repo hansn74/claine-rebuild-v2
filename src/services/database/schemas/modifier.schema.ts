@@ -30,7 +30,7 @@ import type { ModifierDocument } from '@/services/modifiers/types'
  * - ['status', 'createdAt']: Compound index for efficient queue processing
  */
 export const modifierSchema: RxJsonSchema<ModifierDocument> = {
-  version: 1,
+  version: 0,
   primaryKey: 'id',
   type: 'object',
   properties: {

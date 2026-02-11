@@ -7,6 +7,9 @@
  * Story 3.5: Explainability UI — "Why This Priority?"
  * Task 2: Interactive badge that opens PriorityExplainPopover on click
  *
+ * Story 3.6: Manual Priority Adjustment & Feedback Loop
+ * Task 3: Pass emailId to popover for override support
+ *
  * Follows the AttributeTag pattern for consistency.
  */
 
@@ -19,7 +22,9 @@ import type { EmailDocument } from '@/services/database/schemas/email.schema'
 export interface PriorityBadgeProps {
   priority: Priority | undefined | null
   aiMetadata?: EmailDocument['aiMetadata']
+  emailId?: string
   className?: string
+  onPriorityChange?: (newPriority: Priority) => void
 }
 
 /**
@@ -30,13 +35,15 @@ export interface PriorityBadgeProps {
 export const PriorityBadge = memo(function PriorityBadge({
   priority,
   aiMetadata,
+  emailId,
   className,
+  onPriorityChange,
 }: PriorityBadgeProps) {
   const display = getPriorityDisplay(priority)
   const [isOpen, setIsOpen] = useState(false)
   const [triggerRect, setTriggerRect] = useState<DOMRect | null>(null)
 
-  const isInteractive = !!aiMetadata
+  const isInteractive = !!aiMetadata && !!emailId
 
   const handleClick = useCallback(
     (e: MouseEvent<HTMLButtonElement>) => {
@@ -109,6 +116,8 @@ export const PriorityBadge = memo(function PriorityBadge({
           priority={priority}
           triggerRect={triggerRect}
           onClose={handleClose}
+          emailId={emailId}
+          onPriorityChange={onPriorityChange}
         />
       )}
     </>

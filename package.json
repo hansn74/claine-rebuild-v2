@@ -73,6 +73,7 @@
   },
   "dependencies": {
     "@azure/msal-browser": "^4.26.2",
+    "@huggingface/transformers": "^3.8.1",
     "@microsoft/microsoft-graph-client": "^3.0.7",
     "@sentry/react": "^10.27.0",
     "@tanstack/react-virtual": "^3.13.12",

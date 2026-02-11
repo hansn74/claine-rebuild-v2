@@ -16,6 +16,7 @@ import type {
   AttributeDocument,
   MetadataDocument,
   ModifierDocument,
+  PriorityFeedbackDocument,
 } from './schemas'
 
 // Re-export MetadataDocument for convenience
@@ -55,6 +56,7 @@ export interface DatabaseCollections {
   actionQueue?: RxCollection<ActionQueueDocument>
   attributes?: RxCollection<AttributeDocument>
   modifiers?: RxCollection<ModifierDocument>
+  priorityFeedback?: RxCollection<PriorityFeedbackDocument>
 }
 
 /**

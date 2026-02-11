@@ -36,3 +36,6 @@ export { PriorityExplainPopover } from './PriorityExplainPopover'
 // Story 3.4: Priority-Based Inbox View
 export { PrioritySectionHeader } from './PrioritySectionHeader'
 export { ViewModeToggle } from './ViewModeToggle'
+
+// Story 3.6: Manual Priority Adjustment
+export { PriorityContextMenu } from './PriorityContextMenu'

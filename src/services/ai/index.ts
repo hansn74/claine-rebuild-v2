@@ -54,15 +54,6 @@ export {
   type CacheStatus,
 } from './modelCache'
 
-// Cloud fallback
-export {
-  CloudInferenceService,
-  cloudInferenceService,
-  type CloudProvider,
-  type CloudProviderConfig,
-  type CircuitState,
-} from './cloudInferenceService'
-
 // Email analysis (Story 3.2)
 export {
   extractEmailFeatures,
@@ -122,6 +113,13 @@ export {
 } from './priorityScoringService'
 
 export { setEmailPriority, clearPriorityOverride, priorityToScore } from './priorityOverride'
+
+// Priority feedback (Story 3.6)
+export {
+  priorityFeedbackService,
+  type SenderPriorityPattern,
+  type LearningInsight,
+} from './priorityFeedbackService'
 
 // Type definitions
 export type {

@@ -17,6 +17,7 @@ vi.mock('@/services/sync/healthRegistry', () => ({
   healthRegistry: {
     setDatabaseHealth: vi.fn(),
     setSearchIndexHealth: vi.fn(),
+    setAIHealth: vi.fn(),
     connectActionQueue: vi.fn(),
     connectSendQueue: vi.fn(),
     connectNetworkStatus: vi.fn(),
@@ -54,10 +55,13 @@ describe('App', () => {
     )
   })
 
-  it('renders connect email button on welcome screen', async () => {
+  it('renders email provider buttons on welcome screen', async () => {
     render(<App />)
-    // Wait for the CTA button
-    await waitFor(() => expect(screen.getByText(/Connect Email/)).toBeInTheDocument(), {
+    // Wait for the provider buttons (Gmail and Outlook)
+    await waitFor(() => expect(screen.getByText('Gmail')).toBeInTheDocument(), {
+      timeout: 10000,
+    })
+    await waitFor(() => expect(screen.getByText('Outlook')).toBeInTheDocument(), {
       timeout: 10000,
     })
   })

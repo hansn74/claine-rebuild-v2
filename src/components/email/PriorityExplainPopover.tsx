@@ -4,14 +4,19 @@
  * Story 3.5: Explainability UI — "Why This Priority?"
  * Task 1: Portal-based popover showing AI reasoning for priority assignment
  *
+ * Story 3.6: Manual Priority Adjustment & Feedback Loop
+ * Task 3: Priority picker buttons + "Reset to AI" link
+ *
  * Lightweight popover using createPortal, positioned relative to trigger.
  * Closes on Escape key or click outside.
  */
 
-import { memo, useEffect, useRef, useMemo } from 'react'
+import { memo, useEffect, useRef, useMemo, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { cn } from '@/utils/cn'
 import { getPriorityDisplay, isUserOverride, type Priority } from '@/services/ai/priorityDisplay'
+import { priorityFeedbackService } from '@/services/ai/priorityFeedbackService'
+import { clearPriorityOverride } from '@/services/ai/priorityOverride'
 import type { EmailDocument } from '@/services/database/schemas/email.schema'
 
 export interface PriorityExplainPopoverProps {
@@ -19,10 +24,14 @@ export interface PriorityExplainPopoverProps {
   priority: Priority
   triggerRect: DOMRect
   onClose: () => void
+  emailId: string
+  onPriorityChange?: (newPriority: Priority) => void
 }
 
-const POPOVER_ESTIMATED_HEIGHT = 140
+const POPOVER_ESTIMATED_HEIGHT = 200
 const POPOVER_WIDTH = 300
+
+const PRIORITY_OPTIONS: Priority[] = ['high', 'medium', 'low', 'none']
 
 /**
  * Format a timestamp as a relative time string (e.g., "2 hours ago")
@@ -51,6 +60,8 @@ export const PriorityExplainPopover = memo(function PriorityExplainPopover({
   priority,
   triggerRect,
   onClose,
+  emailId,
+  onPriorityChange,
 }: PriorityExplainPopoverProps) {
   const popoverRef = useRef<HTMLDivElement>(null)
 
@@ -96,6 +107,22 @@ export const PriorityExplainPopover = memo(function PriorityExplainPopover({
     return () => document.removeEventListener('mousedown', handleMouseDown)
   }, [onClose])
 
+  const handlePrioritySelect = useCallback(
+    async (newPriority: Priority) => {
+      if (newPriority === priority) return
+      await priorityFeedbackService.recordOverride(emailId, newPriority)
+      onPriorityChange?.(newPriority)
+      onClose()
+    },
+    [emailId, priority, onPriorityChange, onClose]
+  )
+
+  const handleResetToAI = useCallback(async () => {
+    await clearPriorityOverride(emailId)
+    onPriorityChange?.(priority)
+    onClose()
+  }, [emailId, priority, onPriorityChange, onClose])
+
   if (!display) return null
 
   const reasoning = userOverride
@@ -133,6 +160,45 @@ export const PriorityExplainPopover = memo(function PriorityExplainPopover({
 
         {/* Reasoning text */}
         <p className="text-slate-600 leading-relaxed">{reasoning}</p>
+
+        {/* Priority picker */}
+        <div className="pt-1 border-t border-slate-100">
+          <p className="text-xs text-slate-400 mb-1.5">Change priority</p>
+          <div className="flex gap-1" role="group" aria-label="Priority options">
+            {PRIORITY_OPTIONS.map((p) => {
+              const pDisplay = getPriorityDisplay(p)
+              if (!pDisplay) return null
+              const isCurrent = p === priority
+              return (
+                <button
+                  key={p}
+                  type="button"
+                  disabled={isCurrent}
+                  onClick={() => handlePrioritySelect(p)}
+                  className={cn(
+                    'flex-1 text-xs py-1 px-1.5 rounded font-medium transition-colors',
+                    isCurrent
+                      ? 'bg-slate-200 text-slate-400 cursor-default'
+                      : `${pDisplay.bgClass} ${pDisplay.textClass} hover:opacity-80 cursor-pointer`
+                  )}
+                  aria-label={`Set priority to ${pDisplay.label}`}
+                  aria-pressed={isCurrent}
+                >
+                  {pDisplay.label}
+                </button>
+              )
+            })}
+          </div>
+          {userOverride && (
+            <button
+              type="button"
+              onClick={handleResetToAI}
+              className="mt-1.5 text-xs text-blue-500 hover:text-blue-700 hover:underline"
+            >
+              Reset to AI
+            </button>
+          )}
+        </div>
 
         {/* Footer: timestamp + model */}
         <div className="flex items-center justify-between text-xs text-slate-400 pt-1 border-t border-slate-100">

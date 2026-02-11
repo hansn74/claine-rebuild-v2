@@ -81,6 +81,7 @@ export type LogCategory =
   | 'presets'
   | 'queueProcessor'
   | 'undo-hook'
+  | 'ai'
 
 /**
  * Structured log entry with metadata

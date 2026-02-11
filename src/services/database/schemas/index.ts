@@ -103,3 +103,6 @@ export type { MetadataDocument } from './metadata.schema'
 
 export { modifierSchema } from './modifier.schema'
 export type { ModifierDocument } from '@/services/modifiers/types'
+
+export { priorityFeedbackSchema } from './priorityFeedback.schema'
+export type { PriorityFeedbackDocument } from './priorityFeedback.schema'

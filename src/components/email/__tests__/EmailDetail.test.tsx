@@ -3,10 +3,17 @@
  * Tests AC4: Shows basic detail view of email
  */
 
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { EmailDetail } from '../EmailDetail'
 import type { EmailDocument } from '@/services/database/schemas/email.schema'
+
+// Mock ShortcutContext (Story 2.23: EmailDetail now sets activeScope)
+vi.mock('@/context/ShortcutContext', () => ({
+  useShortcuts: () => ({
+    setActiveScope: vi.fn(),
+  }),
+}))
 
 const mockEmail: EmailDocument = {
   id: 'email-1',

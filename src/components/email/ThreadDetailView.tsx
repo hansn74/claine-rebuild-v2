@@ -179,11 +179,12 @@ function ThreadHeader({
               {messageCount} message{messageCount !== 1 ? 's' : ''}
             </span>
           </div>
-          {/* Priority badge (Story 3.5) */}
+          {/* Priority badge (Story 3.5, 3.6) */}
           {aiMetadata?.priority && (
             <PriorityBadge
               priority={aiMetadata.priority}
               aiMetadata={aiMetadata}
+              emailId={emailId}
               className="mt-2"
             />
           )}

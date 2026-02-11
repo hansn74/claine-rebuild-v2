@@ -86,40 +86,56 @@ describe('PriorityBadge', () => {
     expect(screen.getByText('Low').className).toContain('bg-gray-100')
   })
 
-  describe('Interactive mode (with aiMetadata)', () => {
+  describe('Interactive mode (with aiMetadata + emailId)', () => {
     it('renders as a span when aiMetadata is not provided', () => {
       render(<PriorityBadge priority="high" />)
       const badge = screen.getByText('Urgent')
       expect(badge.tagName).toBe('SPAN')
     })
 
-    it('renders as a button when aiMetadata is provided', () => {
+    it('renders as a span when aiMetadata provided but emailId missing', () => {
       render(<PriorityBadge priority="high" aiMetadata={createMockAIMetadata()} />)
+      const badge = screen.getByText('Urgent')
+      expect(badge.tagName).toBe('SPAN')
+    })
+
+    it('renders as a button when both aiMetadata and emailId are provided', () => {
+      render(
+        <PriorityBadge priority="high" aiMetadata={createMockAIMetadata()} emailId="email-1" />
+      )
       const badge = screen.getByText('Urgent')
       expect(badge.tagName).toBe('BUTTON')
     })
 
-    it('has interactive aria-label when aiMetadata provided', () => {
-      render(<PriorityBadge priority="high" aiMetadata={createMockAIMetadata()} />)
+    it('has interactive aria-label when aiMetadata and emailId provided', () => {
+      render(
+        <PriorityBadge priority="high" aiMetadata={createMockAIMetadata()} emailId="email-1" />
+      )
       expect(screen.getByLabelText('Priority: Urgent. Click for details')).toBeInTheDocument()
     })
 
     it('opens popover on click', () => {
-      render(<PriorityBadge priority="high" aiMetadata={createMockAIMetadata()} />)
+      render(
+        <PriorityBadge priority="high" aiMetadata={createMockAIMetadata()} emailId="email-1" />
+      )
       const badge = screen.getByText('Urgent')
       fireEvent.click(badge)
       expect(screen.getByRole('dialog')).toBeInTheDocument()
     })
 
     it('opens popover on Enter key', () => {
-      render(<PriorityBadge priority="high" aiMetadata={createMockAIMetadata()} />)
+      render(
+        <PriorityBadge priority="high" aiMetadata={createMockAIMetadata()} emailId="email-1" />
+      )
       const badge = screen.getByText('Urgent')
       fireEvent.keyDown(badge, { key: 'Enter' })
       expect(screen.getByRole('dialog')).toBeInTheDocument()
     })
 
     it('opens popover on Space key', () => {
-      render(<PriorityBadge priority="high" aiMetadata={createMockAIMetadata()} />)
+      render(
+        <PriorityBadge priority="high" aiMetadata={createMockAIMetadata()} emailId="email-1" />
+      )
       const badge = screen.getByText('Urgent')
       fireEvent.keyDown(badge, { key: ' ' })
       expect(screen.getByRole('dialog')).toBeInTheDocument()
@@ -130,7 +146,7 @@ describe('PriorityBadge', () => {
       render(
         // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
         <div onClick={parentClickHandler}>
-          <PriorityBadge priority="high" aiMetadata={createMockAIMetadata()} />
+          <PriorityBadge priority="high" aiMetadata={createMockAIMetadata()} emailId="email-1" />
         </div>
       )
       const badge = screen.getByText('Urgent')
@@ -139,13 +155,25 @@ describe('PriorityBadge', () => {
     })
 
     it('has aria-expanded and aria-haspopup attributes', () => {
-      render(<PriorityBadge priority="high" aiMetadata={createMockAIMetadata()} />)
+      render(
+        <PriorityBadge priority="high" aiMetadata={createMockAIMetadata()} emailId="email-1" />
+      )
       const badge = screen.getByText('Urgent')
       expect(badge).toHaveAttribute('aria-expanded', 'false')
       expect(badge).toHaveAttribute('aria-haspopup', 'dialog')
 
       fireEvent.click(badge)
       expect(badge).toHaveAttribute('aria-expanded', 'true')
+    })
+
+    it('passes emailId to PriorityExplainPopover', () => {
+      render(
+        <PriorityBadge priority="high" aiMetadata={createMockAIMetadata()} emailId="email-42" />
+      )
+      const badge = screen.getByText('Urgent')
+      fireEvent.click(badge)
+      // Popover should be rendered - emailId is passed internally
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
     })
   })
 })

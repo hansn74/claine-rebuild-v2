@@ -37,6 +37,7 @@ const ALL_SUBSYSTEMS: SubsystemId[] = [
   'send-queue',
   'search-index',
   'database',
+  'ai',
 ]
 
 /** Remote subsystems affected by network status (AC 8) */
@@ -383,6 +384,13 @@ export class HealthRegistry {
    */
   setSearchIndexHealth(state: HealthState, reason?: string): void {
     this.setSignal('search-index', 'init', state, reason)
+  }
+
+  /**
+   * Set AI subsystem health (Story 3.1)
+   */
+  setAIHealth(state: HealthState, reason?: string): void {
+    this.setSignal('ai', 'init', state, reason)
   }
 
   // --- Private Methods ---

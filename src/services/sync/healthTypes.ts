@@ -16,6 +16,7 @@ export type SubsystemId =
   | 'send-queue'
   | 'search-index'
   | 'database'
+  | 'ai'
 
 /** Current health status of a subsystem (AC 1-5) */
 export interface SubsystemHealth {

@@ -14,6 +14,10 @@
  * Story 2.11: Keyboard Shortcuts & Power User Features
  * - AC 2: j/k navigation shortcuts integrated with virtualizer
  * - AC 3: Enter to open selected email
+ *
+ * Story 3.4: Priority-Based Inbox View
+ * - Priority view groups emails by priority level with collapsible sections
+ * - Chronological view preserved as default
  */
 
 import { useRef, useEffect, useCallback, useMemo } from 'react'
@@ -21,9 +25,15 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import { useEmails } from '@/hooks/useEmails'
 import { useEmailListStore } from '@/store/emailListStore'
 import { useAttributeFilterStore } from '@/store/attributeFilterStore'
+import { useViewModeStore } from '@/store/viewModeStore'
+import { usePriorityGroupedEmails } from '@/hooks/usePriorityGroupedEmails'
+import { priorityFeedbackService } from '@/services/ai/priorityFeedbackService'
 import { EmailRow } from './EmailRow'
+import { PrioritySectionHeader } from './PrioritySectionHeader'
+import { ViewModeToggle } from './ViewModeToggle'
 import { ActiveFilterChips } from './filters/ActiveFilterChips'
 import type { EmailDocument } from '@/services/database/schemas/email.schema'
+import type { Priority } from '@/services/ai/priorityDisplay'
 import { logger } from '@/services/logger'
 import { useNavigationShortcuts } from '@/hooks/useEmailShortcut'
 import { useShortcuts } from '@/context/ShortcutContext'
@@ -61,11 +71,26 @@ function getFolderType(folder: string | undefined): FolderType {
  */
 const ESTIMATED_ROW_HEIGHT = 48
 
+/** Section header height for priority view (36px = h-9) */
+const SECTION_HEADER_HEIGHT = 36
+
 /**
  * Number of rows to render outside the visible area (buffer)
  * AC 2: 20-30 rows buffer for smooth scrolling
  */
 const OVERSCAN_COUNT = 25
+
+/** Folders that support priority view (inbox-like folders only) */
+const NON_PRIORITY_FOLDERS = new Set([
+  'sent',
+  'sent mail',
+  'drafts',
+  'draft',
+  'trash',
+  'deleted',
+  'spam',
+  'junk',
+])
 
 export function VirtualEmailList({
   accountId,
@@ -91,6 +116,19 @@ export function VirtualEmailList({
     return hasFilters ? activeFilters : undefined
   }, [activeFilters, hasFilters])
 
+  // Story 3.4: Priority view state
+  const viewMode = useViewModeStore((s) => s.viewMode)
+  const collapsedSections = useViewModeStore((s) => s.collapsedSections)
+  const toggleSection = useViewModeStore((s) => s.toggleSection)
+
+  // Determine if priority view is available for this folder
+  const isPrioritySupported = useMemo(() => {
+    if (!folder) return true // "All Emails" supports priority
+    return !NON_PRIORITY_FOLDERS.has(folder.toLowerCase())
+  }, [folder])
+
+  const isPriorityMode = viewMode === 'priority' && isPrioritySupported
+
   // Story 2.11: Keyboard navigation uses selection directly (no separate focus state)
   const { setActiveScope, vimModeEnabled } = useShortcuts()
 
@@ -106,11 +144,28 @@ export function VirtualEmailList({
     enablePagination: true, // Story 2.16: Progressive loading
   })
 
+  // Story 3.4: Group emails by priority when in priority mode
+  const priorityItems = usePriorityGroupedEmails(emails, collapsedSections)
+
+  // Email-only items for keyboard navigation in priority mode (skip headers)
+  const emailOnlyItems = useMemo(() => {
+    if (!isPriorityMode) return emails
+    return priorityItems
+      .filter((item) => item.type === 'email')
+      .map((item) => (item as { type: 'email'; email: EmailDocument }).email)
+  }, [isPriorityMode, priorityItems, emails])
+
   // Configure virtualizer (AC 1, AC 2)
+  const virtualizerCount = isPriorityMode ? priorityItems.length : emails.length
   const virtualizer = useVirtualizer({
-    count: emails.length,
+    count: virtualizerCount,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => ESTIMATED_ROW_HEIGHT, // Estimated row height
+    estimateSize: (index) => {
+      if (isPriorityMode && priorityItems[index]?.type === 'header') {
+        return SECTION_HEADER_HEIGHT
+      }
+      return ESTIMATED_ROW_HEIGHT
+    },
     overscan: OVERSCAN_COUNT, // Buffer rows for smooth scrolling
     measureElement: (element) => {
       // Dynamic height measurement for varying content (AC 4)
@@ -168,34 +223,54 @@ export function VirtualEmailList({
     [onEmailSelect]
   )
 
+  // Story 3.6: Handle email drop onto priority section header
+  const handleEmailDrop = useCallback((priority: Priority | 'uncategorized') => {
+    if (priority === 'uncategorized') return
+    return (emailId: string) => {
+      priorityFeedbackService.recordOverride(emailId, priority)
+    }
+  }, [])
+
   // Find current selection index for navigation (uses actual email ID, not threadId)
+  // Story 3.4: Use emailOnlyItems so j/k skips headers in priority mode
   const currentIndex = useMemo(() => {
-    if (!selectedEmailId || emails.length === 0) return -1
-    return emails.findIndex((e) => e.id === selectedEmailId)
-  }, [selectedEmailId, emails])
+    if (!selectedEmailId || emailOnlyItems.length === 0) return -1
+    return emailOnlyItems.findIndex((e) => e.id === selectedEmailId)
+  }, [selectedEmailId, emailOnlyItems])
+
+  // Map email-only index to virtualizer index for scrollToIndex in priority mode
+  const toVirtualIndex = useCallback(
+    (emailIdx: number): number => {
+      if (!isPriorityMode) return emailIdx
+      const email = emailOnlyItems[emailIdx]
+      if (!email) return emailIdx
+      return priorityItems.findIndex((item) => item.type === 'email' && item.email.id === email.id)
+    },
+    [isPriorityMode, emailOnlyItems, priorityItems]
+  )
 
   // Story 2.11: Navigation handlers for j/k shortcuts - directly select next/previous
   const handleMoveDown = useCallback(() => {
-    if (emails.length === 0) return
+    if (emailOnlyItems.length === 0) return
     // If nothing selected, select first; otherwise select next
-    const newIndex = currentIndex < 0 ? 0 : Math.min(currentIndex + 1, emails.length - 1)
-    const email = emails[newIndex]
+    const newIndex = currentIndex < 0 ? 0 : Math.min(currentIndex + 1, emailOnlyItems.length - 1)
+    const email = emailOnlyItems[newIndex]
     selectionFromClickRef.current = true // Prevent useEffect from also scrolling
     onEmailSelect?.(email)
-    virtualizer.scrollToIndex(newIndex, { align: 'auto' })
-    logger.debug('shortcuts', 'Navigate down & select', { newIndex, total: emails.length })
-  }, [currentIndex, emails, onEmailSelect, virtualizer])
+    virtualizer.scrollToIndex(toVirtualIndex(newIndex), { align: 'auto' })
+    logger.debug('shortcuts', 'Navigate down & select', { newIndex, total: emailOnlyItems.length })
+  }, [currentIndex, emailOnlyItems, onEmailSelect, virtualizer, toVirtualIndex])
 
   const handleMoveUp = useCallback(() => {
-    if (emails.length === 0) return
+    if (emailOnlyItems.length === 0) return
     // If nothing selected, select first; otherwise select previous
     const newIndex = currentIndex < 0 ? 0 : Math.max(currentIndex - 1, 0)
-    const email = emails[newIndex]
+    const email = emailOnlyItems[newIndex]
     selectionFromClickRef.current = true // Prevent useEffect from also scrolling
     onEmailSelect?.(email)
-    virtualizer.scrollToIndex(newIndex, { align: 'auto' })
-    logger.debug('shortcuts', 'Navigate up & select', { newIndex, total: emails.length })
-  }, [currentIndex, emails, onEmailSelect, virtualizer])
+    virtualizer.scrollToIndex(toVirtualIndex(newIndex), { align: 'auto' })
+    logger.debug('shortcuts', 'Navigate up & select', { newIndex, total: emailOnlyItems.length })
+  }, [currentIndex, emailOnlyItems, onEmailSelect, virtualizer, toVirtualIndex])
 
   // Enter key - no-op since j/k already select (kept for compatibility)
   const handleSelect = useCallback(() => {
@@ -204,22 +279,22 @@ export function VirtualEmailList({
 
   // Vim mode: go to top (gg) - select first email
   const handleGoToTop = useCallback(() => {
-    if (emails.length === 0) return
-    const email = emails[0]
+    if (emailOnlyItems.length === 0) return
+    const email = emailOnlyItems[0]
     onEmailSelect?.(email)
-    virtualizer.scrollToIndex(0, { align: 'start' })
+    virtualizer.scrollToIndex(toVirtualIndex(0), { align: 'start' })
     logger.debug('shortcuts', 'Navigate to top & select (gg)')
-  }, [emails, onEmailSelect, virtualizer])
+  }, [emailOnlyItems, onEmailSelect, virtualizer, toVirtualIndex])
 
   // Vim mode: go to bottom (G) - select last email
   const handleGoToBottom = useCallback(() => {
-    if (emails.length === 0) return
-    const lastIndex = emails.length - 1
-    const email = emails[lastIndex]
+    if (emailOnlyItems.length === 0) return
+    const lastIndex = emailOnlyItems.length - 1
+    const email = emailOnlyItems[lastIndex]
     onEmailSelect?.(email)
-    virtualizer.scrollToIndex(lastIndex, { align: 'end' })
+    virtualizer.scrollToIndex(toVirtualIndex(lastIndex), { align: 'end' })
     logger.debug('shortcuts', 'Navigate to bottom & select (G)')
-  }, [emails, onEmailSelect, virtualizer])
+  }, [emailOnlyItems, onEmailSelect, virtualizer, toVirtualIndex])
 
   // Story 2.11: Register navigation shortcuts (only when in inbox scope)
   useNavigationShortcuts({
@@ -228,7 +303,7 @@ export function VirtualEmailList({
     onSelect: handleSelect,
     onGoToTop: vimModeEnabled ? handleGoToTop : undefined,
     onGoToBottom: vimModeEnabled ? handleGoToBottom : undefined,
-    enabled: emails.length > 0,
+    enabled: emailOnlyItems.length > 0,
     scopes: ['inbox'],
   })
 
@@ -245,6 +320,7 @@ export function VirtualEmailList({
 
   // Scroll to selected email only when selection changes from outside (e.g., from search)
   // Don't scroll when user clicks an email or when email data changes (e.g., mark read/unread)
+  // Story 3.4: Use priority items index when in priority mode
   useEffect(() => {
     const selectionActuallyChanged = selectedEmailId !== prevSelectedEmailIdRef.current
     prevSelectedEmailIdRef.current = selectedEmailId
@@ -255,18 +331,25 @@ export function VirtualEmailList({
       selectionActuallyChanged &&
       !selectionFromClickRef.current
     ) {
-      const index = emails.findIndex((e) => e.id === selectedEmailId)
-      if (index >= 0) {
+      let scrollIndex: number
+      if (isPriorityMode) {
+        scrollIndex = priorityItems.findIndex(
+          (item) => item.type === 'email' && item.email.id === selectedEmailId
+        )
+      } else {
+        scrollIndex = emails.findIndex((e) => e.id === selectedEmailId)
+      }
+      if (scrollIndex >= 0) {
         // Use requestAnimationFrame to ensure virtualizer has updated measurements
         // Use align: 'auto' so it only scrolls if item is outside visible area
         requestAnimationFrame(() => {
-          virtualizer.scrollToIndex(index, { align: 'auto' })
+          virtualizer.scrollToIndex(scrollIndex, { align: 'auto' })
         })
       }
     }
     // Reset the flag after processing
     selectionFromClickRef.current = false
-  }, [selectedEmailId, emails, virtualizer])
+  }, [selectedEmailId, emails, virtualizer, isPriorityMode, priorityItems])
 
   // Scroll to top when folder changes (but not when email is selected)
   useEffect(() => {
@@ -323,7 +406,10 @@ export function VirtualEmailList({
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="p-3 border-b border-slate-200 bg-slate-50 flex-shrink-0">
-        <h2 className="font-semibold text-slate-700 capitalize">{folder || 'All Emails'}</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold text-slate-700 capitalize">{folder || 'All Emails'}</h2>
+          {isPrioritySupported && <ViewModeToggle />}
+        </div>
         <span className="text-sm text-slate-500">{count} emails</span>
       </div>
 
@@ -342,6 +428,61 @@ export function VirtualEmailList({
         >
           {/* Render only visible rows + overscan buffer */}
           {virtualRows.map((virtualRow) => {
+            if (isPriorityMode) {
+              const item = priorityItems[virtualRow.index]
+              if (!item) return null
+
+              if (item.type === 'header') {
+                return (
+                  <div
+                    key={`header-${item.sectionKey}`}
+                    data-index={virtualRow.index}
+                    ref={virtualizer.measureElement}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      transform: `translateY(${virtualRow.start}px)`,
+                    }}
+                  >
+                    <PrioritySectionHeader
+                      sectionKey={item.sectionKey}
+                      priority={item.priority}
+                      count={item.count}
+                      isCollapsed={item.isCollapsed}
+                      onToggle={toggleSection}
+                      onEmailDrop={handleEmailDrop(item.priority)}
+                    />
+                  </div>
+                )
+              }
+
+              const email = item.email
+              return (
+                <div
+                  key={virtualRow.key}
+                  data-index={virtualRow.index}
+                  ref={virtualizer.measureElement}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    transform: `translateY(${virtualRow.start}px)`,
+                  }}
+                >
+                  <EmailRow
+                    email={email}
+                    isSelected={email.threadId === selectedThreadId}
+                    onClick={() => handleEmailClick(email)}
+                    draggable
+                  />
+                </div>
+              )
+            }
+
+            // Chronological mode (default)
             const email = emails[virtualRow.index]
             return (
               <div

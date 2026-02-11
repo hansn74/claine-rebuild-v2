@@ -49,7 +49,7 @@ export function EmptySearch({
   const defaultDescription = showTips ? 'Try different keywords or check your spelling' : undefined
 
   return (
-    <div className={cn('p-6 text-center', className)}>
+    <div className={cn('p-6 text-center', className)} data-testid="empty-search">
       <div className="flex justify-center mb-3">
         <div className="w-12 h-12 flex items-center justify-center rounded-full bg-slate-100">
           <Search className="w-6 h-6 text-slate-400" strokeWidth={1.5} aria-hidden="true" />
