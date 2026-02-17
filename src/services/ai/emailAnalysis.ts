@@ -106,15 +106,16 @@ const URGENCY_KEYWORDS_MEDIUM = [
 const AUTOMATED_SENDER_PATTERNS = [
   'noreply',
   'no-reply',
+  'no_reply',
   'donotreply',
   'do-not-reply',
+  'notification',
   'notifications',
   'mailer-daemon',
   'postmaster',
   'bounce',
   'automated',
   'system',
-  'alert',
   'digest',
 ]
 
@@ -174,10 +175,15 @@ export function buildAnalysisPrompt(
   const systemPrompt = `Classify this email's priority. Most emails are low priority. Respond with ONLY a JSON object, no other text.
 
 Rules:
-- "none" (score 0-20): newsletters, marketing, automated notifications, promotions, spam, noreply senders
-- "low" (score 21-40): FYI updates, receipts, shipping notices, account alerts, social media notifications
-- "medium" (score 41-70): messages from real people that need a response, meeting invites, work discussions
-- "high" (score 71-100): urgent deadlines, direct requests needing immediate action, time-sensitive from known contacts
+- "none" (score 0-20): marketing, mass newsletters, promotional offers, spam, generic automated alerts with no personal relevance (CI builds, app store reviews)
+- "low" (score 21-40): account security alerts, shipping/receipts, file shares from colleagues, calendar updates, weekly summaries, social notifications, automated messages triggered by a real person's action
+- "medium" (score 41-70): direct messages from real people needing a response, meeting invites, work discussions, code review requests, polite-deadline requests
+- "high" (score 71-100): production incidents, urgent deadlines with hard cutoffs (EOD/tomorrow), direct requests needing immediate action, executive escalations
+
+Examples:
+{"priority":"low","score":30,"reasoning":"automated Google Drive share triggered by a colleague sharing a document","signals":["automated","fyi"]}
+{"priority":"none","score":5,"reasoning":"mass promotional email with discount code and unsubscribe link","signals":["newsletter"]}
+{"priority":"medium","score":60,"reasoning":"client asking questions with a soft deadline this week","signals":["request","deadline"]}
 
 Format: {"priority":"none","score":10,"reasoning":"why","signals":["fyi"]}`
 
@@ -187,13 +193,15 @@ Format: {"priority":"none","score":10,"reasoning":"why","signals":["fyi"]}`
   parts.push(`Subject: ${features.subject}`)
   parts.push(`Recipients: ${features.recipientCount}`)
 
-  // Strong hints for the small model
-  if (features.isAutomatedSender) {
+  // Context-aware hints for the small model
+  const isNewsletter = features.contentSignals.includes('newsletter')
+  if (features.isAutomatedSender && isNewsletter) {
+    parts.push('NOTE: This is an automated newsletter/marketing email. Priority should be "none".')
+  } else if (features.isAutomatedSender) {
     parts.push(
-      'NOTE: This is from an automated/noreply sender. Priority should be "none" or "low".'
+      'NOTE: Automated sender. Person-triggered (file share, calendar, security alert) = "low". Pure automated (CI, mass alert) = "none".'
     )
-  }
-  if (features.contentSignals.includes('newsletter')) {
+  } else if (isNewsletter) {
     parts.push('NOTE: This appears to be a newsletter/marketing email. Priority should be "none".')
   }
 
@@ -210,7 +218,13 @@ Format: {"priority":"none","score":10,"reasoning":"why","signals":["fyi"]}`
   }
 
   if (features.urgencyKeywords.length > 0) {
-    parts.push(`Urgency keywords detected: ${features.urgencyKeywords.join(', ')}`)
+    if (features.isAutomatedSender) {
+      parts.push(
+        `Urgency keywords detected: ${features.urgencyKeywords.join(', ')} (automated template language — not real urgency)`
+      )
+    } else {
+      parts.push(`Urgency keywords detected: ${features.urgencyKeywords.join(', ')}`)
+    }
   }
 
   // Truncate body for prompt

@@ -54,7 +54,7 @@ export class TransformersInferenceService {
 
   /**
    * Load the text generation pipeline
-   * @param modelId Model ID to load (e.g., 'onnx-community/Llama-3.2-1B-Instruct-q4f16')
+   * @param modelId Model ID to load (e.g., 'onnx-community/Phi-3.5-mini-instruct-onnx-web')
    * @param provider Execution provider (webgpu or wasm)
    * @param onProgress Progress callback
    */

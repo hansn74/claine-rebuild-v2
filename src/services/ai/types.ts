@@ -148,7 +148,7 @@ export type InferenceErrorCode =
 export interface AIConfig {
   /** Whether AI features are enabled */
   enabled: boolean
-  /** Model ID to use (e.g., 'onnx-community/Llama-3.2-1B-Instruct-q4f16') */
+  /** Model ID to use (e.g., 'onnx-community/Phi-3.5-mini-instruct-onnx-web') */
   modelId: string
   /** Cache version for model storage */
   cacheVersion: number
@@ -236,7 +236,7 @@ export interface AIPerformanceMetrics {
  */
 export const DEFAULT_AI_CONFIG: AIConfig = {
   enabled: true,
-  modelId: 'onnx-community/Llama-3.2-1B-Instruct-q4f16',
+  modelId: 'onnx-community/Phi-3.5-mini-instruct-onnx-web',
   cacheVersion: 1,
   inferenceTimeoutMs: 30000,
 }
