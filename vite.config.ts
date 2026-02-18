@@ -16,6 +16,9 @@ export default defineConfig({
       '@workers': fileURLToPath(new URL('./src/workers', import.meta.url)),
     },
   },
+  optimizeDeps: {
+    entries: ['index.html', 'benchmark.html'],
+  },
   server: {
     port: 5154,
     strictPort: true, // Fail if port is already in use instead of auto-incrementing

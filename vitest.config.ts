@@ -8,7 +8,7 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: './src/test/setup.ts',
-    exclude: ['node_modules', 'dist', 'e2e', '**/*.spec.ts'],
+    exclude: ['node_modules', 'dist', 'e2e', '**/*.spec.ts', 'src/benchmark'],
     // Run tests sequentially to avoid RxDB's 16-collection limit in open-source version
     // Database tests create multiple collections and hit the parallel limit
     pool: 'forks',

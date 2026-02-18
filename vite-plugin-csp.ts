@@ -18,7 +18,12 @@ export function cspHeadersPlugin(): Plugin {
   return {
     name: 'csp-headers',
     configureServer(server) {
-      server.middlewares.use((_req, res, next) => {
+      server.middlewares.use((req, res, next) => {
+        // Skip CSP for benchmark page — it's dev-only and doesn't need restrictions
+        if (req.url?.startsWith('/benchmark')) {
+          next()
+          return
+        }
         // Content Security Policy
         // Allow self, Google OAuth endpoints, Microsoft OAuth endpoints, and email APIs
         res.setHeader(
